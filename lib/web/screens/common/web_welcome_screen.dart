@@ -7,7 +7,7 @@ import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/router/app_routes.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 import '../../../shared/utils/apk_downloader.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/articles/articles_service.dart';
@@ -29,8 +29,6 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     with TickerProviderStateMixin {
   late AnimationController _waveController;
   late AnimationController _heroFadeCtrl;
-  late AnimationController _navCtrl;
-  int _hoveredNav = -1;
   int _hoveredFeature = -1;
   int _hoveredStep = -1;
   bool _ctaHovered = false;
@@ -63,17 +61,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       vsync: this,
     );
 
-    _navCtrl = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
     // Start animations
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _heroFadeCtrl.forward();
-    });
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) _navCtrl.forward();
     });
   }
 
@@ -157,7 +147,6 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     _scrollController.dispose();
     _waveController.dispose();
     _heroFadeCtrl.dispose();
-    _navCtrl.dispose();
     super.dispose();
   }
 
@@ -177,42 +166,64 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            controller: _scrollController,
-            child: Column(
+          WebEcomHeader(
+            currentIndex: -1,
+            onNavigate: (index, [route]) {
+              if (route != null) {
+                context.go(route);
+              } else {
+                context.go(AppRoutes.webTabRoute(index));
+              }
+            },
+            onSearch: (query) {
+              if (query.trim().isNotEmpty) {
+                context.go(
+                  '${AppRoutes.shop}?q=${Uri.encodeComponent(query.trim())}',
+                );
+              }
+            },
+          ),
+          Expanded(
+            child: Stack(
               children: [
-                _buildNavBar(),
+                SingleChildScrollView(
+                  controller: _scrollController,
+                  child: Column(
+                    children: [
+                      _buildHeroSection(),
 
-                _buildHeroSection(),
+                      _buildStatsBar(),
 
-                _buildStatsBar(),
+                      _buildFarmingShowcaseSection(),
 
-                _buildFarmingShowcaseSection(),
+                      _buildFeaturesSection(),
 
-                _buildFeaturesSection(),
+                      _buildSanCarlosAgricultureSection(),
 
-                _buildSanCarlosAgricultureSection(),
+                      _buildDaArticlesSection(),
 
-                _buildDaArticlesSection(),
+                      _buildAppDownloadSection(),
+                      _buildHowItWorksSection(),
+                      _buildTestimonialSection(),
+                      _buildCtaSection(),
 
-                _buildAppDownloadSection(),
-                _buildHowItWorksSection(),
-                _buildTestimonialSection(),
-                _buildCtaSection(),
-
-                const AgriDirectWebFooter(),
+                      const AgriDirectWebFooter(),
+                      if (isMobile) const SizedBox(height: 80),
+                    ],
+                  ),
+                ),
+                if (isMobile && _showMobileBanner)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: _buildMobileAppBanner(),
+                  ),
               ],
             ),
           ),
-          if (isMobile && _showMobileBanner)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: _buildMobileAppBanner(),
-            ),
         ],
       ),
     );
@@ -324,174 +335,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // FLOATING NAV BAR with glassmorphism
-  // ═══════════════════════════════════════════════════════════════
-  Widget _buildNavBar() {
-    final navItems = [
-      'Home',
-      'Shop',
-      'Community',
-      'DA Articles',
-      'About Us',
-      'Find Farmer',
-      'Weather',
-    ];
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 1000;
 
-    final navRoutes = [
-      '/',
-      '/shop',
-      '/community',
-      '/articles',
-      '/about-us',
-      '/farmers-map',
-      '/weather-radar',
-    ];
-
-    return FadeTransition(
-      opacity: CurvedAnimation(parent: _navCtrl, curve: Curves.easeOut),
-      child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 32,
-          vertical: isMobile ? 12 : 16,
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 28,
-          vertical: isMobile ? 12 : 14,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AgriColors.border.withValues(alpha: 0.5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      0,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutCubic,
-                    );
-                  }
-                },
-                child: BrandLogo(
-                  size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
-                ),
-              ),
-            ),
-            if (!isMobile) ...[
-              const SizedBox(width: 48),
-              // Nav items
-              ...List.generate(navItems.length, (i) {
-                final isHovered = _hoveredNav == i;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    onEnter: (_) => setState(() => _hoveredNav = i),
-                    onExit: (_) => setState(() => _hoveredNav = -1),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (i == 0) {
-                          context.go(AppRoutes.marketplace);
-                        } else {
-                          context.go(navRoutes[i]);
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: isHovered
-                              ? AgriColors.emerald50
-                              : Colors.transparent,
-                        ),
-                        child: Text(
-                          navItems[i],
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: isHovered
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: isHovered
-                                ? AgriColors.emerald700
-                                : AgriColors.muted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-            const Spacer(),
-            // Sign In / Person Icon Button
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => context.go('/login'),
-                child: Container(
-                  width: isMobile ? 38 : 44,
-                  height: isMobile ? 38 : 44,
-                  decoration: BoxDecoration(
-                    color: AgriColors.emerald50,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AgriColors.emerald500,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: AgriColors.emerald600,
-                    size: isMobile ? 18 : 22,
-                  ),
-                ),
-              ),
-            ),
-            if (isMobile) ...[
-              const SizedBox(width: 8),
-              WebHamburgerMenuButton(
-                currentIndex: 0,
-                onNavigate: (index) {
-                  if (index == 0) {
-                    if (_scrollController.hasClients) {
-                      _scrollController.animateTo(
-                        0,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeOutCubic,
-                      );
-                    }
-                  } else if (index == 3) {
-                    context.go('/login');
-                  } else {
-                    context.go(navRoutes[index]);
-                  }
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════
   // HERO SECTION with animated waves, particles, and blobs
@@ -692,7 +536,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               _heroVisual(sw),
                             ],
                           )
-                        : _heroContent(sw),
+                        : Column(
+                            children: [
+                              _heroContent(sw),
+                              const SizedBox(height: 48),
+                              _heroVisual(sw),
+                            ],
+                          ),
                   ),
                 ),
               ),
@@ -764,7 +614,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               TextSpan(
                 text: 'Connect Directly\nWith ',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: sw < 768 ? 34 : 54,
+                  fontSize: sw < 480
+                      ? 28
+                      : (sw < 768
+                          ? 34
+                          : (sw < 1024
+                              ? 42
+                              : 54)),
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                   height: 1.1,
@@ -774,7 +630,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               TextSpan(
                 text: 'Local Farmers',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: sw < 768 ? 34 : 54,
+                  fontSize: sw < 480
+                      ? 28
+                      : (sw < 768
+                          ? 34
+                          : (sw < 1024
+                              ? 42
+                              : 54)),
                   fontWeight: FontWeight.w800,
                   color: AgriColors.emerald300,
                   height: 1.1,
@@ -902,8 +764,14 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Widget _heroVisual(double sw) {
-    final visualWidth = sw < 768 ? sw * 0.8 : 380.0;
-    final visualHeight = sw < 768 ? visualWidth * 1.1 : 420.0;
+    final visualWidth = sw < 480
+        ? (sw - 32).clamp(280.0, 360.0)
+        : (sw < 768
+            ? 340.0
+            : (sw < 1024
+                ? 330.0
+                : 380.0));
+    final visualHeight = visualWidth * 1.1;
     return SizedBox(
       width: visualWidth,
       height: visualHeight,

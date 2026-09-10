@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../constants/web_design_tokens.dart';
 
 /// Featured Local Cooperative Spotlight Card for Web Marketplace
@@ -10,6 +11,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
   final String rating;
   final int totalReviews;
   final String cropsSummary;
+  final String? avatarUrl;
   final VoidCallback onVisit;
 
   const WebFarmerSpotlightCard({
@@ -20,6 +22,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
     required this.rating,
     required this.totalReviews,
     required this.cropsSummary,
+    this.avatarUrl,
     required this.onVisit,
   });
 
@@ -45,11 +48,44 @@ class WebFarmerSpotlightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: WebDesignTokens.primaryLight,
-                child: const Icon(Icons.agriculture_rounded,
-                    color: WebDesignTokens.primaryDark, size: 28),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: WebDesignTokens.primaryLight,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: WebDesignTokens.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: avatarUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: WebDesignTokens.primary,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.agriculture_rounded,
+                            color: WebDesignTokens.primaryDark,
+                            size: 26,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.agriculture_rounded,
+                          color: WebDesignTokens.primaryDark,
+                          size: 26,
+                        ),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(

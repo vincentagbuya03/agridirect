@@ -8,12 +8,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:io';
+import 'dart:ui' as ui;
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import '../../../shared/widgets/phone_verification_dialog.dart';
-import '../../widgets/skeleton_loaders.dart';
 
 /// Displays and allows editing of user/farmer details.
 class MyDetailsScreen extends StatefulWidget {
@@ -167,25 +169,33 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _imageUrlController.text = rawImagePath;
             _freeDeliveryMinAmountController.text = (farmer['free_delivery_min_amount'] ?? '0').toString();
             _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
-            // 1. Personal Avatar is loaded from user profile
+            
+            // 1. Personal Avatar / Farm Logo is strictly loaded from image_url, logo_url, or user avatar (NEVER face_photo_path)
             final userProfile = await SupabaseDatabase.getUserProfile(userId);
-            final rawAvatarPath = (userProfile?['avatar_url'] as String?)?.trim() ?? 
-                                  (farmer['face_photo_path'] as String?)?.trim() ?? 
-                                  _auth.userAvatarUrl;
+            final rawLogoPath = (farmer['image_url'] as String?)?.trim().isNotEmpty == true
+                ? (farmer['image_url'] as String).trim()
+                : (farmer['logo_url'] as String?)?.trim().isNotEmpty == true
+                    ? (farmer['logo_url'] as String).trim()
+                    : ((userProfile?['avatar_url'] as String?)?.trim().isNotEmpty == true
+                        ? (userProfile!['avatar_url'] as String).trim()
+                        : _auth.userAvatarUrl);
+
             _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
-              rawAvatarPath,
+              rawLogoPath,
               defaultBucket: 'uploads',
             );
             await _precacheProfileImage(_farmerImageUrl);
 
-            // 2. Farm Cover Banner is loaded from farmers.image_url
-            final rawCoverPath = (farmer['image_url'] ?? '').toString().trim();
+            // 2. Farm Cover Banner is loaded ONLY from cover_url (NEVER image_url or face_photo_path)
+            final rawCoverPath = (farmer['cover_url'] as String?)?.trim() ?? '';
             if (rawCoverPath.isNotEmpty) {
               _farmerCoverUrl = await SupabaseDatabase.getSafeUrl(
                 rawCoverPath,
                 defaultBucket: 'uploads',
               );
               await _precacheProfileImage(_farmerCoverUrl);
+            } else {
+              _farmerCoverUrl = null;
             }
 
             if (updates.isNotEmpty) {
@@ -286,9 +296,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     try {
       final XFile? pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 800,
-        maxHeight: 800,
+        imageQuality: 98,
+        maxWidth: 2048,
+        maxHeight: 2048,
       );
 
       if (pickedFile == null) return;
@@ -367,10 +377,24 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             
             updateSuccessful = result.isNotEmpty;
             if (isFarmer) {
-              await SupabaseConfig.client
-                  .from('farmers')
-                  .update({'face_photo_path': dbPath})
-                  .eq('user_id', userId);
+              try {
+                await SupabaseConfig.client
+                    .from('farmers')
+                    .update({
+                      'image_url': dbPath,
+                      'logo_url': dbPath,
+                    })
+                    .eq('user_id', userId);
+              } catch (logoColErr) {
+                // If logo_url column does not exist yet, update image_url only
+                debugPrint('⚠️ logo_url column might not exist yet, updating image_url only: $logoColErr');
+                await SupabaseConfig.client
+                    .from('farmers')
+                    .update({
+                      'image_url': dbPath,
+                    })
+                    .eq('user_id', userId);
+              }
             }
           }
         } catch (dbErr) {
@@ -433,59 +457,73 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1920,
-      imageQuality: 85,
+      maxWidth: 2560,
+      maxHeight: 1440,
+      imageQuality: 98,
     );
     if (image == null) return;
 
     setState(() => _isUploadingCover = true);
     try {
-      final bytes = await image.readAsBytes();
       final ext = image.name.split('.').last;
       final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final path = 'covers/$fileName';
+      final file = File(image.path);
 
-      final resultPath = await SupabaseDatabase.uploadImage(
-        bucket: 'uploads',
-        path: path,
-        bytes: bytes,
+      // Upload file directly to Supabase Storage 'uploads' bucket
+      await SupabaseConfig.client.storage.from('uploads').upload(
+        path,
+        file,
       );
 
-      if (resultPath != null) {
-        final publicUrl = SupabaseConfig.client.storage
-            .from('uploads')
-            .getPublicUrl(path);
+      final publicUrl = SupabaseConfig.client.storage
+          .from('uploads')
+          .getPublicUrl(path);
 
-        final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
-        if (userId != null && userId.isNotEmpty) {
+      final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
+      final dbPath = 'uploads/$path';
+      if (userId != null && userId.isNotEmpty) {
+        try {
+          final coverUpdates = {
+            'cover_url': dbPath,
+          };
           if (_farmerId != null && _farmerId!.isNotEmpty) {
             await SupabaseConfig.client
                 .from('farmers')
-                .update({
-                  'image_url': path,
-                })
+                .update(coverUpdates)
                 .eq('farmer_id', _farmerId!);
           } else {
             await SupabaseConfig.client
                 .from('farmers')
-                .update({
-                  'image_url': path,
-                })
+                .update(coverUpdates)
                 .eq('user_id', userId);
           }
+        } catch (colErr) {
+          debugPrint('⚠️ Error updating cover_url: $colErr');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Kailangang i-run ang migration para sa cover_url: $colErr'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
         }
+      }
 
-        if (mounted) {
-          setState(() {
-            _farmerCoverUrl = publicUrl;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Farm cover photo updated successfully!'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        }
+      if (mounted) {
+        setState(() {
+          _farmerCoverUrl = publicUrl;
+        });
+      }
+      await _precacheProfileImage(publicUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Farm cover photo updated successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error uploading cover photo: $e');
@@ -525,16 +563,33 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           'farm_longitude': _parseCoordinate(_longitudeController.text),
           'free_delivery_min_amount': double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
         };
+        if (_imageUrlController.text.trim().isNotEmpty) {
+          farmerUpdates['image_url'] = _imageUrlController.text.trim();
+        }
         if (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty) {
-          farmerUpdates['image_url'] = _farmerCoverUrl;
+          farmerUpdates['cover_url'] = _farmerCoverUrl;
         }
 
-        var query = SupabaseConfig.client.from('farmers').update(farmerUpdates);
-
-        if (_farmerId != null && _farmerId!.isNotEmpty) {
-          await query.eq('farmer_id', _farmerId!);
-        } else {
-          await query.eq('user_id', userId);
+        try {
+          var query = SupabaseConfig.client.from('farmers').update(farmerUpdates);
+          if (_farmerId != null && _farmerId!.isNotEmpty) {
+            await query.eq('farmer_id', _farmerId!);
+          } else {
+            await query.eq('user_id', userId);
+          }
+        } catch (updateErr) {
+          if (updateErr.toString().contains('cover_url')) {
+            debugPrint('⚠️ cover_url column might not exist yet during save, retrying without it: $updateErr');
+            farmerUpdates.remove('cover_url');
+            var retryQuery = SupabaseConfig.client.from('farmers').update(farmerUpdates);
+            if (_farmerId != null && _farmerId!.isNotEmpty) {
+              await retryQuery.eq('farmer_id', _farmerId!);
+            } else {
+              await retryQuery.eq('user_id', userId);
+            }
+          } else {
+            rethrow;
+          }
         }
       } else {
         // Update customer details in users table
@@ -582,471 +637,692 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final isFarmer = _auth.isViewingAsFarmer;
+    final locale = FarmerLocaleService.instance;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        centerTitle: true,
-        title: Text(
-          isFarmer ? 'Farm Details' : 'Personal Details',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            color: AppColors.textHeadline,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: _isLoading
-          ? Padding(
-              padding: const EdgeInsets.all(20),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ProfileSkeleton(enabled: true),
-                    const SizedBox(height: 28),
-                    MetricsGridSkeleton(itemCount: 2, enabled: true),
-                  ],
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _infoKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile Image & Header Section
-                    _buildModernProfileHeader(isFarmer),
-                    const SizedBox(height: 32),
-                    const SizedBox(height: 28),
-                    // Form fields
-                    Text(
-                      isFarmer ? 'Farm Information' : 'Personal Information',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        color: AppColors.textHeadline,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Name/Farm Name field
-                    _buildTextField(
-                      controller: _nameController,
-                      label: isFarmer ? 'Farm Name' : 'Full Name',
-                      icon: Icons.business,
-                      enabled: _isEditing,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Email field (read-only)
-                    _buildTextField(
-                      controller: _emailController,
-                      label: 'Email',
-                      icon: Icons.email,
-                      enabled: false,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Phone field (Verified SMS OTP for both Farmer & Customer)
-                    _buildPhoneField(),
-                    const SizedBox(height: 16),
-
-                    if (!isFarmer) ...[
-                      _buildTextField(
-                        controller: _bioController,
-                        label: 'Bio',
-                        icon: Icons.description,
-                        enabled: _isEditing,
-                        maxLines: 3,
-                        isRequired: false,
-                      ),
-                      const SizedBox(height: 28),
-                    ],
-
-                    // Location section
-                    if (isFarmer) ...[
-                      Text(
-                        'Location Details',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: AppColors.textHeadline,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.pin_drop_outlined,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Farm Location',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.textSubtle,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _locationController.text.trim().isNotEmpty
-                                        ? _locationController.text.trim()
-                                        : 'No location detected yet',
-                                    style: GoogleFonts.inter(
-                                      color: AppColors.textHeadline,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildTextField(
-                        controller: _addressController,
-                        label: 'Residential Address',
-                        icon: Icons.home,
-                        enabled: _isEditing,
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildTextField(
-                        controller: _freeDeliveryMinAmountController,
-                        label: 'Minimum Order for Free Delivery (₱)',
-                        icon: Icons.local_shipping,
-                        enabled: _isEditing,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        isRequired: false,
-                        validator: (value) {
-                          final text = value?.trim() ?? '';
-                          if (text.isEmpty) return null;
-                          final parsed = double.tryParse(text);
-                          if (parsed == null || parsed < 0) {
-                            return 'Please enter a valid positive number';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      Text(
-                        _hasPinnedCoordinates()
-                            ? 'Pinned coordinates ready'
-                            : 'No pinned farm location yet',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: _hasPinnedCoordinates()
-                              ? AppColors.success
-                              : Colors.orange,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _isEditing ? _openFarmPinPicker : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            side: BorderSide(
-                              color: _isEditing ? AppColors.primary : Colors.grey.shade300,
-                              width: 1.5,
-                            ),
-                          ),
-                          icon: const Icon(Icons.place_rounded),
-                          label: Text(
-                            _hasPinnedCoordinates()
-                                ? 'Update Farm Pin on Map'
-                                : 'Pin Farm on Map',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                    ] else ...[
-                      // Location section removed for customers
-                      const SizedBox(height: 32),
-                    ],
-
-                    // Action buttons
-                    _buildActionButtons(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.white,
+            centerTitle: false,
+            titleSpacing: 0,
+            title: Text(
+              locale.t(isFarmer ? 'farm_details_title' : 'personal_details_title'),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                color: const Color(0xFF0F172A),
               ),
             ),
-    );
-  }
-
-  Widget _buildModernProfileHeader(bool isFarmer) {
-    final imageUrl = isFarmer ? _farmerImageUrl : _customerImageUrl;
-    final icon = isFarmer ? Icons.agriculture : Icons.person;
-    final roleText = isFarmer ? 'Verified Farm Profile' : 'Buyer Profile';
-    final name = isFarmer ? _nameController.text : _nameController.text;
-    final color = isFarmer ? AppColors.primary : Colors.blue;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              GestureDetector(
-                onTap: (_isUploadingImage || _isImagePickerActive)
-                    ? null
-                    : () {
-                        if (!_isEditing) setState(() => _isEditing = true);
-                        _uploadFarmerImage();
-                      },
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade50,
-                    border: Border.all(color: color.withValues(alpha: 0.2), width: 3),
-                  ),
-                  child: ClipOval(
-                    child: imageUrl != null && imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, _) => Container(color: Colors.grey[100]),
-                            errorWidget: (_, _, _) => Container(
-                              color: Colors.grey[100],
-                              child: Icon(icon, size: 40, color: Colors.grey.shade400),
-                            ),
-                          )
-                        : Container(
-                            color: Colors.grey[100],
-                            child: Icon(icon, size: 40, color: Colors.grey.shade400),
-                          ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: -4,
-                child: GestureDetector(
-                  onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: _isUploadingImage
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
-                  ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
+              onPressed: () => context.pop(),
+            ),
+            actions: const [
+              Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: Center(
+                  child: FarmerLanguageToggle(compact: true),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            name.isNotEmpty ? name : 'My Profile',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textHeadline,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(isFarmer ? Icons.verified_rounded : Icons.shopping_bag_rounded, size: 14, color: color),
-                const SizedBox(width: 6),
-                Text(
-                  roleText,
-                  style: GoogleFonts.inter(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+          bottomNavigationBar: _buildBottomActionBar(locale),
+          body: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 40),
+                  child: Form(
+                    key: _infoKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Zone 1: Unified Storefront Showcase Header (Edge-to-Edge Banner & Logo)
+                        _buildHeroStoreCard(isFarmer, locale),
+
+                        // Zone 2: Padded Bento Content Area
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              _buildFarmCredentialsCard(isFarmer, locale),
+                              if (isFarmer) ...[
+                                const SizedBox(height: 16),
+                                _buildFarmLogisticsCard(locale),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ),
+        );
+      },
+    );
+  }
+
+  /// Modern Store Showcase Header featuring an edge-to-edge banner with frosted
+  /// glass action pill, floating circular avatar, and credentials badge cluster.
+  Widget _buildHeroStoreCard(bool isFarmer, FarmerLocaleService locale) {
+    if (!isFarmer) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildAvatarWithCameraBadge(
+              imageUrl: _customerImageUrl,
+              icon: Icons.person_rounded,
+              isUploading: _isUploadingImage,
+              onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Buyer Profile',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.shopping_bag_rounded, size: 14, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 5),
+                  Text(
+                    locale.t('buyer_profile'),
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF1D4ED8),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final farmName = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : 'My Farm Store';
+    final location = _locationController.text.trim();
+    final barangayOnly = location.isNotEmpty
+        ? location.split(',').first.trim()
+        : '';
+
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      child: Column(
+        children: [
+          // 1. Edge-to-Edge Store Banner (Height: 185px)
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _isUploadingCover ? null : _uploadFarmerCover,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 185,
+                  child: _farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: _farmerCoverUrl!,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                              placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
+                              errorWidget: (_, _, _) => _buildCoverFallback(locale),
+                            ),
+                            // Ambient gradient scrim for high contrast
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.35),
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.5),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : _buildCoverFallback(locale),
+                ),
+              ),
+
+              // Glassmorphic 'Palitan ang Cover' Pill (Top-Right)
+              Positioned(
+                top: 14,
+                right: 14,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _isUploadingCover ? null : _uploadFarmerCover,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isUploadingCover)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            else
+                              const Icon(Icons.photo_camera_rounded, size: 14, color: Colors.white),
+                            const SizedBox(width: 6),
+                            Text(
+                              _isUploadingCover ? locale.t('uploading_cover') : locale.t('change_cover'),
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Overlapping Farm Avatar (Centered, 50px overlap)
+              Positioned(
+                bottom: -50,
+                child: _buildAvatarWithCameraBadge(
+                  imageUrl: _farmerImageUrl,
+                  icon: Icons.agriculture_rounded,
+                  isUploading: _isUploadingImage,
+                  onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 58), // Clear the overlapping avatar
+
+          // Farm Name & Status Badges
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              children: [
+                Text(
+                  farmName,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Badges Cluster Row
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    // Verified Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF059669)),
+                          const SizedBox(width: 5),
+                          Text(
+                            locale.t('verified_farm_profile'),
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF047857),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Active Store Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF22C55E),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            locale.t('active_store_badge'),
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF15803D),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Location Chip (if available)
+                    if (barangayOnly.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on_rounded, size: 13, color: Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Text(
+                              barangayOnly,
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF475569),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
-          if (isFarmer) ...[
-            const SizedBox(height: 20),
-            const Divider(color: Color(0xFFF1F5F9), height: 1),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        ],
+      ),
+    );
+  }
+
+  /// Rich biophilic background for empty cover state with organic concentric rings
+  Widget _buildCoverFallback(FarmerLocaleService locale) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF044E3A), Color(0xFF065F46), Color(0xFF059669)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Subtle decorative circular watermarks
+          Positioned(
+            right: -25,
+            top: -25,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 2),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -35,
+            bottom: -35,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 2),
+              ),
+            ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                ),
+                child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 26),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                locale.t('tap_to_change_cover'),
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                locale.t('no_cover_yet'),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarWithCameraBadge({
+    required String? imageUrl,
+    required IconData icon,
+    required bool isUploading,
+    required VoidCallback? onTap,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 98,
+          height: 98,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+            border: Border.all(color: Colors.white, width: 4),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                    placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
+                    errorWidget: (_, _, _) => Container(
+                      color: const Color(0xFFF1F5F9),
+                      child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                    ),
+                  )
+                : Container(
+                    color: const Color(0xFFF1F5F9),
+                    child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                  ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x40F59E0B),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: isUploading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Bento Card 1: Core Farm Credentials and Contact
+  Widget _buildFarmCredentialsCard(bool isFarmer, FarmerLocaleService locale) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 14,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.storefront_rounded, size: 20, color: Color(0xFF047857)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Farm Cover Banner',
+                      locale.t(isFarmer ? 'farm_info_title' : 'personal_info_title'),
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textHeadline,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Banner photo on your store page',
+                      locale.t('store_credentials_subtitle'),
                       style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: AppColors.textSubtle,
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                OutlinedButton.icon(
-                  onPressed: _isUploadingCover ? null : _uploadFarmerCover,
-                  icon: _isUploadingCover
-                      ? const SizedBox(
-                          width: 13,
-                          height: 13,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                        )
-                      : const Icon(Icons.camera_alt_rounded, size: 14),
-                  label: Text(
-                    _isUploadingCover ? 'Uploading...' : 'Change Cover',
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildTextField(
+            controller: _nameController,
+            label: locale.t(isFarmer ? 'farm_name_label' : 'full_name_label'),
+            icon: isFarmer ? Icons.storefront_rounded : Icons.person_outline_rounded,
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 14),
+
+          // Security read-only Email field
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: const Icon(Icons.alternate_email_rounded, size: 18, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        locale.t('email_label'),
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _emailController.text.trim().isNotEmpty
+                            ? _emailController.text.trim()
+                            : 'No email registered',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_rounded, size: 12, color: Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Text(
+                        locale.t('protected_field'),
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: _farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: _farmerCoverUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => Container(color: Colors.grey[100]),
-                        errorWidget: (_, _, _) => Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF064E3B), Color(0xFF047857)],
-                            ),
-                          ),
-                          child: const Center(
-                            child: Icon(Icons.landscape_rounded, color: Colors.white38, size: 32),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF064E3B), Color(0xFF047857)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.add_photo_alternate_rounded, color: Colors.white60, size: 28),
-                              const SizedBox(height: 6),
-                              Text(
-                                'No cover photo uploaded yet\nTap "Change Cover" to add one',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
+          ),
+          const SizedBox(height: 14),
+
+          // Zero-truncation Phone Field
+          _buildPhoneField(locale),
+
+          if (!isFarmer) ...[
+            const SizedBox(height: 14),
+            _buildTextField(
+              controller: _bioController,
+              label: 'Bio',
+              icon: Icons.description_outlined,
+              enabled: _isEditing,
+              maxLines: 3,
+              isRequired: false,
             ),
           ],
         ],
@@ -1054,84 +1330,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required bool enabled,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    bool isRequired = true,
-    String? Function(String?)? validator,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: enabled ? Colors.white : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
-      ),
-      child: TextFormField(
-        controller: controller,
-        enabled: enabled,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w600,
-          color: enabled ? AppColors.textHeadline : Colors.grey.shade600,
-          fontSize: 14,
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.inter(
-            color: Colors.grey.shade500,
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Icon(icon, color: enabled ? AppColors.primary : Colors.grey.shade400, size: 22),
-          filled: true,
-          fillColor: Colors.transparent,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: Colors.transparent),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        validator: (value) {
-          if (!enabled) return null;
-
-          if (validator != null) {
-            return validator(value);
-          }
-
-          if (isRequired && (value?.trim().isEmpty ?? true)) {
-            return 'This field cannot be empty';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  Widget _buildPhoneField() {
+  /// Zero-truncation phone credentials card with stacked layout
+  Widget _buildPhoneField(FarmerLocaleService locale) {
     final authUser = SupabaseConfig.client.auth.currentUser;
     var phone = _phoneController.text.trim();
     if (phone.isEmpty) {
@@ -1140,191 +1340,512 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final hasPhone = phone.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Icon + Label (Full Text) + Badge
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.phone_android_rounded,
+                  color: Color(0xFF059669),
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  locale.t('phone_label'),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: hasPhone ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: hasPhone ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  hasPhone ? locale.t('phone_verified_badge') : locale.t('phone_unverified_badge'),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: hasPhone ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Bottom Row: Full Number + Action Button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  hasPhone ? phone : locale.t('phone_empty'),
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: hasPhone ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final success = await PhoneVerificationDialog.show(
+                    context,
+                    initialPhone: phone,
+                  );
+                  if (success == true && mounted) {
+                    _loadDetails();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFECFDF5),
+                  foregroundColor: const Color(0xFF047857),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFFA7F3D0), width: 1.2),
+                  ),
+                ),
+                child: Text(
+                  hasPhone ? locale.t('phone_update_btn') : locale.t('phone_verify_btn'),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.phone_iphone_rounded,
-              color: Color(0xFF059669),
-              size: 22,
-            ),
+    );
+  }
+
+  /// Bento Card 2: Location, GPS Map Pin, and Delivery Logistics
+  Widget _buildFarmLogisticsCard(FarmerLocaleService locale) {
+    final hasPin = _hasPinnedCoordinates();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 14,
+            offset: Offset(0, 3),
           ),
-          const SizedBox(width: 14),
-          Expanded(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.local_shipping_rounded, size: 20, color: Color(0xFF047857)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      locale.t('location_logistics_title'),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      locale.t('logistics_subtitle'),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildTextField(
+            controller: _addressController,
+            label: locale.t('residential_address_label'),
+            icon: Icons.home_work_outlined,
+            enabled: _isEditing,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 14),
+
+          // Interactive Map Pin Preview Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: hasPin ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasPin ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Mobile Number',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF64748B),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: hasPin ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        hasPin ? Icons.place_rounded : Icons.location_off_rounded,
+                        size: 22,
+                        color: hasPin ? const Color(0xFF047857) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            locale.t('map_pin_title'),
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasPin
+                                ? (_locationController.text.trim().isNotEmpty
+                                    ? _locationController.text.trim()
+                                    : locale.t('pinned_ready'))
+                                : locale.t('pinned_empty'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: hasPin ? const Color(0xFF047857) : const Color(0xFF64748B),
+                              fontWeight: hasPin ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  hasPhone
-                      ? () {
-                          final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
-                          if (digits.length >= 10) {
-                            final last10 = digits.substring(digits.length - 10);
-                            return '+63 ${last10.substring(0, 3)} ${last10.substring(3, 6)} ${last10.substring(6)}';
-                          }
-                          return phone;
-                        }()
-                      : 'No phone linked',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: hasPhone
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFF94A3B8),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: _isEditing ? _openFarmPinPicker : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF047857),
+                      backgroundColor: Colors.white,
+                      disabledForegroundColor: const Color(0xFF94A3B8),
+                      side: BorderSide(
+                        color: _isEditing ? const Color(0xFF059669) : const Color(0xFFCBD5E1),
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.map_rounded, size: 16),
+                    label: Text(
+                      hasPin ? locale.t('update_pin_btn') : locale.t('pin_on_map_btn'),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final success = await PhoneVerificationDialog.show(
-                context,
-                initialPhone: _phoneController.text,
-                onVerified: (verifiedPhone) {
-                  setState(() {
-                    _phoneController.text = verifiedPhone;
-                  });
-                },
-              );
-              if (success && mounted) {
-                _loadDetails();
-              }
+          const SizedBox(height: 14),
+          _buildTextField(
+            controller: _freeDeliveryMinAmountController,
+            label: locale.t('free_delivery_min_label'),
+            icon: Icons.local_shipping_rounded,
+            enabled: _isEditing,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            isRequired: false,
+            helperText: locale.t('free_delivery_hint'),
+            validator: (value) {
+               final text = value?.trim() ?? '';
+               if (text.isEmpty) return null;
+               final parsed = double.tryParse(text);
+               if (parsed == null || parsed < 0) {
+                 return 'Please enter a valid positive number';
+               }
+               return null;
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFECFDF5),
-              foregroundColor: const Color(0xFF059669),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0xFFA7F3D0)),
-              ),
-            ),
-            child: Text(
-              hasPhone ? 'Update' : 'Verify',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
-    if (!_isEditing) {
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton.icon(
-          onPressed: () => setState(() => _isEditing = true),
-          icon: const Icon(Icons.edit_rounded, color: Colors.white),
-          label: Text(
-            'Edit Details',
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
+  /// Docked bottom action bar providing immediate access to Edit, Save, and Cancel
+  Widget _buildBottomActionBar(FarmerLocaleService locale) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 16,
+            offset: Offset(0, -4),
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
+        ],
+      ),
+      child: !_isEditing
+          ? Container(
+              width: double.infinity,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF059669), Color(0xFF047857)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33059669),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: () => setState(() => _isEditing = true),
+                icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  locale.t('edit_details_btn'),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            )
+          : Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        _loadDetails();
+                        setState(() => _isEditing = false);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: Text(
+                        locale.t('cancel_btn'),
+                        style: GoogleFonts.plusJakartaSans(
+                           fontWeight: FontWeight.w700,
+                           fontSize: 14,
+                           color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF059669), Color(0xFF047857)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33059669),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveDetails,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              locale.t('save_details_btn'),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            elevation: 0,
-          ),
-        ),
-      );
-    }
+    );
+  }
 
-    return Row(
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool enabled,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    bool isRequired = true,
+    String? helperText,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () {
-              _loadDetails();
-              setState(() => _isEditing = false);
-            },
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              side: BorderSide(color: Colors.grey.shade300, width: 1.5),
-            ),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSubtle,
-              ),
-            ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF334155),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _isSaving ? null : _saveDetails,
-            icon: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: AppShimmerLoader(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check_rounded, color: Colors.white),
-            label: Text(
-              _isSaving ? 'Saving...' : 'Save',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          enabled: enabled,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: enabled ? const Color(0xFF0F172A) : const Color(0xFF475569),
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF8FAFC),
+            prefixIcon: Icon(icon, size: 20, color: enabled ? const Color(0xFF059669) : const Color(0xFF94A3B8)),
+            prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            helperText: helperText,
+            helperStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              disabledBackgroundColor: Colors.grey[300],
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              elevation: 0,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF059669), width: 1.8),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
             ),
           ),
+          validator: validator ?? (value) {
+            if (isRequired && (value == null || value.trim().isEmpty)) {
+              return 'This field cannot be empty';
+            }
+            return null;
+          },
         ),
       ],
     );
   }
 
-  double? _parseCoordinate(String value) {
+  double? _parseCoordinate(String? value) {
+    if (value == null) return null;
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
     return double.tryParse(trimmed);

@@ -16,6 +16,7 @@ CREATE TABLE public.users (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
+CREATE UNIQUE INDEX idx_users_unique_active_phone ON public.users (phone) WHERE phone IS NOT NULL AND trim(phone) != '';
 CREATE TABLE public.roles (
   name text NOT NULL UNIQUE,
   role_id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -38,6 +39,8 @@ CREATE TABLE public.farmers (
   specialty text,
   location text,
   badge text,
+  logo_url text,
+  cover_url text,
   image_url text,
   farmer_id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone DEFAULT now(),

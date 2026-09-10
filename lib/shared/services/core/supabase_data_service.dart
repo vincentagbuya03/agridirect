@@ -1,6 +1,8 @@
+import 'package:agridirect/shared/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'supabase_config.dart';
@@ -375,8 +377,8 @@ class SupabaseDataService {
 
   /// Watch farmer's own products in real-time
   Stream<List<Map<String, dynamic>>> watchFarmerProducts() async* {
-    final userId = SupabaseConfig.currentUser?.id;
-    if (userId == null) {
+    final userId = SupabaseConfig.currentUser?.id ?? AuthService().userId;
+    if (userId.isEmpty) {
       yield [];
       return;
     }
@@ -398,22 +400,26 @@ class SupabaseDataService {
     // Yield initial data
     yield await getFarmerProducts();
 
-    // Listen for changes in products table
-    final productStream = _client
-        .from('products')
-        .stream(primaryKey: ['product_id'])
-        .eq('farmer_id', farmerId);
+    try {
+      // Listen for changes in products table
+      final productStream = _client
+          .from('products')
+          .stream(primaryKey: ['product_id'])
+          .eq('farmer_id', farmerId);
 
-    await for (final _ in productStream) {
-      yield await getFarmerProducts();
+      await for (final _ in productStream) {
+        yield await getFarmerProducts();
+      }
+    } catch (streamErr) {
+      debugPrint('⚠️ Error or timeout in product realtime stream: $streamErr');
     }
   }
 
   /// Get farmer's own products (for inventory management)
   Future<List<Map<String, dynamic>>> getFarmerProducts() async {
     try {
-      final userId = SupabaseConfig.currentUser?.id;
-      if (userId == null) return [];
+      final userId = SupabaseConfig.currentUser?.id ?? AuthService().userId;
+      if (userId.isEmpty) return [];
 
       // First, get the farmer_id for this user
       final farmerResponse = await _client
@@ -429,62 +435,67 @@ class SupabaseDataService {
 
       final farmerId = farmerResponse['farmer_id'] as String;
 
-      // Get products from v_products view with units joined
+      // Get products directly from v_products view (which already exposes unit_abbr, stock_quantity, and image_url)
       final response = await _client
           .from('v_products')
-          .select('''
-            product_id,
-            name,
-            description,
-            price,
-            harvest_days,
-            is_preorder,
-            is_free_shipping,
-            is_wholesale,
-            is_flash_sale,
-            discount_percent,
-            flash_sale_start,
-            flash_sale_end,
-            farmer_id,
-            category_id,
-            unit_id,
-            created_at,
-            units(abbreviation, name)
-          ''')
+          .select()
           .eq('farmer_id', farmerId)
           .order('created_at', ascending: false);
 
-      // Now get images and inventory for each product
       List<Map<String, dynamic>> productsWithImages = [];
 
       for (var item in response) {
         final productId = item['product_id'] as String;
 
-        // Get first/primary image
-        final imageResponse = await _client
-            .from('product_images')
-            .select('image_url')
-            .eq('product_id', productId)
-            .order('sort_order', ascending: true)
-            .limit(1)
-            .maybeSingle();
+        // Primary image from v_products or fallback to product_images
+        String imageUrl = (item['image_url'] as String?)?.trim() ?? '';
+        if (imageUrl.isEmpty) {
+          try {
+            final imageResponse = await _client
+                .from('product_images')
+                .select('image_url')
+                .eq('product_id', productId)
+                .order('sort_order', ascending: true)
+                .limit(1)
+                .maybeSingle();
+            imageUrl = (imageResponse?['image_url'] as String?)?.trim() ?? '';
+          } catch (_) {}
+        }
 
-        // Get inventory information
-        final inventoryResponse = await _client
-            .from('product_inventory')
-            .select('available_quantity, reserved_quantity')
-            .eq('product_id', productId)
-            .maybeSingle();
+        // Available quantity from v_products stock_quantity or product_inventory
+        double availableQuantity =
+            (item['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+        double reservedQuantity = 0.0;
 
-        final price = (item['price'] as num?)?.toDouble() ?? 0;
-        final unitData = item['units'] as Map?;
-        final unitAbbr = (unitData?['abbreviation'] as String?) ?? 'kg';
-        final availableQuantity =
-            (inventoryResponse?['available_quantity'] as num?)?.toDouble() ?? 0;
-        final reservedQuantity =
-            (inventoryResponse?['reserved_quantity'] as num?)?.toDouble() ?? 0;
+        try {
+          final inventoryResponse = await _client
+              .from('product_inventory')
+              .select('available_quantity, reserved_quantity')
+              .eq('product_id', productId)
+              .maybeSingle();
+
+          if (inventoryResponse != null) {
+            availableQuantity =
+                (inventoryResponse['available_quantity'] as num?)?.toDouble() ??
+                availableQuantity;
+            reservedQuantity =
+                (inventoryResponse['reserved_quantity'] as num?)?.toDouble() ??
+                0.0;
+          }
+        } catch (_) {}
+
+        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
+        final unitAbbr =
+            (item['unit_abbr'] as String?) ??
+            (item['units'] is Map
+                ? (item['units']['abbreviation'] as String?)
+                : null) ??
+            'kg';
 
         String status = 'IN STOCK';
+        if (availableQuantity <= 0) {
+          status = 'OUT OF STOCK';
+        }
 
         productsWithImages.add({
           'id': productId,
@@ -493,6 +504,7 @@ class SupabaseDataService {
           'description': item['description'] ?? '',
           'price': price,
           'unit': unitAbbr,
+          'unit_name': item['unit_name'] ?? '',
           'available': availableQuantity,
           'available_quantity': availableQuantity,
           'reserved_quantity': reservedQuantity,
@@ -511,8 +523,10 @@ class SupabaseDataService {
           'flash_sale_start': item['flash_sale_start'],
           'flash_sale_end': item['flash_sale_end'],
           'status': status,
-          'image': imageResponse?['image_url'] ?? '',
+          'image': imageUrl,
+          'image_url': imageUrl,
           'category_id': item['category_id'],
+          'category_name': item['category_name'],
           'unit_id': item['unit_id'],
           'created_at': item['created_at']?.toString(),
         });
@@ -643,7 +657,9 @@ class SupabaseDataService {
     // Mapping based on category name keywords
     final name = categoryName.toLowerCase();
 
-    if (name.contains('vegetable') || name.contains('veggie') || name.contains('greens')) {
+    if (name.contains('vegetable') ||
+        name.contains('veggie') ||
+        name.contains('greens')) {
       return Icons.eco_rounded.codePoint;
     }
     if (name.contains('fruit')) {
@@ -659,19 +675,29 @@ class SupabaseDataService {
         name.contains('cheese')) {
       return Icons.water_drop_rounded.codePoint;
     }
-    if (name.contains('poultry') || name.contains('chicken') || name.contains('egg')) {
+    if (name.contains('poultry') ||
+        name.contains('chicken') ||
+        name.contains('egg')) {
       return Icons.egg_alt_rounded.codePoint;
     }
-    if (name.contains('livestock') || name.contains('meat') || name.contains('pork') || name.contains('beef')) {
+    if (name.contains('livestock') ||
+        name.contains('meat') ||
+        name.contains('pork') ||
+        name.contains('beef')) {
       return Icons.pets_rounded.codePoint;
     }
     if (name.contains('herb') || name.contains('spice')) {
       return Icons.spa_rounded.codePoint;
     }
-    if (name.contains('root') || name.contains('tuber') || name.contains('cassava') || name.contains('camote')) {
+    if (name.contains('root') ||
+        name.contains('tuber') ||
+        name.contains('cassava') ||
+        name.contains('camote')) {
       return Icons.agriculture_rounded.codePoint;
     }
-    if (name.contains('fish') || name.contains('seafood') || name.contains('marine')) {
+    if (name.contains('fish') ||
+        name.contains('seafood') ||
+        name.contains('marine')) {
       return Icons.set_meal_rounded.codePoint;
     }
 
@@ -681,22 +707,31 @@ class SupabaseDataService {
   int _getCategoryColor(String categoryName, {required bool isBackground}) {
     final name = categoryName.toLowerCase();
 
-    if (name.contains('vegetable') || name.contains('veggie') || name.contains('greens')) {
+    if (name.contains('vegetable') ||
+        name.contains('veggie') ||
+        name.contains('greens')) {
       return isBackground ? 0xFFDCFCE7 : 0xFF10B981; // Green
     }
     if (name.contains('fruit')) {
       return isBackground ? 0xFFFFEDD5 : 0xFFEA580C; // Coral Orange
     }
-    if (name.contains('grain') || name.contains('rice') || name.contains('corn')) {
+    if (name.contains('grain') ||
+        name.contains('rice') ||
+        name.contains('corn')) {
       return isBackground ? 0xFFFEF9C3 : 0xFFCA8A04; // Harvest Gold
     }
     if (name.contains('root') || name.contains('tuber')) {
       return isBackground ? 0xFFFFEDD5 : 0xFFC2410C; // Terracotta / Earthy
     }
-    if (name.contains('poultry') || name.contains('chicken') || name.contains('egg')) {
+    if (name.contains('poultry') ||
+        name.contains('chicken') ||
+        name.contains('egg')) {
       return isBackground ? 0xFFFEF3C7 : 0xFFD97706; // Sunny Amber
     }
-    if (name.contains('livestock') || name.contains('meat') || name.contains('pork') || name.contains('beef')) {
+    if (name.contains('livestock') ||
+        name.contains('meat') ||
+        name.contains('pork') ||
+        name.contains('beef')) {
       return isBackground ? 0xFFFFE4E6 : 0xFFBE123C; // Rose Ruby
     }
     if (name.contains('herb') || name.contains('spice')) {
@@ -705,7 +740,9 @@ class SupabaseDataService {
     if (name.contains('fish') || name.contains('seafood')) {
       return isBackground ? 0xFFE0F2FE : 0xFF0284C7; // Ocean Cyan
     }
-    if (name.contains('dairy') || name.contains('milk') || name.contains('cheese')) {
+    if (name.contains('dairy') ||
+        name.contains('milk') ||
+        name.contains('cheese')) {
       return isBackground ? 0xFFDBEAFE : 0xFF2563EB; // Sky Blue
     }
     if (name.contains('organic')) {
@@ -937,9 +974,11 @@ class SupabaseDataService {
         : null;
 
     final now = DateTime.now();
-    final bool isFlash = item['is_flash_sale'] == true &&
+    final bool isFlash =
+        item['is_flash_sale'] == true &&
         (flashEnd == null || flashEnd.isAfter(now)) &&
-        (flashStart == null || flashStart.isBefore(now.add(const Duration(minutes: 1))));
+        (flashStart == null ||
+            flashStart.isBefore(now.add(const Duration(minutes: 1))));
 
     double discountPercent =
         (item['discount_percent'] as num?)?.toDouble() ?? 0.0;
@@ -959,14 +998,15 @@ class SupabaseDataService {
       displayPriceStr = '\u20B1${discountedPrice.toStringAsFixed(0)}';
       origPriceStr = '\u20B1${rawPrice.toStringAsFixed(0)}';
 
-      final double stock =
-          (item['stock_quantity'] as num?)?.toDouble() ?? 50.0;
+      final double stock = (item['stock_quantity'] as num?)?.toDouble() ?? 50.0;
       if (soldCount == null) {
         final seed = (item['product_id']?.toString().hashCode ?? 0).abs();
         soldCount = 5 + (seed % 30);
       }
-      claimPercent ??=
-          ((soldCount / (soldCount + stock)) * 100).clamp(15.0, 95.0);
+      claimPercent ??= ((soldCount / (soldCount + stock)) * 100).clamp(
+        15.0,
+        95.0,
+      );
     }
 
     return ProductItem(
@@ -1176,8 +1216,9 @@ class SupabaseDataService {
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
-      final products =
-          enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      final products = enrichedItems
+          .map((item) => _mapToProductItem(item))
+          .toList();
       return products.where((p) => p.isFlashSale).toList();
     } catch (e) {
       debugPrint('Error fetching flash sale products: $e');
@@ -1233,7 +1274,7 @@ class SupabaseDataService {
             final rawAvatar =
                 (fData['image_url']?.toString().trim().isNotEmpty == true)
                 ? fData['image_url']
-                : fData['face_photo_path'];
+                : fData['logo_url'];
             fData['avatar_url'] = rawAvatar;
             if (fid.isNotEmpty) farmerMap[fid] = fData;
             if (uid.isNotEmpty) farmerMap[uid] = fData;
@@ -1355,7 +1396,7 @@ class SupabaseDataService {
             final rawAvatar =
                 (fData['image_url']?.toString().trim().isNotEmpty == true)
                 ? fData['image_url']
-                : fData['face_photo_path'];
+                : fData['logo_url'];
             fData['avatar_url'] = rawAvatar;
             if (fid.isNotEmpty) farmerMap[fid] = fData;
             if (uid.isNotEmpty) farmerMap[uid] = fData;
@@ -1393,7 +1434,7 @@ class SupabaseDataService {
               final rawAvatar =
                   (fData['image_url']?.toString().trim().isNotEmpty == true)
                   ? fData['image_url']
-                  : fData['face_photo_path'];
+                  : fData['logo_url'];
               fData['avatar_url'] = rawAvatar;
               if (fid.isNotEmpty) farmerMap[fid] = fData;
               if (uid.isNotEmpty) farmerMap[uid] = fData;
@@ -2713,7 +2754,10 @@ class SupabaseDataService {
               .order('created_at', ascending: false)
               .limit(20);
         } catch (_) {
-          response = await _client.from('farmers').select('*, users(avatar_url, name)').limit(20);
+          response = await _client
+              .from('farmers')
+              .select('*, users(avatar_url, name)')
+              .limit(20);
         }
       }
 
@@ -2725,33 +2769,33 @@ class SupabaseDataService {
       final farmers = rows.map((item) {
         final userObj = item['users'] as Map<String, dynamic>?;
 
-        // Avatar / Farm Logo (avatar_url from users table, fallback to face_photo_path)
-        final rawAvatar = (userObj?['avatar_url'] ??
-                item['avatar_url'] ??
-                item['face_photo_path'] ??
-                item['profile_picture'] ??
-                item['profile_image_url'])
-            ?.toString();
+        // Avatar / Farm Logo (image_url is the logo, with fallback to logo_url or user avatar, NEVER face_photo_path)
+        final rawAvatar =
+            (item['image_url'] ??
+                    item['logo_url'] ??
+                    userObj?['avatar_url'] ??
+                    item['avatar_url'] ??
+                    item['profile_image_url'])
+                ?.toString();
         final avatarUrl = _resolveImageUrl(rawAvatar);
 
-        // Farm Cover Photo (strictly image_url on farmers table)
-        final rawCoverPath = (item['image_url'] ??
-                item['cover_image_url'] ??
-                item['cover_url'] ??
-                item['farm_photo_path'] ??
-                item['farm_image_url'] ??
-                item['farm_banner_url'] ??
-                item['banner_url'])
-            ?.toString();
+        // Farm Cover Photo (strictly cover_url or banner_url)
+        final rawCoverPath =
+            (item['cover_url'] ??
+                    item['cover_image_url'] ??
+                    item['farm_banner_url'] ??
+                    item['banner_url'])
+                ?.toString();
         String? resolvedCover = _resolveImageUrl(rawCoverPath);
 
         // If cover is duplicate of avatar/face photo, clear it
-        final isAvatarDuplicate = resolvedCover != null &&
+        final isAvatarDuplicate =
+            resolvedCover != null &&
             ((avatarUrl != null && resolvedCover == avatarUrl) ||
-             resolvedCover.toLowerCase().contains('face_photo') ||
-             resolvedCover.toLowerCase().contains('avatar') ||
-             resolvedCover.toLowerCase().contains('profile_picture') ||
-             resolvedCover.toLowerCase().contains('selfie'));
+                resolvedCover.toLowerCase().contains('face_photo') ||
+                resolvedCover.toLowerCase().contains('avatar') ||
+                resolvedCover.toLowerCase().contains('profile_picture') ||
+                resolvedCover.toLowerCase().contains('selfie'));
 
         if (isAvatarDuplicate) {
           resolvedCover = null;
@@ -2762,14 +2806,12 @@ class SupabaseDataService {
         final farmerName = item['farmer_name']?.toString().trim();
         final ownerName = (fullName != null && fullName.isNotEmpty)
             ? fullName
-            : ((farmerName != null && farmerName.isNotEmpty)
-                ? farmerName
-                : '');
+            : ((farmerName != null && farmerName.isNotEmpty) ? farmerName : '');
 
         final displayName =
             (farmName != null && farmName.isNotEmpty && farmName != 'Farm')
-                ? farmName
-                : (ownerName.isNotEmpty ? ownerName : 'San Carlos Farm');
+            ? farmName
+            : (ownerName.isNotEmpty ? ownerName : 'San Carlos Farm');
 
         final loc =
             item['location']?.toString().trim() ??

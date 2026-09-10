@@ -25,18 +25,45 @@ class WebFlashSaleStrip extends StatefulWidget {
 class _WebFlashSaleStripState extends State<WebFlashSaleStrip> {
   final ScrollController _scrollController = ScrollController();
   Timer? _ticker;
-  Duration _remaining = const Duration(hours: 3, minutes: 42, seconds: 15);
+  Duration _remaining = const Duration();
 
   @override
   void initState() {
     super.initState();
+    _calculateTimeLeft();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _remaining.inSeconds > 0) {
-        setState(() {
-          _remaining = _remaining - const Duration(seconds: 1);
-        });
+      if (mounted) {
+        if (_remaining.inSeconds > 0) {
+          setState(() {
+            _remaining = _remaining - const Duration(seconds: 1);
+          });
+        } else {
+          _calculateTimeLeft();
+          setState(() {});
+        }
       }
     });
+  }
+
+  void _calculateTimeLeft() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    _remaining = midnight.difference(now);
+  }
+
+  double _getClaimPercentage(ProductItem product) {
+    if (product.claimPercentage != null && product.claimPercentage! > 0) {
+      return product.claimPercentage!.clamp(0.05, 0.95);
+    }
+    final stock = product.stockQuantity ?? 0;
+    final sold = product.soldCount ?? 0;
+    final total = stock + sold;
+    if (total > 0 && sold > 0) {
+      return (sold / total).clamp(0.1, 0.95);
+    }
+    // Realistic distributed claimed % based on product
+    final hash = (product.name.hashCode.abs() % 45) + 35;
+    return hash / 100.0;
   }
 
   @override
@@ -242,7 +269,7 @@ class _WebFlashSaleStripState extends State<WebFlashSaleStrip> {
               separatorBuilder: (_, index) => const SizedBox(width: 16),
               itemBuilder: (context, index) {
                 final product = widget.flashProducts[index];
-                final claimPct = product.claimPercentage ?? 0.72;
+                final claimPct = _getClaimPercentage(product);
 
                 return SizedBox(
                   width: 230,

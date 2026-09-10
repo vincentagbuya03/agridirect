@@ -53,6 +53,7 @@ class _WebShopScreenState extends State<WebShopScreen> {
     'Grains',
     'Root Crops',
     'Organic',
+    'Pre-Orders',
   ];
 
   @override
@@ -65,7 +66,8 @@ class _WebShopScreenState extends State<WebShopScreen> {
       _searchQuery = widget.initialSearchQuery!;
     }
     if (widget.initialShowPreOrders) {
-      _filterState = _filterState.copyWith(wholesaleOnly: true);
+      _filterState = _filterState.copyWith(preorderOnly: true);
+      _selectedCategory = 'Pre-Orders';
     }
     _loadProducts();
   }
@@ -84,6 +86,16 @@ class _WebShopScreenState extends State<WebShopScreen> {
       _searchQuery = widget.initialSearchQuery!;
       shouldReapply = true;
     }
+    if (widget.initialShowPreOrders != oldWidget.initialShowPreOrders) {
+      if (widget.initialShowPreOrders) {
+        _filterState = _filterState.copyWith(preorderOnly: true);
+        _selectedCategory = 'Pre-Orders';
+      } else {
+        _filterState = _filterState.copyWith(preorderOnly: false);
+        _selectedCategory = 'All';
+      }
+      shouldReapply = true;
+    }
     if (shouldReapply) {
       _applyFilters();
     }
@@ -92,7 +104,7 @@ class _WebShopScreenState extends State<WebShopScreen> {
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products = await _dataService.getNearbyProducts();
+      final products = await _dataService.getAllProducts();
       if (mounted) {
         setState(() {
           _allProducts = products;
@@ -120,8 +132,10 @@ class _WebShopScreenState extends State<WebShopScreen> {
       }).toList();
     }
 
-    // 2. Category
-    if (_selectedCategory != 'All') {
+    // 2. Category & Pre-Orders
+    if (_selectedCategory == 'Pre-Orders' || _filterState.preorderOnly) {
+      results = results.where((p) => p.isPreorder).toList();
+    } else if (_selectedCategory != 'All') {
       results = results.where((p) {
         return (p.categoryName?.toLowerCase() ?? '') ==
             _selectedCategory.toLowerCase();
@@ -201,7 +215,7 @@ class _WebShopScreenState extends State<WebShopScreen> {
 
   void _navigateToProduct(ProductItem product) {
     final prodId = product.productId ?? 'view';
-    context.push(AppRoutes.product(prodId), extra: product);
+    context.go(AppRoutes.product(prodId), extra: product);
   }
 
   @override
@@ -326,7 +340,9 @@ class _WebShopScreenState extends State<WebShopScreen> {
                                                         : isCompact
                                                             ? 3
                                                             : _densityColumns,
-                                                    childAspectRatio: 0.68,
+                                                    childAspectRatio: isMobile
+                                                        ? (sw < 420 ? 0.58 : 0.62)
+                                                        : (isCompact ? 0.65 : 0.68),
                                                     crossAxisSpacing: 14,
                                                     mainAxisSpacing: 14,
                                                   ),
@@ -448,7 +464,10 @@ class _WebShopScreenState extends State<WebShopScreen> {
 
   Widget _buildToolbar(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 16,
+        vertical: isMobile ? 10 : 12,
+      ),
       decoration: BoxDecoration(
         color: WebDesignTokens.surface,
         borderRadius: BorderRadius.circular(14),
@@ -459,7 +478,9 @@ class _WebShopScreenState extends State<WebShopScreen> {
         children: [
           // Results Count
           Text(
-            'Showing ${_filteredProducts.isEmpty ? 0 : (_currentPage - 1) * _itemsPerPage + 1}–${_currentPage * _itemsPerPage > _filteredProducts.length ? _filteredProducts.length : _currentPage * _itemsPerPage} of ${_filteredProducts.length} harvests',
+            isMobile
+                ? '${_filteredProducts.length} harvests'
+                : 'Showing ${_filteredProducts.isEmpty ? 0 : (_currentPage - 1) * _itemsPerPage + 1}–${_currentPage * _itemsPerPage > _filteredProducts.length ? _filteredProducts.length : _currentPage * _itemsPerPage} of ${_filteredProducts.length} harvests',
             style: GoogleFonts.nunitoSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -469,15 +490,16 @@ class _WebShopScreenState extends State<WebShopScreen> {
 
           // Sort Dropdown & Density Switcher
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Sort by: ',
+                'Sort: ',
                 style: GoogleFonts.nunitoSans(
                   fontSize: 13,
                   color: WebDesignTokens.slate500,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _sortBy,

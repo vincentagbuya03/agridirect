@@ -26,8 +26,8 @@ class FarmerLanguageToggle extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           child: Container(
             padding: EdgeInsets.symmetric(
-              horizontal: compact ? 10 : 14,
-              vertical: compact ? 6 : 8,
+              horizontal: compact ? 6 : 14,
+              vertical: compact ? 4 : 8,
             ),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -45,17 +45,17 @@ class FarmerLanguageToggle extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildOption(
-                  label: '🇵🇭 Filipino',
+                  label: compact ? '🇵🇭 FIL' : '🇵🇭 Filipino',
                   isActive: isFil,
                 ),
                 Container(
                   width: 1,
-                  height: 16,
+                  height: 14,
                   color: const Color(0xFFCBD5E1),
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  margin: EdgeInsets.symmetric(horizontal: compact ? 2 : 6),
                 ),
                 _buildOption(
-                  label: '🇺🇸 English',
+                  label: compact ? '🇺🇸 EN' : '🇺🇸 English',
                   isActive: !isFil,
                 ),
               ],
@@ -68,7 +68,10 @@ class FarmerLanguageToggle extends StatelessWidget {
 
   Widget _buildOption({required String label, required bool isActive}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 3 : 4,
+      ),
       decoration: BoxDecoration(
         color: isActive ? FarmerTheme.softMint : Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -76,7 +79,7 @@ class FarmerLanguageToggle extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: compact ? 12 : 13,
+          fontSize: compact ? 11.5 : 13,
           fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
           color: isActive ? FarmerTheme.primaryAction : FarmerTheme.textMuted,
         ),

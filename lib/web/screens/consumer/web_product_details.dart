@@ -639,37 +639,39 @@ class _WebProductDetailsState extends State<WebProductDetails>
                   ],
                 ],
               ),
-              const Divider(height: 24, color: WebDesignTokens.border),
+              if (product.isWholesale) ...[
+                const Divider(height: 24, color: WebDesignTokens.border),
 
-              // Wholesale Bulk Tiers Table
-              Text(
-                'Wholesale Bulk Pricing Tiers',
-                style: GoogleFonts.rubik(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: WebDesignTokens.dark,
+                // Wholesale Bulk Tiers Table
+                Text(
+                  'Wholesale Bulk Pricing Tiers',
+                  style: GoogleFonts.rubik(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: WebDesignTokens.dark,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildBulkTierCard('1–9 ${product.unit}',
-                      '₱${_numericPrice.toStringAsFixed(0)}', 'Standard'),
-                  const SizedBox(width: 8),
-                  _buildBulkTierCard(
-                    '10–49 ${product.unit}',
-                    '₱${(_numericPrice * 0.9).toStringAsFixed(0)}',
-                    'Save 10%',
-                    isHighlighted: true,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildBulkTierCard(
-                    '50+ ${product.unit}',
-                    '₱${(_numericPrice * 0.8).toStringAsFixed(0)}',
-                    'Save 20%',
-                  ),
-                ],
-              ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildBulkTierCard('1–9 ${product.unit}',
+                        '₱${_numericPrice.toStringAsFixed(0)}', 'Standard'),
+                    const SizedBox(width: 8),
+                    _buildBulkTierCard(
+                      '10–49 ${product.unit}',
+                      '₱${(_numericPrice * 0.9).toStringAsFixed(0)}',
+                      'Save 10%',
+                      isHighlighted: true,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildBulkTierCard(
+                      '50+ ${product.unit}',
+                      '₱${(_numericPrice * 0.8).toStringAsFixed(0)}',
+                      'Save 20%',
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -794,12 +796,12 @@ class _WebProductDetailsState extends State<WebProductDetails>
           soldKg: '3,450 kg',
           avatarUrl: _farmerProfile?['avatar_url']?.toString() ??
               product.farmerAvatarUrl,
-          onChat: () => context.push(AppRoutes.messages),
+          onChat: () => context.go(AppRoutes.messages),
           onVisitStore: () {
             if (product.farmerId != null) {
-              context.push(AppRoutes.farmerProfile(product.farmerId!));
+              context.go(AppRoutes.farmerProfile(product.farmerId!));
             } else {
-              context.push(AppRoutes.localShops);
+              context.go(AppRoutes.localShops);
             }
           },
         ),
@@ -1061,7 +1063,7 @@ class _WebProductDetailsState extends State<WebProductDetails>
                 child: WebProductCard(
                   product: item,
                   onTap: () {
-                    context.push(AppRoutes.product(item.productId ?? 'view'),
+                    context.go(AppRoutes.product(item.productId ?? 'view'),
                         extra: item);
                   },
                 ),

@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../../shared/router/app_routes.dart';
 
 class WebVouchersScreen extends StatefulWidget {
   const WebVouchersScreen({super.key});
@@ -97,10 +98,16 @@ class _WebVouchersScreenState extends State<WebVouchersScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'vouchers',
-              searchPlaceholder: 'Search discount codes, delivery coupons & deals...',
-              onSearchChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+            WebEcomHeader(
+              currentIndex: 0,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildFullWidthHeroBanner(),
             const SizedBox(height: 32),

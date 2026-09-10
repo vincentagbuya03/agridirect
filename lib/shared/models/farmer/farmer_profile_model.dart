@@ -22,6 +22,10 @@ class FarmerProfile {
   @JsonKey(name: 'farm_longitude')
   final double? farmLongitude;
   final String? badge;
+  @JsonKey(name: 'logo_url')
+  final String? logoUrl;
+  @JsonKey(name: 'cover_url')
+  final String? coverUrl;
   @JsonKey(name: 'image_url')
   final String? imageUrl;
   @JsonKey(name: 'is_verified')
@@ -30,6 +34,10 @@ class FarmerProfile {
   final DateTime createdAt;
   @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
+
+  // Helper getters for clarity (image_url is the logo, cover_url is the cover)
+  String? get farmLogo => imageUrl ?? logoUrl;
+  String? get farmCover => coverUrl;
 
   // Related data from view
   @JsonKey(name: 'farmer_name')
@@ -54,6 +62,8 @@ class FarmerProfile {
     this.farmLatitude,
     this.farmLongitude,
     this.badge,
+    this.logoUrl,
+    this.coverUrl,
     this.imageUrl,
     this.isVerified = false,
     required this.createdAt,
@@ -79,6 +89,8 @@ class FarmerProfile {
     double? farmLatitude,
     double? farmLongitude,
     String? badge,
+    String? logoUrl,
+    String? coverUrl,
     String? imageUrl,
     bool? isVerified,
     DateTime? createdAt,
@@ -99,6 +111,8 @@ class FarmerProfile {
       farmLatitude: farmLatitude ?? this.farmLatitude,
       farmLongitude: farmLongitude ?? this.farmLongitude,
       badge: badge ?? this.badge,
+      logoUrl: logoUrl ?? this.logoUrl,
+      coverUrl: coverUrl ?? this.coverUrl,
       imageUrl: imageUrl ?? this.imageUrl,
       isVerified: isVerified ?? this.isVerified,
       createdAt: createdAt ?? this.createdAt,

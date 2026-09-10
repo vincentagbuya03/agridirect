@@ -91,7 +91,7 @@ class _WebPromoVoucherStripState extends State<WebPromoVoucherStrip> {
               Container(width: 1, height: 80, color: Colors.grey[200]),
               const SizedBox(width: 24),
               ElevatedButton(
-                onPressed: () => context.push(widget.ctaRoute),
+                onPressed: () => context.go(widget.ctaRoute),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: widget.themeColor,
                   foregroundColor: Colors.white,
@@ -211,7 +211,7 @@ class _WebMiniVoucherCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: TextButton(
-              onPressed: () => context.push('/vouchers'),
+              onPressed: () => context.go('/vouchers'),
               style: TextButton.styleFrom(
                 foregroundColor: themeColor,
                 backgroundColor: themeColor.withValues(alpha: 0.1),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../constants/web_design_tokens.dart';
 
 /// Hero Bento Grid: Main Carousel (8 cols) + Dual Promotional Micro-Cards (4 cols)
@@ -24,6 +25,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   Timer? _autoPlayTimer;
   Timer? _countdownTimer;
   Duration _flashRemaining = const Duration(hours: 3, minutes: 42, seconds: 15);
+  Map<String, dynamic>? _featuredFarmer;
 
   final List<Map<String, dynamic>> _heroSlides = [
     {
@@ -79,6 +81,8 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   @override
   void initState() {
     super.initState();
+    _calculateFlashRemaining();
+    _loadFeaturedFarmer();
     _pageController = PageController();
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_pageController.hasClients) {
@@ -92,12 +96,34 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
     });
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _flashRemaining.inSeconds > 0) {
-        setState(() {
-          _flashRemaining = _flashRemaining - const Duration(seconds: 1);
-        });
+      if (mounted) {
+        if (_flashRemaining.inSeconds > 0) {
+          setState(() {
+            _flashRemaining = _flashRemaining - const Duration(seconds: 1);
+          });
+        } else {
+          _calculateFlashRemaining();
+          setState(() {});
+        }
       }
     });
+  }
+
+  Future<void> _loadFeaturedFarmer() async {
+    try {
+      final farmers = await SupabaseDataService().getFeaturedFarmers();
+      if (farmers.isNotEmpty && mounted) {
+        setState(() {
+          _featuredFarmer = farmers.first;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _calculateFlashRemaining() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    _flashRemaining = midnight.difference(now);
   }
 
   @override
@@ -510,27 +536,40 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           ),
           const SizedBox(height: 8),
           Text(
-            'San Carlos Organic Growers',
+            _featuredFarmer?['farm_name'] ??
+                _featuredFarmer?['shop_name'] ??
+                'San Carlos Organic Growers',
             style: GoogleFonts.rubik(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: WebDesignTokens.dark,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
-            'Brgy. Roxas Cooperative • 45 Registered Local Growers • ⭐ 4.9 Rating',
+            '${_featuredFarmer?['location'] ?? _featuredFarmer?['farm_address'] ?? 'Brgy. Roxas, San Carlos City'} • ⭐ ${_featuredFarmer?['average_rating']?.toString() ?? _featuredFarmer?['rating']?.toString() ?? '4.9'} Rating',
             style: GoogleFonts.nunitoSans(
               fontSize: 12,
               color: WebDesignTokens.slate600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () => context.go(AppRoutes.localShops),
+            onTap: () {
+              final fid = _featuredFarmer?['farmer_id'] ?? _featuredFarmer?['id'];
+              if (fid != null && fid.toString().isNotEmpty) {
+                context.go('${AppRoutes.farmerProfileBase}/$fid');
+              } else {
+                context.go(AppRoutes.localShops);
+              }
+            },
             child: Row(
               children: [
                 Text(
-                  'Visit Farm Cooperative',
+                  'Visit Farm Storefront',
                   style: GoogleFonts.rubik(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

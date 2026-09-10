@@ -224,7 +224,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                     if (!isCompact)
                       IconButton(
                         tooltip: 'Vouchers & Rewards',
-                        onPressed: () => context.push('/vouchers'),
+                        onPressed: () => context.go('/vouchers'),
                         icon: const Icon(Icons.confirmation_num_outlined,
                             color: Color(0xFF475569)),
                       ),
@@ -239,7 +239,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                           children: [
                             IconButton(
                               tooltip: 'Shopping Cart',
-                              onPressed: () => context.push('/cart'),
+                              onPressed: () => context.go('/cart'),
                               icon: const Icon(Icons.shopping_cart_outlined,
                                   color: Color(0xFF1E293B), size: 24),
                             ),
@@ -290,7 +290,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                               ? displayName[0].toUpperCase()
                               : 'U';
                           return InkWell(
-                            onTap: () => context.push(AppRoutes.profile),
+                            onTap: () => context.go(AppRoutes.profile),
                             borderRadius: BorderRadius.circular(20),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -325,7 +325,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                           );
                         }
                         return ElevatedButton(
-                          onPressed: () => context.push(AppRoutes.login),
+                          onPressed: () => context.go(AppRoutes.login),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF059669),
                             foregroundColor: Colors.white,

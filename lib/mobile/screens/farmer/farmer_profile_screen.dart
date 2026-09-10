@@ -105,21 +105,14 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
     try {
       final farmers = await SupabaseConfig.client
           .from('farmers')
-          .select(
-            'farm_name, image_url, face_photo_path, location, specialty, farming_history, years_of_experience',
-          )
+          .select()
           .eq('user_id', userId)
           .limit(1);
 
       if (farmers.isNotEmpty && mounted) {
-        final rawCover = farmers[0]['image_url'] as String?;
-        final facePhoto = farmers[0]['face_photo_path'] as String?;
-        final isFacePhoto = rawCover != null &&
-            (rawCover == facePhoto ||
-             rawCover.contains('face_photo') ||
-             rawCover.contains('selfie'));
-
-        final safeCoverUrl = (rawCover != null && !isFacePhoto)
+        // 1. Cover Banner: strictly from cover_url (never image_url or face_photo_path)
+        final rawCover = (farmers[0]['cover_url'] as String?)?.trim();
+        final safeCoverUrl = (rawCover != null && rawCover.isNotEmpty)
             ? await SupabaseDatabase.getSafeUrl(
                 rawCover,
                 defaultBucket: 'uploads',
@@ -133,10 +126,18 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           _yearsExperience = farmers[0]['years_of_experience'] as int?;
           _farmerCoverUrl = safeCoverUrl.isNotEmpty ? safeCoverUrl : null;
         });
+
+        // 2. Farm Logo / Avatar: strictly from image_url, logo_url, or user avatar (NEVER face_photo_path)
         final userProfile = await SupabaseDatabase.getUserProfile(userId);
-        final rawAvatarUrl = (userProfile?['avatar_url'] as String?)?.trim() ?? auth.userAvatarUrl;
+        final rawLogoUrl = (farmers[0]['image_url'] as String?)?.trim().isNotEmpty == true
+            ? (farmers[0]['image_url'] as String).trim()
+            : ((farmers[0]['logo_url'] as String?)?.trim().isNotEmpty == true
+                ? (farmers[0]['logo_url'] as String).trim()
+                : ((userProfile?['avatar_url'] as String?)?.trim().isNotEmpty == true
+                    ? (userProfile!['avatar_url'] as String).trim()
+                    : auth.userAvatarUrl));
         final safeUrl = await SupabaseDatabase.getSafeUrl(
-          rawAvatarUrl,
+          rawLogoUrl,
           defaultBucket: 'uploads',
         );
         if (mounted) {

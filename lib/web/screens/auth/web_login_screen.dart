@@ -1113,7 +1113,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
 
   void _showForgotPasswordDialog() {
     // Navigate to the code-based password reset screen
-    context.push(AppRoutes.resetPasswordWithCode);
+    context.go(AppRoutes.resetPasswordWithCode);
   }
 
   void _showSnackBar(String message) {

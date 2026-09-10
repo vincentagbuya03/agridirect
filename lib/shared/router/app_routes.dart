@@ -95,6 +95,22 @@ class AppRoutes {
 
   /// Converts a tab index back to the appropriate route path.
   static String webTabRoute(int index, {bool isFarmer = false}) {
+    if (isFarmer) {
+      switch (index) {
+        case 1:
+          return '$farmerDashboard?tab=1';
+        case 2:
+          return '$farmerDashboard?tab=2';
+        case 3:
+          return community;
+        case 4:
+          return '$farmerDashboard?tab=4';
+        case 5:
+          return profile;
+        default:
+          return farmerDashboard;
+      }
+    }
     switch (index) {
       case 1:
         return shop;
@@ -106,7 +122,7 @@ class AppRoutes {
       case 4:
         return cart;
       default:
-        return isFarmer ? farmerDashboard : marketplace;
+        return marketplace;
     }
   }
 }

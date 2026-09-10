@@ -10,11 +10,8 @@ import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/router/app_routes.dart';
-import '../../../shared/services/auth/auth_service.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/farmer/web_farmer_header.dart';
 import '../../widgets/crop_milestones_timeline.dart';
 import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/data/app_data.dart';
@@ -33,7 +30,8 @@ class WebFarmerPreordersTab extends StatefulWidget {
   State<WebFarmerPreordersTab> createState() => _WebFarmerPreordersTabState();
 }
 
-class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
+class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
+    with SingleTickerProviderStateMixin {
   // Design Tokens
   static const Color _primary = Color(0xFF059669);
   static const Color _primaryDark = Color(0xFF047857);
@@ -49,7 +47,6 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
   List<Map<String, dynamic>> _preorders = [];
   double _totalProjectedRevenue = 0.0;
   double _totalReservations = 0.0;
-  int _hoveredNav = -1;
   final Set<String> _expandedProductIds = {};
 
   String _searchQuery = '';
@@ -222,7 +219,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
       backgroundColor: _surface,
       body: Column(
         children: [
-          _buildNavBar(),
+          WebFarmerHeader(
+            currentIndex: widget.currentIndex,
+            onNavigate: (index, [route]) => widget.onNavigate(index),
+          ),
           Expanded(
             child: _isLoading
                 ? const Center(child: AppShimmerLoader())
@@ -230,13 +230,13 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
                     physics: const BouncingScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(
                       isMobile ? 16 : 36,
-                      0,
+                      12,
                       isMobile ? 16 : 36,
                       48,
                     ),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1360),
+                        constraints: const BoxConstraints(maxWidth: 1400),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -253,140 +253,6 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
                     ),
                   ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Nav Bar ───────────────────────────────────────────────────────────────
-  Widget _buildNavBar() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 900;
-    final isCompact = sw < 1100;
-
-    if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
-      );
-    }
-
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
-    return Container(
-      margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: _dark.withValues(alpha: 0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: BrandLogo(
-                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
-              ),
-            ),
-          ),
-          if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 48),
-            ...List.generate(navItems.length, (i) {
-              final isActive = i == widget.currentIndex;
-              final isHovered = _hoveredNav == i;
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 20,
-                        vertical: isCompact ? 10 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: isActive
-                            ? _primary.withValues(alpha: 0.1)
-                            : isHovered
-                                ? _border.withValues(alpha: 0.35)
-                                : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 15,
-                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                          color: isActive ? _primary : (isHovered ? _dark : _muted),
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-          const Spacer(),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(5),
-              child: Container(
-                width: (isMobile || isCompact) ? 38 : 44,
-                height: (isMobile || isCompact) ? 38 : 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primary, _primaryDark],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 22,
-                ),
-              ),
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(width: 8),
-            WebHamburgerMenuButton(
-              currentIndex: widget.currentIndex,
-              onNavigate: widget.onNavigate,
-            ),
-          ],
         ],
       ),
     );
@@ -451,7 +317,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
         ),
         // Action Button: Add Pre-Order
         ElevatedButton.icon(
-          onPressed: () => context.push(AppRoutes.addProduct),
+          onPressed: () => context.go(AppRoutes.addProduct),
           icon: const Icon(Icons.add_rounded, size: 18),
           label: Text(
             isMobile ? 'New' : 'Launch Campaign',
@@ -515,7 +381,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
 
     if (isMobile) {
       return SizedBox(
-        height: 120,
+        height: 136,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
@@ -545,7 +411,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
 
   Widget _buildMetricCard(_HarvestMetricData data) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -566,16 +432,16 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: data.bgColor,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(data.icon, size: 18, color: data.color),
+                child: Icon(data.icon, size: 17, color: data.color),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
             data.value,
             style: GoogleFonts.plusJakartaSans(
@@ -768,7 +634,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
               ),
               const SizedBox(height: 18),
               ElevatedButton.icon(
-                onPressed: () => context.push(AppRoutes.addProduct),
+                onPressed: () => context.go(AppRoutes.addProduct),
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: const Text('Create Pre-Order Listing'),
                 style: ElevatedButton.styleFrom(
@@ -1063,7 +929,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
                             targetQuantity: target,
                             farm: '',
                           );
-                          context.push(AppRoutes.farmerPreorderDetail, extra: productItem);
+                          context.go(AppRoutes.farmerPreorderDetail, extra: productItem);
                         },
                         icon: const Icon(Icons.visibility_outlined, size: 20, color: _muted),
                         tooltip: 'View Campaign Details',

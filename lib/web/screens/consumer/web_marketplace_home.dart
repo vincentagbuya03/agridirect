@@ -88,7 +88,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   void _navigateToProduct(ProductItem product) {
     final prodId = product.productId ?? 'view';
-    context.push(AppRoutes.product(prodId), extra: product);
+    context.go(AppRoutes.product(prodId), extra: product);
   }
 
   @override
@@ -99,81 +99,93 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
     return Scaffold(
       backgroundColor: WebDesignTokens.bg,
-      body: Column(
-        children: [
-          // ─── 3-Tier Enterprise E-Commerce Header ───
-          WebEcomHeader(
-            currentIndex: widget.currentIndex,
-            onNavigate: widget.onNavigate,
-            onSearch: (query) {
-              context.go(AppRoutes.shop, extra: {'search': query});
-            },
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxHeight <= 120) {
+            return const SizedBox.shrink();
+          }
 
-          // ─── Main Scrollable Marketplace Storefront ───
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
+          return Column(
+            children: [
+              // ─── 3-Tier Enterprise E-Commerce Header ───
+              WebEcomHeader(
+                currentIndex: widget.currentIndex,
+                onNavigate: widget.onNavigate,
+                onSearch: (query) {
+                  context.go(AppRoutes.shop, extra: {'search': query});
+                },
+              ),
 
-                  // Content Container
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: containerWidth),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 12 : 24,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 1. Hero Bento Grid
-                            WebHeroBentoGrid(
-                              onNavigate: widget.onNavigate,
+              // ─── Main Scrollable Marketplace Storefront ───
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+
+                      // Content Container
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: containerWidth),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 24,
                             ),
-                            const SizedBox(height: 28),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // 1. Hero Bento Grid
+                                WebHeroBentoGrid(
+                                  onNavigate: widget.onNavigate,
+                                ),
+                                const SizedBox(height: 24),
 
-                            // 2. 4-Pillar Trust Badge Strip
-                            const WebTrustBadgeStrip(),
-                            const SizedBox(height: 36),
+                                // 1.5 Quick Promotional Discovery Buttons
+                                _buildMarketplaceChannelButtons(context, sw),
+                                const SizedBox(height: 28),
 
-                            // 3. Visual Harvest Categories
-                            _buildVisualCategoriesSection(context),
-                            const SizedBox(height: 36),
+                                // 2. 4-Pillar Trust Badge Strip
+                                const WebTrustBadgeStrip(),
+                                const SizedBox(height: 36),
 
-                            // 4. Dynamic Flash Deals Strip
-                            _buildFlashDealsSection(),
-                            const SizedBox(height: 36),
+                                // 3. Visual Harvest Categories
+                                _buildVisualCategoriesSection(context),
+                                const SizedBox(height: 36),
 
-                            // 5. Featured Farmer Cooperatives
-                            _buildFarmerCooperativesSection(),
-                            const SizedBox(height: 36),
+                                // 4. Dynamic Flash Deals Strip
+                                _buildFlashDealsSection(),
+                                const SizedBox(height: 36),
 
-                            // 6. Curated Harvest Picks Grid
-                            _buildCuratedProduceGrid(sw),
-                            const SizedBox(height: 48),
+                                // 5. Featured Farmer Cooperatives
+                                _buildFarmerCooperativesSection(),
+                                const SizedBox(height: 36),
 
-                            // 7. AgriDirect Ecosystem & Community Hub
-                            _buildAgriServicesHub(context, sw),
-                            const SizedBox(height: 48),
+                                // 6. Curated Harvest Picks Grid
+                                _buildCuratedProduceGrid(sw),
+                                const SizedBox(height: 48),
 
-                            // 8. Community & Economic Impact Counter
-                            _buildImpactMetricsSection(),
-                            const SizedBox(height: 40),
-                          ],
+                                // 7. AgriDirect Ecosystem & Community Hub
+                                _buildAgriServicesHub(context, sw),
+                                const SizedBox(height: 48),
+
+                                // 8. Community & Economic Impact Counter
+                                _buildImpactMetricsSection(),
+                                const SizedBox(height: 40),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // Enterprise Footer
-                  const AgriDirectWebFooter(),
-                ],
+                      // Enterprise Footer
+                      const AgriDirectWebFooter(),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -183,45 +195,60 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     final sw = MediaQuery.of(context).size.width;
     final isWideDesktop = sw >= 1024;
 
+    final isMobile = sw < 650;
+
+    final headerText = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Explore by Harvest Category',
+          style: GoogleFonts.rubik(
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: FontWeight.w700,
+            color: WebDesignTokens.dark,
+          ),
+        ),
+        Text(
+          'Find fresh local crops sorted by department',
+          style: GoogleFonts.nunitoSans(
+            fontSize: isMobile ? 12 : 13,
+            color: WebDesignTokens.slate500,
+          ),
+        ),
+      ],
+    );
+
+    final allCatBtn = TextButton(
+      onPressed: () => context.go(AppRoutes.shop),
+      child: Text(
+        'All Categories >',
+        style: GoogleFonts.rubik(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: WebDesignTokens.primary,
+        ),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Explore by Harvest Category',
-                  style: GoogleFonts.rubik(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: WebDesignTokens.dark,
-                  ),
-                ),
-                Text(
-                  'Find fresh local crops sorted by agricultural department',
-                  style: GoogleFonts.nunitoSans(
-                    fontSize: 13,
-                    color: WebDesignTokens.slate500,
-                  ),
-                ),
-              ],
-            ),
-            TextButton(
-              onPressed: () => context.go(AppRoutes.shop),
-              child: Text(
-                'All Categories >',
-                style: GoogleFonts.rubik(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: WebDesignTokens.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              headerText,
+              Align(alignment: Alignment.centerLeft, child: allCatBtn),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              headerText,
+              allCatBtn,
+            ],
+          ),
         const SizedBox(height: 16),
         if (isWideDesktop)
           Row(
@@ -508,6 +535,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                   final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
                   final crops = (f['specialty'] ?? 'Fresh Crops').toString();
                   final fid = f['farmer_id'] ?? f['id'];
+                  final avatar = (f['image_url'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -518,9 +546,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                       rating: rating,
                       totalReviews: reviews,
                       cropsSummary: crops,
+                      avatarUrl: avatar,
                       onVisit: () {
                         if (fid != null && fid.toString().isNotEmpty) {
-                          context.push('${AppRoutes.farmerProfileBase}/$fid');
+                          context.go('${AppRoutes.farmerProfileBase}/$fid');
                         } else {
                           context.go(AppRoutes.localShops);
                         }
@@ -540,6 +569,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                 final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
                 final crops = (f['specialty'] ?? 'Fresh Crops').toString();
                 final fid = f['farmer_id'] ?? f['id'];
+                final avatar = (f['image_url'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
 
                 return Expanded(
                   child: Padding(
@@ -551,9 +581,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                       rating: rating,
                       totalReviews: reviews,
                       cropsSummary: crops,
+                      avatarUrl: avatar,
                       onVisit: () {
                         if (fid != null && fid.toString().isNotEmpty) {
-                          context.push('${AppRoutes.farmerProfileBase}/$fid');
+                          context.go('${AppRoutes.farmerProfileBase}/$fid');
                         } else {
                           context.go(AppRoutes.localShops);
                         }
@@ -607,57 +638,84 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Section Header & Tabs
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            Builder(
+              builder: (context) {
+                final isMobile = screenWidth < 768;
+
+                final headerTitles = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Fresh Harvest Picks For You',
                       style: GoogleFonts.rubik(
-                        fontSize: 20,
+                        fontSize: isMobile ? 18 : 20,
                         fontWeight: FontWeight.w700,
                         color: WebDesignTokens.dark,
                       ),
                     ),
                     Text(
-                      'Direct from San Carlos farms picked in the last 24 hours',
+                      isMobile
+                          ? 'Direct from San Carlos farms picked in last 24h'
+                          : 'Direct from San Carlos farms picked in the last 24 hours',
                       style: GoogleFonts.nunitoSans(
-                        fontSize: 13,
+                        fontSize: isMobile ? 12 : 13,
                         color: WebDesignTokens.slate500,
                       ),
                     ),
                   ],
-                ),
-                // Tab Filter Chips
-                Wrap(
-                  spacing: 6,
-                  children: ['All', 'Vegetables', 'Fruits', 'Grains'].map((tab) {
-                    final isSelected = _activeTab == tab;
-                    return ChoiceChip(
-                      label: Text(tab),
-                      labelStyle: GoogleFonts.rubik(
-                        fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : WebDesignTokens.slate600,
-                      ),
-                      selected: isSelected,
-                      selectedColor: WebDesignTokens.primary,
-                      backgroundColor: WebDesignTokens.surface,
-                      side: BorderSide(
-                        color: isSelected
-                            ? WebDesignTokens.primary
-                            : WebDesignTokens.border,
-                      ),
-                      onSelected: (_) => setState(() => _activeTab = tab),
-                    );
-                  }).toList(),
-                ),
-              ],
+                );
+
+                final tabChips = SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['All', 'Vegetables', 'Fruits', 'Grains'].map((tab) {
+                      final isSelected = _activeTab == tab;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(tab),
+                          labelStyle: GoogleFonts.rubik(
+                            fontSize: 12,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : WebDesignTokens.slate600,
+                          ),
+                          selected: isSelected,
+                          selectedColor: WebDesignTokens.primary,
+                          backgroundColor: WebDesignTokens.surface,
+                          side: BorderSide(
+                            color: isSelected
+                                ? WebDesignTokens.primary
+                                : WebDesignTokens.border,
+                          ),
+                          onSelected: (_) => setState(() => _activeTab = tab),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                );
+
+                if (isMobile) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      headerTitles,
+                      const SizedBox(height: 12),
+                      tabChips,
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    headerTitles,
+                    tabChips,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 20),
 
@@ -702,8 +760,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns,
                   childAspectRatio: screenWidth < 500
-                      ? 0.62
-                      : (screenWidth < 650 ? 0.65 : 0.68),
+                      ? 0.58
+                      : (screenWidth < 650 ? 0.62 : 0.68),
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
@@ -908,7 +966,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
         'icon': Icons.local_florist_rounded,
         'color': const Color(0xFF059669),
         'action': 'Read Our Story →',
-        'route': AppRoutes.webWelcome,
+        'route': AppRoutes.aboutUs,
       },
     ];
 
@@ -1004,45 +1062,63 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
       );
     }
 
+    final isMobile = screenWidth < 768;
+
+    final headerText = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'AgriDirect Ecosystem & Community Hub',
+          style: GoogleFonts.rubik(
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: FontWeight.w700,
+            color: WebDesignTokens.dark,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Connecting San Carlos consumers with accredited growers, weather intelligence, and community resources',
+          style: GoogleFonts.nunitoSans(
+            fontSize: isMobile ? 12 : 13,
+            color: WebDesignTokens.slate500,
+          ),
+        ),
+      ],
+    );
+
+    final aboutBtn = TextButton(
+      onPressed: () => context.go(AppRoutes.aboutUs),
+      child: Text(
+        'About AgriDirect >',
+        style: GoogleFonts.rubik(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: WebDesignTokens.primary,
+        ),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AgriDirect Ecosystem & Community Hub',
-                  style: GoogleFonts.rubik(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: WebDesignTokens.dark,
-                  ),
-                ),
-                Text(
-                  'Connecting San Carlos consumers with accredited growers, weather intelligence, and community resources',
-                  style: GoogleFonts.nunitoSans(
-                    fontSize: 13,
-                    color: WebDesignTokens.slate500,
-                  ),
-                ),
-              ],
-            ),
-            TextButton(
-              onPressed: () => context.go(AppRoutes.aboutUs),
-              child: Text(
-                'About AgriDirect >',
-                style: GoogleFonts.rubik(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: WebDesignTokens.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              headerText,
+              const SizedBox(height: 4),
+              Align(alignment: Alignment.centerLeft, child: aboutBtn),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: headerText),
+              const SizedBox(width: 16),
+              aboutBtn,
+            ],
+          ),
         const SizedBox(height: 18),
         if (screenWidth >= 1024)
           Row(
@@ -1077,6 +1153,245 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
             }).toList(),
           ),
       ],
+    );
+  }
+
+  // ─── Marketplace Discovery Channel Buttons ───
+  Widget _buildMarketplaceChannelButtons(BuildContext context, double sw) {
+    final channels = [
+      {
+        'title': 'Fresh Produce',
+        'subtitle': 'Farm Harvest',
+        'icon': Icons.eco_rounded,
+        'color': const Color(0xFF059669),
+        'bgColor': const Color(0xFFECFDF5),
+        'route': AppRoutes.freshProduce,
+        'badge': 'DAILY',
+      },
+      {
+        'title': 'Flash Sale',
+        'subtitle': 'Up to 50% Off',
+        'icon': Icons.bolt_rounded,
+        'color': const Color(0xFFDC2626),
+        'bgColor': const Color(0xFFFEF2F2),
+        'route': AppRoutes.flashSale,
+        'badge': 'HOT',
+      },
+      {
+        'title': 'Free Shipping',
+        'subtitle': 'Min. ₱500 Order',
+        'icon': Icons.local_shipping_rounded,
+        'color': const Color(0xFF0D9488),
+        'bgColor': const Color(0xFFF0FDFA),
+        'route': AppRoutes.freeShipping,
+        'badge': 'FREE',
+      },
+      {
+        'title': 'Vouchers Hub',
+        'subtitle': 'Claim Coupons',
+        'icon': Icons.confirmation_number_rounded,
+        'color': const Color(0xFFD97706),
+        'bgColor': const Color(0xFFFFFBEB),
+        'route': AppRoutes.vouchers,
+        'badge': 'SAVE',
+      },
+      {
+        'title': 'Wholesale Bulk',
+        'subtitle': 'Sacks & Crates',
+        'icon': Icons.inventory_2_rounded,
+        'color': const Color(0xFF2563EB),
+        'bgColor': const Color(0xFFEFF6FF),
+        'route': AppRoutes.wholesale,
+        'badge': 'BULK',
+      },
+      {
+        'title': 'Local Farms',
+        'subtitle': 'San Carlos Shops',
+        'icon': Icons.storefront_rounded,
+        'color': const Color(0xFF16A34A),
+        'bgColor': const Color(0xFFF0FDF4),
+        'route': AppRoutes.localShops,
+        'badge': 'DIRECT',
+      },
+    ];
+
+    final isMobile = sw < 768;
+
+    if (isMobile) {
+      return SizedBox(
+        height: 84,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: channels.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 10),
+          itemBuilder: (context, i) {
+            final c = channels[i];
+            return SizedBox(
+              width: 154,
+              child: _buildChannelButtonCard(
+                context: context,
+                title: c['title'] as String,
+                subtitle: c['subtitle'] as String,
+                icon: c['icon'] as IconData,
+                color: c['color'] as Color,
+                bgColor: c['bgColor'] as Color,
+                route: c['route'] as String,
+                badge: c['badge'] as String,
+                isMobile: true,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (sw < 1024) {
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: channels.map((c) {
+          return SizedBox(
+            width: (sw - 48 - 24) / 3,
+            child: _buildChannelButtonCard(
+              context: context,
+              title: c['title'] as String,
+              subtitle: c['subtitle'] as String,
+              icon: c['icon'] as IconData,
+              color: c['color'] as Color,
+              bgColor: c['bgColor'] as Color,
+              route: c['route'] as String,
+              badge: c['badge'] as String,
+              isMobile: false,
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    return Row(
+      children: channels.map((c) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: _buildChannelButtonCard(
+              context: context,
+              title: c['title'] as String,
+              subtitle: c['subtitle'] as String,
+              icon: c['icon'] as IconData,
+              color: c['color'] as Color,
+              bgColor: c['bgColor'] as Color,
+              route: c['route'] as String,
+              badge: c['badge'] as String,
+              isMobile: false,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildChannelButtonCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    required String route,
+    required String badge,
+    required bool isMobile,
+  }) {
+    return InkWell(
+      onTap: () => context.go(route),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: WebDesignTokens.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: WebDesignTokens.border),
+          boxShadow: WebDesignTokens.cardRest,
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.rubik(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: WebDesignTokens.dark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.nunitoSans(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: WebDesignTokens.slate500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              top: -6,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  badge,
+                  style: GoogleFonts.rubik(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -124,9 +124,12 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
 
   double _calculateDeliveryFee() {
     if (_selectedPaymentMethod != 'COD') return 0.0;
-    final minAmount = _farmerProfile?.freeDeliveryMinAmount ?? 0.0;
+    final minAmount = (_farmerProfile?.freeDeliveryMinAmount != null &&
+            _farmerProfile!.freeDeliveryMinAmount! > 0)
+        ? _farmerProfile!.freeDeliveryMinAmount!
+        : 500.0;
     final subtotal = _calculateSubtotal();
-    if (minAmount > 0 && subtotal >= minAmount) {
+    if (subtotal >= minAmount) {
       return 0.0;
     }
     return 50.0;

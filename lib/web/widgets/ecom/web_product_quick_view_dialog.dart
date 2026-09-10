@@ -332,7 +332,7 @@ class _WebProductQuickViewDialogState extends State<WebProductQuickViewDialog> {
             onPressed: () {
               Navigator.of(context).pop();
               final prodId = widget.product.productId ?? 'view';
-              context.push(AppRoutes.product(prodId), extra: widget.product);
+              context.go(AppRoutes.product(prodId), extra: widget.product);
             },
             child: Text(
               'View Complete Product Specifications >',

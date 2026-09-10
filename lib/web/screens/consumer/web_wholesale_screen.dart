@@ -6,7 +6,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../../shared/router/app_routes.dart';
 
 class WebWholesaleScreen extends StatefulWidget {
   const WebWholesaleScreen({super.key});
@@ -53,10 +54,16 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'wholesale',
-              searchPlaceholder: 'Search bulk crops, sacks, crates & commercial harvests...',
-              onSearchChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+            WebEcomHeader(
+              currentIndex: 1,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
             const SizedBox(height: 32),
@@ -614,7 +621,7 @@ class _WebWholesaleProductCardState extends State<_WebWholesaleProductCard> {
         action: SnackBarAction(
           label: 'VIEW CART',
           textColor: Colors.white,
-          onPressed: () => context.push('/cart'),
+          onPressed: () => context.go('/cart'),
         ),
       ));
     }

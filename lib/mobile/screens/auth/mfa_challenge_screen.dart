@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -164,8 +165,10 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = kIsWeb || MediaQuery.of(context).size.width > 768;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isWeb ? const Color(0xFFF8FAFC) : AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -192,59 +195,59 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
                 color: AppColors.textHeadline,
               ),
             ),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(AppRoutes.login);
+              }
+            },
           ),
         ),
       ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 16.0,
+            return Center(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                    maxWidth: isWeb ? 460 : double.infinity,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 12),
-                      _buildSecurityBadge(),
-                      const SizedBox(height: 28),
-                      Text(
-                        'Two-Factor Authentication',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textHeadline,
-                          letterSpacing: -0.4,
-                        ),
-                        textAlign: TextAlign.center,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 24.0,
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.)',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: AppColors.textSubtle,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      _buildPinInputSection(),
-                      const SizedBox(height: 24),
-                      if (_error != null) _buildErrorBanner(),
-                      const SizedBox(height: 28),
-                      _buildStatusIndicator(),
-                      const SizedBox(height: 36),
-                      _buildSecurityFooter(),
-                      const SizedBox(height: 16),
-                    ],
+                      child: isWeb
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32.0,
+                                vertical: 36.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A)
+                                        .withValues(alpha: 0.05),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: _buildFormContent(),
+                            )
+                          : _buildFormContent(),
+                    ),
                   ),
                 ),
               ),
@@ -255,11 +258,54 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
     );
   }
 
+  Widget _buildFormContent() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 8),
+        _buildSecurityBadge(),
+        const SizedBox(height: 24),
+        Text(
+          'Two-Factor Authentication',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textHeadline,
+            letterSpacing: -0.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.)',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: AppColors.textSubtle,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 32),
+        _buildPinInputSection(),
+        const SizedBox(height: 20),
+        if (_error != null) ...[
+          _buildErrorBanner(),
+          const SizedBox(height: 20),
+        ],
+        _buildStatusIndicator(),
+        const SizedBox(height: 32),
+        _buildSecurityFooter(),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _buildSecurityBadge() {
     return ScaleTransition(
       scale: _pulseAnimation,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.08),
           shape: BoxShape.circle,
@@ -276,14 +322,14 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
           ],
         ),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
             color: AppColors.primary,
             shape: BoxShape.circle,
           ),
           child: const Icon(
             Icons.shield_outlined,
-            size: 38,
+            size: 34,
             color: Colors.white,
           ),
         ),
@@ -293,22 +339,15 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
 
   Widget _buildPinInputSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _error != null
               ? AppColors.error.withValues(alpha: 0.3)
               : const Color(0xFFE2E8F0),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -316,17 +355,17 @@ class _MfaChallengeScreenState extends State<MfaChallengeScreen>
           for (int i = 0; i < 6; i++) ...[
             if (i == 3)
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                width: 6,
-                height: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                width: 8,
+                height: 2.5,
                 decoration: BoxDecoration(
                   color: const Color(0xFF94A3B8),
-                  borderRadius: BorderRadius.circular(1),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             Expanded(
-              child: AspectRatio(
-                aspectRatio: 0.85,
+              child: SizedBox(
+                height: 54,
                 child: _buildDigitCell(i),
               ),
             ),

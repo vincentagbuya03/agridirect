@@ -82,12 +82,16 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
       final userId = AuthService().userId;
       if (userId.isNotEmpty) {
-        await SupabaseConfig.client
-            .from('farmers')
-            .update({
-              'image_url': publicUrl,
-            })
-            .eq('user_id', userId);
+        try {
+          await SupabaseConfig.client
+              .from('farmers')
+              .update({
+                'cover_url': publicUrl,
+              })
+              .eq('user_id', userId);
+        } catch (colErr) {
+          debugPrint('⚠️ Error updating cover_url in farmer_public_profile_screen: $colErr');
+        }
       }
 
       if (!mounted) return;
@@ -320,8 +324,8 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   }
 
   SliverAppBar _buildSliverAppBar(BuildContext context, bool innerBoxIsScrolled) {
-    final imageUrl = f['imageUrl']?.toString();
-    final avatarUrl = (f['avatar_url'] ?? f['avatarUrl'] ?? f['face_photo_path'])?.toString();
+    final coverUrl = (f['cover_url'] ?? f['coverUrl'] ?? f['coverPath'])?.toString();
+    final avatarUrl = (f['image_url'] ?? f['imageUrl'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['avatarUrl'])?.toString();
 
     return SliverAppBar(
       expandedHeight: 180,
@@ -468,7 +472,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
             Hero(
               tag: 'farmer_${f['farmerId']}',
               child: SafeNetworkImage(
-                imageUrl: _customCoverUrl ?? imageUrl,
+                imageUrl: _customCoverUrl ?? coverUrl,
                 defaultBucket: 'uploads',
                 fit: BoxFit.cover,
                 placeholder: _imagePlaceholder(),

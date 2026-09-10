@@ -20,6 +20,7 @@ class WebNavigation extends StatefulWidget {
   final String? initialPostId;
   final String? initialCategory;
   final String? initialSearchQuery;
+  final int initialProfileTab;
 
   const WebNavigation({
     super.key,
@@ -29,6 +30,7 @@ class WebNavigation extends StatefulWidget {
     this.initialPostId,
     this.initialCategory,
     this.initialSearchQuery,
+    this.initialProfileTab = 0,
   });
 
   @override
@@ -49,6 +51,14 @@ class _WebNavigationState extends State<WebNavigation> {
   }
 
   @override
+  void didUpdateWidget(WebNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      _currentIndex = widget.initialIndex;
+    }
+  }
+
+  @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
     super.dispose();
@@ -66,8 +76,11 @@ class _WebNavigationState extends State<WebNavigation> {
       return;
     }
 
-    // If trying to access Profile (index 3) and not logged in, show login instead
-    if (index == 3 && !_auth.isLoggedIn) {
+    final isFarmer = _auth.isViewingAsFarmer;
+    final profileIndex = isFarmer ? 5 : 3;
+
+    // If trying to access Profile and not logged in, show login instead
+    if (index == profileIndex && !_auth.isLoggedIn) {
       _showLoginDialog();
       return;
     }
@@ -75,8 +88,12 @@ class _WebNavigationState extends State<WebNavigation> {
       _currentIndex = index;
       _selectedCategoryFilter = category;
     });
-    if (!_auth.isViewingAsFarmer) {
-      context.go(AppRoutes.webTabRoute(index));
+
+    final targetRoute = AppRoutes.webTabRoute(index, isFarmer: isFarmer);
+    if (category != null && category.isNotEmpty && !category.startsWith('/')) {
+      context.go('$targetRoute?category=${Uri.encodeComponent(category)}');
+    } else {
+      context.go(targetRoute);
     }
   }
 
@@ -116,6 +133,7 @@ class _WebNavigationState extends State<WebNavigation> {
           onLogout: _handleLogout,
           onNavigate: _navigateTo,
           currentIndex: _currentIndex,
+          initialTab: widget.initialProfileTab,
         ),
       ];
     }
@@ -134,6 +152,7 @@ class _WebNavigationState extends State<WebNavigation> {
         onLogout: _handleLogout,
         onNavigate: _navigateTo,
         currentIndex: _currentIndex,
+        initialTab: widget.initialProfileTab,
       ),
     ];
   }
@@ -152,7 +171,7 @@ class _WebNavigationState extends State<WebNavigation> {
       if (_currentIndex >= screens.length) {
         _currentIndex = 0;
       }
-      return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
+      return AppOpenBanner(child: screens[_currentIndex]);
     }
 
     debugPrint('   → Showing consumer dashboard (current tab: $_currentIndex, isAdmin: ${_auth.isAdmin})');
@@ -162,6 +181,6 @@ class _WebNavigationState extends State<WebNavigation> {
       _currentIndex = 0;
     }
 
-    return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
+    return AppOpenBanner(child: screens[_currentIndex]);
   }
 }

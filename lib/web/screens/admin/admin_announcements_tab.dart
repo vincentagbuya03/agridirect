@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/ai/ai_service.dart';
 import 'admin_ui.dart';
@@ -262,12 +263,16 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
       String code = 'weather_daily_summary';
       const farmName = 'San Carlos City farms';
 
-      const apiKey = 'd519e73b738173d3d9a7bd5737ea3992';
-      try {
-        final url = Uri.parse(
-          'https://api.openweathermap.org/data/2.5/forecast?lat=15.9224&lon=120.3489&units=metric&appid=$apiKey',
-        );
-        final res = await http.get(url);
+      final apiKey = dotenv.env['OPENWEATHER_API_KEY']?.trim().isNotEmpty == true
+          ? dotenv.env['OPENWEATHER_API_KEY']!.trim()
+          : const String.fromEnvironment('OPENWEATHER_API_KEY', defaultValue: '');
+
+      if (apiKey.isNotEmpty) {
+        try {
+          final url = Uri.parse(
+            'https://api.openweathermap.org/data/2.5/forecast?lat=15.9224&lon=120.3489&units=metric&appid=$apiKey',
+          );
+          final res = await http.get(url);
         if (res.statusCode == 200) {
           final data = jsonDecode(utf8.decode(res.bodyBytes));
           final list = (data['list'] as List?) ?? [];
@@ -326,6 +331,7 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
           }
         }
       } catch (_) {}
+    }
 
       final aiRes = await _ai.generateWeatherPush(
         farmName: farmName,

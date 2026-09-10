@@ -261,6 +261,151 @@ class FarmerStrings {
       'en': 'Weather',
       'fil': 'Panahon',
     },
+    // Farm Details Redesign Strings
+    'farm_details_title': {
+      'en': 'Farm Details',
+      'fil': 'Detalye ng Sakahan',
+    },
+    'personal_details_title': {
+      'en': 'Personal Details',
+      'fil': 'Personal na Detalye',
+    },
+    'change_cover': {
+      'en': 'Change Cover',
+      'fil': 'Palitan ang Cover',
+    },
+    'uploading_cover': {
+      'en': 'Uploading...',
+      'fil': 'Nag-a-upload...',
+    },
+    'no_cover_yet': {
+      'en': 'No cover photo uploaded yet',
+      'fil': 'Wala pang cover photo',
+    },
+    'tap_to_add_cover': {
+      'en': 'Tap to add store cover banner',
+      'fil': 'Pindutin para maglagay ng cover banner',
+    },
+    'verified_farm_profile': {
+      'en': 'Verified Farm Profile',
+      'fil': 'Kumpirmadong Sakahan',
+    },
+    'buyer_profile': {
+      'en': 'Buyer Profile',
+      'fil': 'Profile ng Mamimili',
+    },
+    'farm_info_title': {
+      'en': 'Farm Credentials',
+      'fil': 'Impormasyon ng Sakahan',
+    },
+    'personal_info_title': {
+      'en': 'Personal Information',
+      'fil': 'Personal na Impormasyon',
+    },
+    'farm_name_label': {
+      'en': 'Farm Name',
+      'fil': 'Pangalan ng Sakahan',
+    },
+    'full_name_label': {
+      'en': 'Full Name',
+      'fil': 'Buong Pangalan',
+    },
+    'email_label': {
+      'en': 'Registered Email',
+      'fil': 'Naka-rehistrong Email',
+    },
+    'phone_label': {
+      'en': 'Mobile Phone (SMS OTP)',
+      'fil': 'Numero ng Mobile Phone',
+    },
+    'phone_verified_badge': {
+      'en': 'Verified',
+      'fil': 'Kumpirmado',
+    },
+    'phone_unverified_badge': {
+      'en': 'Unverified',
+      'fil': 'Hindi Pa Kumpirmado',
+    },
+    'phone_update_btn': {
+      'en': 'Update',
+      'fil': 'Palitan',
+    },
+    'phone_verify_btn': {
+      'en': 'Verify',
+      'fil': 'Kumpirmahin',
+    },
+    'location_logistics_title': {
+      'en': 'Location & Delivery',
+      'fil': 'Lokasyon at Paghahatid',
+    },
+    'residential_address_label': {
+      'en': 'Farm / Residential Address',
+      'fil': 'Tirahan o Lokasyon ng Sakahan',
+    },
+    'free_delivery_min_label': {
+      'en': 'Minimum Order for Free Delivery (₱)',
+      'fil': 'Halaga para sa Libreng Delivery (₱)',
+    },
+    'free_delivery_hint': {
+      'en': 'Leave 0 if free delivery is not offered',
+      'fil': 'Ilagay ang 0 kung walang libreng delivery',
+    },
+    'map_pin_title': {
+      'en': 'GPS Map Pin Location',
+      'fil': 'GPS Pin sa Mapa',
+    },
+    'pinned_ready': {
+      'en': 'Farm coordinates pinned and verified',
+      'fil': 'Naituro na ang lokasyon sa mapa',
+    },
+    'pinned_empty': {
+      'en': 'No farm coordinates pinned yet',
+      'fil': 'Wala pang lokasyon na naituro sa mapa',
+    },
+    'pin_on_map_btn': {
+      'en': 'Pin Farm on Map',
+      'fil': 'Ituro ang Sakahan sa Mapa',
+    },
+    'update_pin_btn': {
+      'en': 'Update Pin on Map',
+      'fil': 'Baguhin ang Pin sa Mapa',
+    },
+    'edit_details_btn': {
+      'en': 'Edit Details',
+      'fil': 'Baguhin ang Detalye',
+    },
+    'save_changes_btn': {
+      'en': 'Save Changes',
+      'fil': 'I-save',
+    },
+    'saving_changes': {
+      'en': 'Saving...',
+      'fil': 'Sine-save...',
+    },
+    'cancel_btn': {
+      'en': 'Cancel',
+      'fil': 'Kanselahin',
+    },
+    'active_store_badge': {
+      'en': 'Active Store',
+      'fil': 'Aktibong Tindahan',
+    },
+    'tap_to_change_cover': {
+      'en': 'Tap to upload storefront banner',
+      'fil': 'I-tap para maglagay ng banner',
+    },
+    'protected_field': {
+      'en': 'Protected',
+      'fil': 'Protektado',
+    },
+    'store_credentials_subtitle': {
+      'en': 'Core identity and contact information',
+      'fil': 'Pangunahing detalye at kontak ng sakahan',
+    },
+    'logistics_subtitle': {
+      'en': 'Delivery address and order conditions',
+      'fil': 'Address ng sakahan at pamantayan sa paghahatid',
+    },
   };
 
   /// Retrieve localized string for [key] in specified [lang] or fallback to English.

@@ -57,7 +57,7 @@ class WebMoreActionsDialog extends StatelessWidget {
               color: const Color(0xFF10B981),
               onTap: () {
                 Navigator.of(context).pop();
-                context.push(AppRoutes.community);
+                context.go(AppRoutes.community);
               },
             ),
             _buildActionRow(
@@ -68,7 +68,7 @@ class WebMoreActionsDialog extends StatelessWidget {
               color: const Color(0xFF0EA5E9),
               onTap: () {
                 Navigator.of(context).pop();
-                context.push(AppRoutes.weatherRadar);
+                context.go(AppRoutes.weatherRadar);
               },
               isLast: true,
             ),

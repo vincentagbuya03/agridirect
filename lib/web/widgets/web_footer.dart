@@ -355,8 +355,8 @@ class AgriDirectWebFooter extends StatelessWidget {
                         Expanded(
                           child: _buildFooterSection('EXPLORE & MORE', [
                             _FooterAction('Storefront Home', () => context.go(AppRoutes.marketplace)),
-                            _FooterAction('Our Story & Welcome', () => context.go(AppRoutes.webWelcome)),
-                            _FooterAction('About Us', () => context.go(AppRoutes.aboutUs)),
+                            _FooterAction('Welcome & Intro', () => context.go(AppRoutes.webWelcome)),
+                            _FooterAction('About Us & Mission', () => context.go(AppRoutes.aboutUs)),
                             _FooterAction('Find Farmer Map', () => context.go(AppRoutes.farmersMap)),
                             _FooterAction('Weather Radar', () => context.go(AppRoutes.weatherRadar)),
                             _FooterAction('Community Hub', () => context.go(AppRoutes.community)),
@@ -428,8 +428,8 @@ class AgriDirectWebFooter extends StatelessWidget {
                       flex: 2,
                       child: _buildFooterSection('EXPLORE & SERVICES', [
                         _FooterAction('Storefront Home', () => context.go(AppRoutes.marketplace)),
-                        _FooterAction('Our Story & Welcome', () => context.go(AppRoutes.webWelcome)),
-                        _FooterAction('About Us', () => context.go(AppRoutes.aboutUs)),
+                        _FooterAction('Welcome & Intro', () => context.go(AppRoutes.webWelcome)),
+                        _FooterAction('About Us & Mission', () => context.go(AppRoutes.aboutUs)),
                         _FooterAction('Find Farmer Map', () => context.go(AppRoutes.farmersMap)),
                         _FooterAction('Weather Radar', () => context.go(AppRoutes.weatherRadar)),
                         _FooterAction('Community Hub', () => context.go(AppRoutes.community)),

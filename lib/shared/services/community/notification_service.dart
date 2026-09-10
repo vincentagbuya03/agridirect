@@ -410,6 +410,8 @@ class NotificationService {
     );
   }
 
+  static bool _isLaunchingCall = false;
+
   static Future<void> launchCallScreen({
     required String name,
     required String? avatarUrl,
@@ -427,28 +429,38 @@ class NotificationService {
       return;
     }
 
-    BuildContext? ctx = appNavigatorKey.currentContext;
-    int retries = 0;
-    while (ctx == null && retries < 25) {
-      await Future.delayed(const Duration(milliseconds: 80));
-      ctx = appNavigatorKey.currentContext;
-      retries++;
+    if (_isLaunchingCall) {
+      debugPrint('📞 launchCallScreen already in progress, skipping duplicate');
+      return;
     }
+    _isLaunchingCall = true;
 
-    if (ctx != null && ctx.mounted) {
-      Navigator.of(ctx, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (_) => InAppCallScreen(
-            name: name,
-            avatarUrl: avatarUrl,
-            callId: callId,
-            channelName: channelName,
-            isVideo: isVideo,
-            isIncoming: isIncoming,
-            isAlreadyAccepted: isAlreadyAccepted,
+    try {
+      BuildContext? ctx = appNavigatorKey.currentContext;
+      int retries = 0;
+      while (ctx == null && retries < 40) {
+        await Future.delayed(const Duration(milliseconds: 80));
+        ctx = appNavigatorKey.currentContext;
+        retries++;
+      }
+
+      if (ctx != null && ctx.mounted) {
+        await Navigator.of(ctx, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => InAppCallScreen(
+              name: name,
+              avatarUrl: avatarUrl,
+              callId: callId,
+              channelName: channelName,
+              isVideo: isVideo,
+              isIncoming: isIncoming,
+              isAlreadyAccepted: isAlreadyAccepted,
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } finally {
+      _isLaunchingCall = false;
     }
   }
 
