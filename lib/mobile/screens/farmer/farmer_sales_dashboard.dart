@@ -22,6 +22,8 @@ import '../../../shared/localization/farmer_locale_service.dart';
 import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import '../support/kiko_ai_chat_screen.dart';
 import 'weather_detail_screen.dart';
+import '../../../shared/widgets/tour/spotlight_tour_controller.dart';
+import '../../../shared/widgets/tour/farmer_tour_steps.dart';
 
 class FarmerSalesDashboard extends StatefulWidget {
   const FarmerSalesDashboard({super.key});
@@ -60,6 +62,13 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   late Stream<int> _unreadMessagesStream;
 
+  // Guided Tour Target Keys
+  final GlobalKey _performanceBentoKey = GlobalKey();
+  final GlobalKey _weatherAiKey = GlobalKey();
+  final GlobalKey _quickOpsKey = GlobalKey();
+  final GlobalKey _salesAnalyticsKey = GlobalKey();
+  final GlobalKey _headerActionsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +81,28 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     _initializeLocationTracking();
     _startPeriodicRefresh();
     OfflineProductService().init();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndLaunchFarmerTour();
+    });
+  }
+
+  Future<void> _checkAndLaunchFarmerTour({bool force = false}) async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    final steps = getFarmerTourSteps(
+      performanceBentoKey: _performanceBentoKey,
+      weatherAiKey: _weatherAiKey,
+      quickOpsKey: _quickOpsKey,
+      salesAnalyticsKey: _salesAnalyticsKey,
+      headerActionsKey: _headerActionsKey,
+    );
+    await SpotlightTourController.startTour(
+      context,
+      steps: steps,
+      prefKey: SpotlightTourController.farmerTourKey,
+      force: force,
+    );
   }
 
   @override
@@ -358,30 +389,45 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(locale),
+                      KeyedSubtree(
+                        key: _headerActionsKey,
+                        child: _buildHeader(locale),
+                      ),
                       const SizedBox(height: 18),
-                      _buildWeatherAiCard(locale),
+                      KeyedSubtree(
+                        key: _weatherAiKey,
+                        child: _buildWeatherAiCard(locale),
+                      ),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
                         locale.t('performance_overview'),
                         subtitle: locale.t('performance_overview_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildPerformanceBento(locale),
+                      KeyedSubtree(
+                        key: _performanceBentoKey,
+                        child: _buildPerformanceBento(locale),
+                      ),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
                         locale.t('quick_operations'),
                         subtitle: locale.t('quick_operations_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildQuickOperationsGrid(locale),
+                      KeyedSubtree(
+                        key: _quickOpsKey,
+                        child: _buildQuickOperationsGrid(locale),
+                      ),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
                         locale.t('sales_analytics'),
                         subtitle: locale.t('sales_analytics_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildSalesAnalyticsCard(locale),
+                      KeyedSubtree(
+                        key: _salesAnalyticsKey,
+                        child: _buildSalesAnalyticsCard(locale),
+                      ),
                     ],
                   ),
                 ),
