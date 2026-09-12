@@ -246,7 +246,8 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            _buildDailyDiscoveriesSliver(),
+          ),
+          _buildDailyDiscoveriesSliver(),
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
