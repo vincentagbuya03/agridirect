@@ -147,28 +147,37 @@ class _SpotlightTourOverlayState extends State<SpotlightTourOverlay>
     double cardTop;
     final safeTop = mediaQuery.padding.top + 16.0;
     final safeBottom = screenSize.height - mediaQuery.padding.bottom - 16.0;
+    const estimatedCardHeight = 250.0;
+    final maxAllowedTop = math.max(safeTop, safeBottom - estimatedCardHeight);
 
-    if (targetRect == null) {
-      // Center placement fallback
-      cardTop = (screenSize.height - 240) / 2;
+    final bool isTargetOnScreen = targetRect != null &&
+        targetRect.bottom > safeTop &&
+        targetRect.top < safeBottom;
+
+    if (!isTargetOnScreen) {
+      // Fallback: gracefully center card if target is missing or offscreen
+      cardTop = (screenSize.height - estimatedCardHeight) / 2;
     } else {
       final targetCenterY = targetRect.center.dy;
       final showBelow = step.preferredPosition == TourCardPosition.bottom ||
           (step.preferredPosition == TourCardPosition.auto &&
-              targetCenterY < screenSize.height * 0.52);
+              targetCenterY < screenSize.height * 0.50);
 
       if (showBelow) {
         cardTop = targetRect.bottom + 14;
-        if (cardTop + 240 > safeBottom) {
-          cardTop = math.max(safeTop, targetRect.top - 240 - 14);
+        if (cardTop + estimatedCardHeight > safeBottom) {
+          cardTop = targetRect.top - estimatedCardHeight - 14;
         }
       } else {
-        cardTop = targetRect.top - 240 - 14;
+        cardTop = targetRect.top - estimatedCardHeight - 14;
         if (cardTop < safeTop) {
-          cardTop = math.min(safeBottom - 240, targetRect.bottom + 14);
+          cardTop = targetRect.bottom + 14;
         }
       }
     }
+
+    // Bulletproof clamping: card can NEVER be pushed off-screen
+    cardTop = cardTop.clamp(safeTop, maxAllowedTop);
 
     // Horizontal centering
     final cardLeft = (screenSize.width - cardWidth) / 2;
@@ -427,11 +436,15 @@ class _SpotlightPainter extends CustomPainter {
     final fullScreenRect = Offset.zero & size;
     final screenPath = Path()..addRect(fullScreenRect);
 
-    // If no target rect, simply draw the dark overlay
-    if (targetRect == null) {
+    final bool isTargetVisible = targetRect != null &&
+        targetRect!.bottom > 0 &&
+        targetRect!.top < size.height;
+
+    // If no target rect or completely offscreen, simply draw the dark overlay
+    if (!isTargetVisible) {
       canvas.drawRect(
         fullScreenRect,
-        Paint()..color = Colors.black.withValues(alpha: 0.72),
+        Paint()..color = Colors.black.withValues(alpha: 0.74),
       );
       return;
     }

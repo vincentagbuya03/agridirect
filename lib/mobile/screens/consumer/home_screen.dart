@@ -55,11 +55,11 @@ class _HomeScreenState extends State<HomeScreen>
   Position? _userPosition;
 
   // Guided Tour Target Keys
-  final GlobalKey _searchAndAddressKey = GlobalKey();
+  final GlobalKey _searchBarKey = GlobalKey();
   final GlobalKey _quickChannelsKey = GlobalKey();
   final GlobalKey _featuredFarmersKey = GlobalKey();
-  final GlobalKey _flashDealsKey = GlobalKey();
-  final GlobalKey _cartOrAssistantKey = GlobalKey();
+  final GlobalKey _heroBannerKey = GlobalKey();
+  final GlobalKey _cartActionKey = GlobalKey();
 
   @override
   void initState() {
@@ -83,11 +83,11 @@ class _HomeScreenState extends State<HomeScreen>
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     final steps = getConsumerTourSteps(
-      searchAndAddressKey: _searchAndAddressKey,
+      searchAndAddressKey: _searchBarKey,
       quickChannelsKey: _quickChannelsKey,
       featuredFarmersKey: _featuredFarmersKey,
-      flashDealsKey: _flashDealsKey,
-      cartOrAssistantKey: _cartOrAssistantKey,
+      flashDealsKey: _heroBannerKey,
+      cartOrAssistantKey: _cartActionKey,
     );
     await SpotlightTourController.startTour(
       context,
@@ -148,10 +148,11 @@ class _HomeScreenState extends State<HomeScreen>
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             EcomSliverAppBar(
-              key: _searchAndAddressKey,
               displayCity: _displayCity,
               onLocationTap: () => _showAddressPicker(context),
               unreadMessagesStream: _unreadCountStream,
+              searchBarKey: _searchBarKey,
+              cartActionKey: _cartActionKey,
             ),
             if (AuthService().isSeller)
               SliverToBoxAdapter(
@@ -166,7 +167,12 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 6)),
-            const SliverToBoxAdapter(child: EcomHeroBanner()),
+            SliverToBoxAdapter(
+              child: KeyedSubtree(
+                key: _heroBannerKey,
+                child: const EcomHeroBanner(),
+              ),
+            ),
             SliverToBoxAdapter(
               child: KeyedSubtree(
                 key: _quickChannelsKey,
@@ -178,10 +184,7 @@ class _HomeScreenState extends State<HomeScreen>
                 future: _flashSaleProductsFuture,
                 builder: (context, snapshot) {
                   final products = snapshot.data ?? [];
-                  return KeyedSubtree(
-                    key: _flashDealsKey,
-                    child: EcomFlashSaleSection(flashProducts: products),
-                  );
+                  return EcomFlashSaleSection(flashProducts: products);
                 },
               ),
             ),
@@ -204,10 +207,8 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             SliverToBoxAdapter(
-              child: KeyedSubtree(
-                key: _cartOrAssistantKey,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                   child: Row(
                     children: [
                       Container(
@@ -246,8 +247,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-          ),
-          _buildDailyDiscoveriesSliver(),
+            _buildDailyDiscoveriesSliver(),
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

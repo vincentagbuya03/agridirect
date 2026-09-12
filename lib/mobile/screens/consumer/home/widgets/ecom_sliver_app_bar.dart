@@ -13,12 +13,16 @@ class EcomSliverAppBar extends StatelessWidget {
   final String displayCity;
   final VoidCallback onLocationTap;
   final Stream<int>? unreadMessagesStream;
+  final GlobalKey? searchBarKey;
+  final GlobalKey? cartActionKey;
 
   const EcomSliverAppBar({
     super.key,
     required this.displayCity,
     required this.onLocationTap,
     this.unreadMessagesStream,
+    this.searchBarKey,
+    this.cartActionKey,
   });
 
   Widget _buildActionButton({
@@ -220,27 +224,30 @@ class EcomSliverAppBar extends StatelessWidget {
                     const SizedBox(width: 8),
 
                     // Shopping Cart with Live Item Count
-                    ListenableBuilder(
-                      listenable: CartService(),
-                      builder: (context, _) {
-                        final count = CartService().itemCount;
-                        return _buildActionButton(
-                          iconWidget: const Icon(
-                            Icons.shopping_cart_outlined,
-                            color: Colors.white,
-                            size: 19,
-                          ),
-                          badgeCount: count,
-                          showDotOnly: false,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const CartScreen(),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                    KeyedSubtree(
+                      key: cartActionKey,
+                      child: ListenableBuilder(
+                        listenable: CartService(),
+                        builder: (context, _) {
+                          final count = CartService().itemCount;
+                          return _buildActionButton(
+                            iconWidget: const Icon(
+                              Icons.shopping_cart_outlined,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                            badgeCount: count,
+                            showDotOnly: false,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const CartScreen(),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -257,6 +264,7 @@ class EcomSliverAppBar extends StatelessWidget {
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
+                      key: searchBarKey,
                       height: 40,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(

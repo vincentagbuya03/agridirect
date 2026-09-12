@@ -47,10 +47,10 @@ List<TourStepModel> getConsumerTourSteps({
       targetKey: flashDealsKey,
       badge: '4 OF 5',
       icon: Icons.bolt_rounded,
-      title: 'Flash Deals & Pre-Orders',
+      title: 'Featured Deals & Pre-Orders',
       description:
-          'Lock in unbeatable farm-gate prices before harvest time, or grab limited-time fresh discounts today.',
-      preferredPosition: TourCardPosition.top,
+          'Discover seasonal harvest highlights, subsidized delivery programs, and lock in lower farm-gate prices.',
+      preferredPosition: TourCardPosition.bottom,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       borderRadius: 22,
     ),
@@ -58,11 +58,11 @@ List<TourStepModel> getConsumerTourSteps({
       targetKey: cartOrAssistantKey,
       badge: '5 OF 5',
       icon: Icons.shopping_bag_rounded,
-      title: 'Track Orders & Kiko AI',
+      title: 'Shopping Cart & Messages',
       description:
-          'Review your cart, track live deliveries from farm dispatch, and chat with Kiko AI anytime for instant assistance.',
+          'Review your farm produce basket, track dispatch to your doorstep, and chat directly with farmers in real-time.',
       preferredPosition: TourCardPosition.bottom,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       borderRadius: 18,
     ),
   ];
