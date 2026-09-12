@@ -98,19 +98,43 @@ try {
         }
     }
 
-    # 3. Update Supabase Remote Config
+    # 3. Verify GitHub Asset Availability before publishing to Supabase
     Write-Host ""
-    Write-Host "Updating Supabase remote version config..." -ForegroundColor Cyan
+    Write-Host "Checking if APK is uploaded to GitHub Releases..." -ForegroundColor Cyan
+    $apkUrl = "https://github.com/vincentagbuya03/agridirect/releases/download/v$targetVer/AgriDirect-Installer.apk"
 
-    $supabaseUrl = "https://ywfppgarzyksacgbesme.supabase.co"
-    $supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnBwZ2Fyenlrc2FjZ2Jlc21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NzEzMjcsImV4cCI6MjA4NzM0NzMyN30.aX1HIacJsHV8gU-9tGONnDpucE9vePWOrJbgMR4fSzs"
-
-    $notesArray = $Notes -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-    if ($notesArray.Count -eq 0) {
-        $notesArray = @($Notes)
+    $assetReady = $false
+    try {
+        $headRes = Invoke-WebRequest -Uri $apkUrl -Method Head -MaximumRedirection 5 -ErrorAction Stop
+        if ($headRes.StatusCode -eq 200) {
+            $assetReady = $true
+            Write-Host "[OK] GitHub Release asset is online and ready (HTTP 200)!" -ForegroundColor Green
+        }
+    } catch {
+        # Asset not yet reachable on GitHub
     }
 
-    $apkUrl = "https://github.com/vincentagbuya03/agridirect/releases/download/v$targetVer/AgriDirect-Installer.apk"
+    if (-not $assetReady) {
+        Write-Host ""
+        Write-Host "=======================================================" -ForegroundColor Yellow
+        Write-Host " IMPORTANT: UPLOAD APK BEFORE UPDATING SUPABASE" -ForegroundColor Yellow
+        Write-Host "=======================================================" -ForegroundColor Yellow
+        Write-Host "The APK is NOT yet reachable at:" -ForegroundColor Yellow
+        Write-Host "  $apkUrl" -ForegroundColor White
+        Write-Host ""
+        Write-Host "1. Go to: https://github.com/vincentagbuya03/agridirect/releases/new" -ForegroundColor Cyan
+        Write-Host "2. Create/Edit release tag: v$targetVer" -ForegroundColor Cyan
+        Write-Host "3. Upload: $githubInstaller" -ForegroundColor Cyan
+        Write-Host ""
+        $choice = Read-Host "Proceed with Supabase remote update anyway? (y/N)"
+        if ($choice -notmatch '^[Yy]') {
+            Write-Warning "Supabase update deferred. Run '.\scripts\publish-update.ps1 -SkipBuild' after upload finishes."
+            return
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Updating Supabase remote version config..." -ForegroundColor Cyan
 
     $headers = @{
         "apikey" = $supabaseKey
