@@ -57,7 +57,7 @@
   Create 5 steps targeting Search Bar, Farmers Map, Pre-Orders, Weather Radar, and Cart/Kiko AI with friendly consumer copy.
 
 - [ ] **Step 2: Write `farmer_tour_steps.dart`**
-  Create 5 steps targeting Sales Overview, Add Harvest, Orders Manager, Weather Radar, and Community/Payouts with farm-tailored copy.
+  Create 5 steps targeting Sales Overview, Weather & Kiko Advisory, Add Harvest/Product, Orders Manager, and Direct Buyer Chat & Community.
 
 - [ ] **Step 3: Commit**
   `git add lib/shared/widgets/tour; git commit -m "feat(tour): define consumer and farmer step configurations"`

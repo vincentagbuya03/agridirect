@@ -39,11 +39,11 @@ Create a standalone, decoupled widget package:
 5. **Cart & Assistant**: Target cart icon & Kiko AI. Focus: seamless checkout, order tracking, and instant support.
 
 #### Farmer Tour Steps (`farmer_tour_steps.dart`):
-1. **Farm Dashboard & Wallet**: Target sales balance and daily metrics. Focus: daily earnings, revenue trends, and orders summary.
-2. **List Produce Button**: Target `+ Add Product` button. Focus: fast harvest posting with pictures and per-kg pricing.
-3. **Order Manager**: Target orders tab. Focus: accepting orders, preparing pickups, and marking deliveries.
-4. **Weather Radar & Advisory**: Target weather widget/map. Focus: satellite precipitation alerts to safeguard crops.
-5. **Community & Profile**: Target community / profile tab. Focus: buyer chats, peer farmer collaboration, and payout configurations.
+1. **Farm Performance & Sales**: Target sales summary & metrics. Focus: total revenue, active listings, and sales trends.
+2. **Weather Radar & AI Advisory**: Target weather widget. Focus: real-time rain radar, typhoon warnings, and Kiko AI crop tips.
+3. **Add Produce & Manage Listings**: Target `+ Add Product` / quick operations. Focus: fast crop posting with photos and per-kg pricing.
+4. **Orders & Dispatch**: Target orders navigation. Focus: fulfilling incoming customer orders and managing pre-orders.
+5. **Buyer Chat & Community Hub**: Target messages & community tab. Focus: direct customer negotiations, answering questions, and sharing farm updates.
 
 ---
 
