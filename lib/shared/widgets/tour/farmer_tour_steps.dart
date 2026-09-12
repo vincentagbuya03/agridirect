@@ -11,15 +11,15 @@ List<TourStepModel> getFarmerTourSteps({
 }) {
   return [
     TourStepModel(
-      targetKey: performanceBentoKey,
+      targetKey: headerActionsKey,
       badge: '1 OF 5',
-      icon: Icons.insights_rounded,
-      title: 'Farm Performance & Sales',
+      icon: Icons.chat_bubble_outline_rounded,
+      title: 'Buyer Messages & Alerts',
       description:
-          'Monitor your total farm revenue, active listings, customer followers, and yearly sales trends at a glance.',
+          'Chat directly with interested buyers, negotiate bulk orders, and receive instant alerts when items are ordered.',
       preferredPosition: TourCardPosition.bottom,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      borderRadius: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      borderRadius: 18,
     ),
     TourStepModel(
       targetKey: weatherAiKey,
@@ -33,8 +33,19 @@ List<TourStepModel> getFarmerTourSteps({
       borderRadius: 22,
     ),
     TourStepModel(
-      targetKey: quickOpsKey,
+      targetKey: performanceBentoKey,
       badge: '3 OF 5',
+      icon: Icons.insights_rounded,
+      title: 'Farm Performance & Sales',
+      description:
+          'Monitor your total farm revenue, active listings, customer followers, and yearly sales trends at a glance.',
+      preferredPosition: TourCardPosition.top,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      borderRadius: 22,
+    ),
+    TourStepModel(
+      targetKey: quickOpsKey,
+      badge: '4 OF 5',
       icon: Icons.add_circle_outline_rounded,
       title: 'Post Harvests & Manage Stock',
       description:
@@ -45,7 +56,7 @@ List<TourStepModel> getFarmerTourSteps({
     ),
     TourStepModel(
       targetKey: salesAnalyticsKey,
-      badge: '4 OF 5',
+      badge: '5 OF 5',
       icon: Icons.bar_chart_rounded,
       title: 'Sales Trends & History',
       description:
@@ -53,17 +64,6 @@ List<TourStepModel> getFarmerTourSteps({
       preferredPosition: TourCardPosition.top,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       borderRadius: 22,
-    ),
-    TourStepModel(
-      targetKey: headerActionsKey,
-      badge: '5 OF 5',
-      icon: Icons.chat_bubble_outline_rounded,
-      title: 'Buyer Messages & Alerts',
-      description:
-          'Chat directly with interested buyers, negotiate bulk orders, and receive instant alerts when items are ordered.',
-      preferredPosition: TourCardPosition.bottom,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      borderRadius: 18,
     ),
   ];
 }

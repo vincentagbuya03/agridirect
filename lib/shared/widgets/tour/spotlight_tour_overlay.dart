@@ -42,6 +42,10 @@ class _SpotlightTourOverlayState extends State<SpotlightTourOverlay>
       parent: _pulseController,
       curve: Curves.easeInOut,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToTarget();
+    });
   }
 
   @override
@@ -50,9 +54,30 @@ class _SpotlightTourOverlayState extends State<SpotlightTourOverlay>
     super.dispose();
   }
 
+  void _scrollToTarget() {
+    if (_currentStep >= widget.steps.length) return;
+    final step = widget.steps[_currentStep];
+    final key = step.targetKey;
+    if (key != null && key.currentContext != null) {
+      try {
+        Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOutCubic,
+          alignment: 0.35,
+        ).then((_) {
+          if (mounted) setState(() {});
+        }).catchError((_) {});
+      } catch (_) {}
+    }
+  }
+
   void _next() {
     if (_currentStep < widget.steps.length - 1) {
       setState(() => _currentStep++);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToTarget();
+      });
     } else {
       widget.onFinish();
     }
@@ -61,6 +86,9 @@ class _SpotlightTourOverlayState extends State<SpotlightTourOverlay>
   void _previous() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToTarget();
+      });
     }
   }
 
