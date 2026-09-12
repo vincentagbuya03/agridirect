@@ -391,22 +391,56 @@ class _CommunityStoriesScreenState extends State<CommunityStoriesScreen> {
                             width: 1.5,
                           ),
                         ),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: _primaryLight,
-                          backgroundImage: (avatar != null && avatar.isNotEmpty)
-                              ? CachedNetworkImageProvider(avatar)
-                              : null,
-                          child: (avatar == null || avatar.isEmpty)
-                              ? Text(
-                                  _getInitials(formattedName),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _primary,
+                        child: ClipOval(
+                          child: (avatar != null && avatar.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: avatar,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, _) => Container(
+                                    width: 40,
+                                    height: 40,
+                                    color: _primaryLight,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _getInitials(formattedName),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: _primary,
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, _, _) => Container(
+                                    width: 40,
+                                    height: 40,
+                                    color: _primaryLight,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _getInitials(formattedName),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: _primary,
+                                      ),
+                                    ),
                                   ),
                                 )
-                              : null,
+                              : Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: _primaryLight,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _getInitials(formattedName),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: _primary,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),

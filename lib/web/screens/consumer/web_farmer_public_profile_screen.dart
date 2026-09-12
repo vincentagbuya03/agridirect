@@ -113,14 +113,14 @@ class _WebFarmerPublicProfileScreenState
         await SupabaseConfig.client
             .from('farmers')
             .update({
-              'image_url': publicUrl,
+              'cover_url': publicUrl,
             })
             .eq('user_id', userId);
       } else if (widget.farmerId.isNotEmpty) {
         await SupabaseConfig.client
             .from('farmers')
             .update({
-              'image_url': publicUrl,
+              'cover_url': publicUrl,
             })
             .eq('farmer_id', widget.farmerId);
       }
@@ -601,13 +601,14 @@ class _WebFarmerPublicProfileScreenState
   // 1. FLAGSHIP STORE SHOWCASE BANNER
   // ---------------------------------------------------------------------------
   Widget _buildFlagshipCoverBanner(Map<String, dynamic> farmer, bool isMobile) {
-    final rawAvatar = (farmer['image_url'] ??
-            farmer['logo_url'] ??
-            farmer['avatar_url'] ??
-            farmer['profile_image_url'] ??
-            farmer['profile_picture'])
-        ?.toString();
-    final avatarUrl = rawAvatar;
+    final rawAvatar = farmer['logo_url']?.toString().trim();
+    final avatarUrl = (rawAvatar != null &&
+            rawAvatar.isNotEmpty &&
+            !rawAvatar.contains('face_photo') &&
+            !rawAvatar.contains('avatar') &&
+            !rawAvatar.contains('valid_id'))
+        ? rawAvatar
+        : null;
 
     final rawCover = (_customCoverUrl ??
             farmer['cover_url'] ??
@@ -680,6 +681,24 @@ class _WebFarmerPublicProfileScreenState
                       Icons.agriculture_rounded,
                       size: 44,
                       color: Colors.white24,
+                    ),
+                  ),
+                ),
+              )
+            else if (!ownProfile)
+              Image.asset(
+                'assets/images/banner_1.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF064E3B),
+                        Color(0xFF047857),
+                        Color(0xFF10B981),
+                      ],
                     ),
                   ),
                 ),
@@ -887,13 +906,14 @@ class _WebFarmerPublicProfileScreenState
     double avgRating,
     int totalReviews,
   ) {
-    final rawAvatar = (farmer['image_url'] ??
-            farmer['logo_url'] ??
-            farmer['avatar_url'] ??
-            farmer['profile_image_url'] ??
-            farmer['profile_picture'])
-        ?.toString();
-    final avatarUrl = rawAvatar;
+    final rawAvatar = farmer['logo_url']?.toString().trim();
+    final avatarUrl = (rawAvatar != null &&
+            rawAvatar.isNotEmpty &&
+            !rawAvatar.contains('face_photo') &&
+            !rawAvatar.contains('avatar') &&
+            !rawAvatar.contains('valid_id'))
+        ? rawAvatar
+        : null;
     final farmName = _farmName(farmer);
     final specialty = _specialty(farmer);
     final locationText = _location(farmer);
@@ -1263,41 +1283,44 @@ class _WebFarmerPublicProfileScreenState
           height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
+            color: Colors.white,
             border: Border.all(color: WebDesignTokens.border, width: 2),
             boxShadow: WebDesignTokens.cardRest,
           ),
           child: ClipOval(
-            child: SafeNetworkImage(
-              imageUrl: avatarUrl,
-              defaultBucket: 'avatars',
-              fit: BoxFit.cover,
-              placeholder: Container(
-                color: _primary,
-                child: Center(
-                  child: Text(
-                    farmName.isNotEmpty ? farmName[0].toUpperCase() : 'F',
-                    style: GoogleFonts.rubik(
-                      fontSize: size * 0.4,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+            child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                ? SafeNetworkImage(
+                    imageUrl: avatarUrl,
+                    defaultBucket: 'uploads',
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: const Color(0xFFF1F5F9),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: size * 0.5,
+                        color: _primary,
+                      ),
+                    ),
+                    errorWidget: Container(
+                      color: const Color(0xFFF1F5F9),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: size * 0.5,
+                        color: _primary,
+                      ),
+                    ),
+                  )
+                : Container(
+                    color: const Color(0xFFF1F5F9),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.person_rounded,
+                      size: size * 0.5,
+                      color: _primary,
                     ),
                   ),
-                ),
-              ),
-              errorWidget: Container(
-                color: _primary,
-                child: Center(
-                  child: Text(
-                    farmName.isNotEmpty ? farmName[0].toUpperCase() : 'F',
-                    style: GoogleFonts.rubik(
-                      fontSize: size * 0.4,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
         if (isVerified)

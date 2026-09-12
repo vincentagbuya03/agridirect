@@ -214,7 +214,7 @@ class FollowService {
 
       final profilesResponse = await _client
           .from('v_farmer_profiles')
-          .select('farmer_id, user_id, farm_name, image_url, avatar_url')
+          .select('farmer_id, user_id, farm_name, logo_url, cover_url, avatar_url')
           .inFilter('farmer_id', farmerIds);
 
       final profilesByFarmerId = {

@@ -26,6 +26,7 @@ import 'home/widgets/ecom_hero_banner.dart';
 import 'home/widgets/ecom_quick_channels.dart';
 import 'home/widgets/ecom_flash_sale_section.dart';
 import 'home/widgets/ecom_product_card.dart';
+import '../../widgets/address_management_sheets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -893,9 +894,27 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        context.push(AppRoutes.myDetails);
+                        final newAddr =
+                            await showModalBottomSheet<UserAddress>(
+                          context: context,
+                          isScrollControlled: true,
+                          useRootNavigator: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => const AddressEditorSheet(),
+                        );
+                        if (newAddr != null) {
+                          await UserService().setDefaultAddress(newAddr.addressId);
+                          if (mounted) {
+                            setState(() {
+                              _defaultAddress = newAddr;
+                              _addressLoaded = true;
+                            });
+                          }
+                        } else {
+                          _loadDefaultAddress();
+                        }
                       },
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Add Address'),
@@ -1033,9 +1052,12 @@ class _HomeScreenState extends State<HomeScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    context.push(AppRoutes.addressBook);
+                    await context.push(AppRoutes.addressBook);
+                    if (mounted) {
+                      _loadDefaultAddress();
+                    }
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Manage Addresses'),

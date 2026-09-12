@@ -772,6 +772,16 @@ class SupabaseDataService {
       return trimmed;
     }
     String cleanPath = trimmed;
+    if (cleanPath.startsWith('avatars/')) {
+      return _client.storage
+          .from('avatars')
+          .getPublicUrl(cleanPath.replaceFirst('avatars/', ''));
+    }
+    if (cleanPath.startsWith('/avatars/')) {
+      return _client.storage
+          .from('avatars')
+          .getPublicUrl(cleanPath.replaceFirst('/avatars/', ''));
+    }
     if (cleanPath.startsWith('uploads/')) {
       cleanPath = cleanPath.substring('uploads/'.length);
     } else if (cleanPath.startsWith('/uploads/')) {
@@ -913,20 +923,63 @@ class SupabaseDataService {
     }
   }
 
-  /// Delete a product
+  /// Delete or archive a product
   Future<bool> deleteProduct(String productId) async {
     try {
-      // Delete from inventory first (due to foreign keys)
-      await _client
-          .from('product_inventory')
-          .delete()
-          .eq('product_id', productId);
+      // Clean up cart references if any
+      try {
+        await _client.from('cart_items').delete().eq('product_id', productId);
+      } catch (_) {}
 
-      // Delete images
-      await _client.from('product_images').delete().eq('product_id', productId);
+      // Check if product has past order items (foreign key constraint fk_order_items_product)
+      bool hasOrders = false;
+      try {
+        final orderItems = await _client
+            .from('order_items')
+            .select('order_item_id')
+            .eq('product_id', productId)
+            .limit(1);
+        hasOrders = (orderItems as List).isNotEmpty;
+      } catch (_) {}
 
-      // Delete product itself
-      await _client.from('products').delete().eq('product_id', productId);
+      if (hasOrders) {
+        // Soft delete / archive product so order history integrity is preserved
+        await _client
+            .from('products')
+            .update({'is_active': false})
+            .eq('product_id', productId);
+        try {
+          await _client
+              .from('product_inventory')
+              .update({'available_quantity': 0})
+              .eq('product_id', productId);
+        } catch (_) {}
+      } else {
+        // Safe to hard delete: delete inventory and images first
+        try {
+          await _client
+              .from('product_inventory')
+              .delete()
+              .eq('product_id', productId);
+        } catch (_) {}
+        try {
+          await _client.from('product_images').delete().eq('product_id', productId);
+        } catch (_) {}
+
+        try {
+          await _client.from('products').delete().eq('product_id', productId);
+        } on PostgrestException catch (e) {
+          // If foreign key constraint is encountered, fallback to soft delete
+          if (e.code == '23503') {
+            await _client
+                .from('products')
+                .update({'is_active': false})
+                .eq('product_id', productId);
+          } else {
+            rethrow;
+          }
+        }
+      }
 
       return true;
     } catch (e) {
@@ -1620,7 +1673,18 @@ class SupabaseDataService {
                 .select('avatar_url')
                 .eq('user_id', uId)
                 .maybeSingle();
-            avatarUrl = userResponse?['avatar_url']?.toString();
+            final rawUserAvatar = userResponse?['avatar_url']?.toString();
+            avatarUrl = _resolveImageUrl(rawUserAvatar);
+
+            if (avatarUrl == null || avatarUrl.isEmpty) {
+              final farmerResponse = await _client
+                  .from('farmers')
+                  .select('logo_url')
+                  .eq('user_id', uId)
+                  .maybeSingle();
+              final rawFarmer = farmerResponse?['logo_url']?.toString();
+              avatarUrl = _resolveImageUrl(rawFarmer);
+            }
           } catch (e) {
             debugPrint('Error fetching user avatar: $e');
           }
@@ -1714,7 +1778,7 @@ class SupabaseDataService {
             .toList();
       }
 
-      // Fetch user avatars for enrichment
+      // Fetch user/farmer avatars for enrichment
       final userIds = (response as List)
           .map((item) => item['user_id']?.toString())
           .where((id) => id != null && id.isNotEmpty)
@@ -1731,13 +1795,32 @@ class SupabaseDataService {
               .inFilter('user_id', userIds);
           for (final row in (usersResponse as List)) {
             final uId = row['user_id']?.toString();
-            final avatar = row['avatar_url']?.toString();
-            if (uId != null && avatar != null && avatar.isNotEmpty) {
-              userAvatars[uId] = avatar;
+            final raw = row['avatar_url']?.toString();
+            final resolved = _resolveImageUrl(raw);
+            if (uId != null && resolved != null && resolved.isNotEmpty) {
+              userAvatars[uId] = resolved;
             }
           }
         } catch (e) {
           debugPrint('Error fetching user avatars for forum posts: $e');
+        }
+
+        // Check farmers table for any farmer profiles missing avatar in users table
+        try {
+          final farmersResponse = await _client
+              .from('farmers')
+              .select('user_id, logo_url')
+              .inFilter('user_id', userIds);
+          for (final row in (farmersResponse as List)) {
+            final uId = row['user_id']?.toString();
+            final raw = row['logo_url']?.toString();
+            final resolved = _resolveImageUrl(raw);
+            if (uId != null && resolved != null && resolved.isNotEmpty) {
+              userAvatars[uId] ??= resolved;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching farmer avatars for forum posts: $e');
         }
       }
 
@@ -1826,7 +1909,18 @@ class SupabaseDataService {
               .select('avatar_url')
               .eq('user_id', uId)
               .maybeSingle();
-          avatarUrl = userResponse?['avatar_url']?.toString();
+          final rawUserAvatar = userResponse?['avatar_url']?.toString();
+          avatarUrl = _resolveImageUrl(rawUserAvatar);
+
+          if (avatarUrl == null || avatarUrl.isEmpty) {
+            final farmerResponse = await _client
+                .from('farmers')
+                .select('logo_url')
+                .eq('user_id', uId)
+                .maybeSingle();
+            final rawFarmer = farmerResponse?['logo_url']?.toString();
+            avatarUrl = _resolveImageUrl(rawFarmer);
+          }
         } catch (e) {
           debugPrint('Error fetching user avatar: $e');
         }
@@ -2767,39 +2861,30 @@ class SupabaseDataService {
           .toList();
 
       final farmers = rows.map((item) {
-        final userObj = item['users'] as Map<String, dynamic>?;
-
-        // Avatar / Farm Logo (image_url is the logo, with fallback to logo_url or user avatar, NEVER face_photo_path)
-        final rawAvatar =
-            (item['image_url'] ??
-                    item['logo_url'] ??
-                    userObj?['avatar_url'] ??
-                    item['avatar_url'] ??
-                    item['profile_image_url'])
-                ?.toString();
-        final avatarUrl = _resolveImageUrl(rawAvatar);
+        // Farm Logo: strictly image_url or logo_url (NEVER personal user avatar or face_photo_path)
+        final rawAvatar = (item['logo_url'] ?? item['image_url'])?.toString().trim();
+        final isValidLogo = rawAvatar != null &&
+            rawAvatar.isNotEmpty &&
+            !rawAvatar.toLowerCase().contains('face_photo') &&
+            !rawAvatar.toLowerCase().contains('valid_id') &&
+            !rawAvatar.toLowerCase().contains('selfie');
+        final avatarUrl = isValidLogo ? _resolveImageUrl(rawAvatar) : null;
 
         // Farm Cover Photo (strictly cover_url or banner_url)
-        final rawCoverPath =
-            (item['cover_url'] ??
-                    item['cover_image_url'] ??
-                    item['farm_banner_url'] ??
-                    item['banner_url'])
-                ?.toString();
-        String? resolvedCover = _resolveImageUrl(rawCoverPath);
-
-        // If cover is duplicate of avatar/face photo, clear it
-        final isAvatarDuplicate =
-            resolvedCover != null &&
-            ((avatarUrl != null && resolvedCover == avatarUrl) ||
-                resolvedCover.toLowerCase().contains('face_photo') ||
-                resolvedCover.toLowerCase().contains('avatar') ||
-                resolvedCover.toLowerCase().contains('profile_picture') ||
-                resolvedCover.toLowerCase().contains('selfie'));
-
-        if (isAvatarDuplicate) {
-          resolvedCover = null;
-        }
+        final rawCoverPath = (item['cover_url'] ??
+                item['cover_image_url'] ??
+                item['farm_banner_url'] ??
+                item['banner_url'])
+            ?.toString()
+            .trim();
+        final isValidCover = rawCoverPath != null &&
+            rawCoverPath.isNotEmpty &&
+            !rawCoverPath.toLowerCase().contains('face_photo') &&
+            !rawCoverPath.toLowerCase().contains('avatar') &&
+            !rawCoverPath.toLowerCase().contains('profile_picture') &&
+            !rawCoverPath.toLowerCase().contains('selfie') &&
+            (avatarUrl == null || rawCoverPath != rawAvatar);
+        String? resolvedCover = isValidCover ? _resolveImageUrl(rawCoverPath) : null;
 
         final farmName = item['farm_name']?.toString().trim();
         final fullName = item['full_name']?.toString().trim();

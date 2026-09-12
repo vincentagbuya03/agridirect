@@ -647,8 +647,18 @@ class NotificationService {
     debugPrint('Message data: ${message.data}');
 
     final inferredLinkType = _inferLinkTypeFromData(message.data);
-    final linkType = (message.data['link_type'] ?? inferredLinkType).toString();
-    final linkId = message.data['link_id'] ?? '';
+    final linkType = (message.data['link_type'] ??
+            message.data['linkType'] ??
+            message.data['type'] ??
+            inferredLinkType)
+        .toString();
+    final linkId = (message.data['link_id'] ??
+            message.data['linkId'] ??
+            message.data['productId'] ??
+            message.data['orderId'] ??
+            message.data['id'] ??
+            '')
+        .toString();
 
     debugPrint('Link type: $linkType, Link ID: $linkId');
 
@@ -682,18 +692,33 @@ class NotificationService {
 
   // Helper to get payload from message
   String _getPayload(RemoteMessage message) {
-    final linkType =
-        (message.data['link_type'] ?? _inferLinkTypeFromData(message.data))
-            .toString();
-    final linkId = message.data['link_id'] ?? '';
+    final linkType = (message.data['link_type'] ??
+            message.data['linkType'] ??
+            message.data['type'] ??
+            _inferLinkTypeFromData(message.data))
+        .toString();
+    final linkId = (message.data['link_id'] ??
+            message.data['linkId'] ??
+            message.data['productId'] ??
+            message.data['orderId'] ??
+            message.data['id'] ??
+            '')
+        .toString();
     return '$linkType:$linkId';
   }
 
   String _inferLinkTypeFromData(Map<String, dynamic> data) {
-    final category = data['category']?.toString().trim().toLowerCase();
-    if (category == 'weather') {
-      return 'weather';
-    }
+    final category = (data['category'] ?? data['linkType'] ?? data['type'])
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    if (category == 'weather' || category == 'radar') return 'weather';
+    if (category == 'order' || category == 'orders') return 'order';
+    if (category == 'product' || category == 'products') return 'product';
+    if (category == 'chat' || category == 'conversation' || category == 'message') return 'conversation';
+    if (category == 'voucher' || category == 'promo' || category == 'discount') return 'voucher';
+    if (category == 'post' || category == 'community') return 'post';
+    if (category == 'farm' || category == 'farmer') return 'farm';
     return '';
   }
 
@@ -833,18 +858,22 @@ class NotificationService {
       if (ctx != null && ctx.mounted) {
         if (kIsWeb) {
           if (isFarmer) {
-            GoRouter.of(ctx).go('${AppRoutes.farmerDashboard}?tab=2');
+            GoRouter.of(ctx).push('${AppRoutes.farmerDashboard}?tab=2');
           } else {
-            GoRouter.of(ctx).go(AppRoutes.profile);
+            GoRouter.of(ctx).push(AppRoutes.customerOrders);
           }
         } else {
           if (isFarmer) {
-            GoRouter.of(ctx).go(AppRoutes.home);
+            if (linkId.isNotEmpty) {
+              GoRouter.of(ctx).push('/farmer/orders/$linkId');
+            } else {
+              GoRouter.of(ctx).push(AppRoutes.farmerDashboard);
+            }
           } else {
             if (linkId.isNotEmpty) {
-              GoRouter.of(ctx).go('/orders/$linkId');
+              GoRouter.of(ctx).push('/orders/$linkId');
             } else {
-              GoRouter.of(ctx).go(AppRoutes.customerOrders);
+              GoRouter.of(ctx).push(AppRoutes.customerOrders);
             }
           }
         }
@@ -858,12 +887,12 @@ class NotificationService {
       if (ctx != null && ctx.mounted) {
         if (kIsWeb) {
           if (isFarmer) {
-            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+            GoRouter.of(ctx).push(AppRoutes.farmerDashboard);
           } else {
-            GoRouter.of(ctx).go(AppRoutes.profile);
+            GoRouter.of(ctx).push(AppRoutes.profile);
           }
         } else {
-          GoRouter.of(ctx).go(AppRoutes.home);
+          GoRouter.of(ctx).push(isFarmer ? AppRoutes.farmerDashboard : AppRoutes.profile);
         }
       }
       return;
@@ -879,12 +908,12 @@ class NotificationService {
         
         if (hasSellerRole) {
           authService.switchToFarmerMode();
-          GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+          GoRouter.of(ctx).push(AppRoutes.farmerDashboard);
         } else {
           if (kIsWeb) {
-            GoRouter.of(ctx).go(AppRoutes.profile);
+            GoRouter.of(ctx).push(AppRoutes.profile);
           } else {
-            GoRouter.of(ctx).go(AppRoutes.farmerRegister);
+            GoRouter.of(ctx).push(AppRoutes.farmerRegister);
           }
         }
       }
@@ -893,61 +922,65 @@ class NotificationService {
 
     final ctx = appNavigatorKey.currentContext;
     if (ctx != null && ctx.mounted) {
-      if (linkType == 'weather') {
-        final isFarmer = AuthService().isViewingAsFarmer;
-        if (kIsWeb) {
-          if (isFarmer) {
-            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
-          } else {
-            GoRouter.of(ctx).go(AppRoutes.weatherRadar);
-          }
-        } else {
-          if (isFarmer) {
-            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
-          } else {
-            GoRouter.of(ctx).go(AppRoutes.home);
-          }
-        }
+      if (linkType == 'weather' ||
+          linkType == 'radar' ||
+          linkType == 'weather_radar' ||
+          linkType == 'rain' ||
+          linkType == 'storm') {
+        GoRouter.of(ctx).push(AppRoutes.weatherRadar);
         return;
       }
 
-      if (linkType == 'flash_sale' || linkType == 'flash_harvest' || linkType == 'promo') {
-        GoRouter.of(ctx).go(AppRoutes.flashSale);
+      if (linkType == 'flash_sale' || linkType == 'flash_harvest') {
+        GoRouter.of(ctx).push(AppRoutes.flashSale);
         return;
       }
 
-      if (linkType == 'radar' || linkType == 'weather_radar' || linkType == 'weather') {
-        GoRouter.of(ctx).go(AppRoutes.weatherRadar);
+      if (linkType == 'voucher' || linkType == 'vouchers' || linkType == 'promo') {
+        GoRouter.of(ctx).push(AppRoutes.vouchers);
         return;
       }
 
       if (linkType == 'farmer_dashboard') {
         AuthService().switchToFarmerMode();
-        GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+        GoRouter.of(ctx).push(AppRoutes.farmerDashboard);
         return;
       }
 
       if (linkType == 'announcement' || linkType == 'community') {
-        GoRouter.of(ctx).go(AppRoutes.community);
+        GoRouter.of(ctx).push(AppRoutes.community);
         return;
       }
 
-      if (linkType == 'preorder' && linkId.isNotEmpty) {
-        GoRouter.of(ctx).go(AppRoutes.preorder(linkId));
-        return;
-      }
-
-      if (linkType == 'product') {
+      if (linkType == 'preorder' || linkType == 'preorders') {
         if (linkId.isNotEmpty) {
-          GoRouter.of(ctx).go(AppRoutes.product(linkId));
+          GoRouter.of(ctx).push(AppRoutes.preorder(linkId));
         } else {
-          GoRouter.of(ctx).go(AppRoutes.marketplace);
+          GoRouter.of(ctx).push(AppRoutes.preorders);
+        }
+        return;
+      }
+
+      if (linkType == 'product' || linkType == 'products') {
+        if (linkId.isNotEmpty) {
+          GoRouter.of(ctx).push(AppRoutes.product(linkId));
+        } else {
+          GoRouter.of(ctx).push(AppRoutes.shop);
+        }
+        return;
+      }
+
+      if (linkType == 'farmer' || linkType == 'farm') {
+        if (linkId.isNotEmpty) {
+          GoRouter.of(ctx).push(AppRoutes.farmerProfile(linkId));
+        } else {
+          GoRouter.of(ctx).push(AppRoutes.farmersMap);
         }
         return;
       }
 
       if (linkType == 'marketplace' || linkType == 'shop') {
-        GoRouter.of(ctx).go(AppRoutes.marketplace);
+        GoRouter.of(ctx).push(AppRoutes.shop);
         return;
       }
 
@@ -970,12 +1003,12 @@ class NotificationService {
         }
         final finalCtx = appNavigatorKey.currentContext;
         if (finalCtx != null && finalCtx.mounted) {
-          GoRouter.of(finalCtx).go(AppRoutes.home);
+          GoRouter.of(finalCtx).push(AppRoutes.community);
         }
         return;
       }
 
-      GoRouter.of(ctx).go(AppRoutes.home);
+      GoRouter.of(ctx).push(AppRoutes.home);
     }
   }
 

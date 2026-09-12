@@ -97,7 +97,8 @@ class MessageService {
             user_id,
             farm_name,
             specialty,
-            image_url,
+            logo_url,
+            cover_url,
             user:users (user_id, name, email, avatar_url, updated_at)
           )
         ''');
@@ -171,7 +172,7 @@ class MessageService {
         subtitle = (farmerData?['specialty'] as String?)?.trim().isNotEmpty == true
             ? farmerData!['specialty'].toString()
             : 'Farmer';
-        avatarUrl = farmerData?['image_url'] as String?;
+        avatarUrl = (farmerData?['logo_url'] ?? userData?['avatar_url']) as String?;
         otherUpdatedAt = userData?['updated_at'] as String?;
       }
 

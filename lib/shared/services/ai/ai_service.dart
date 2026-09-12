@@ -182,7 +182,23 @@ Your responsibilities:
     return 'Moo! 🌾 Hindi ma-proseso ang larawan sa kasalukuyan. Siguraduhing malinaw ang kuha ng dahon o pananim at subukang muli!';
   }
 
-  /// Generate a smart agronomic weather push notification description via OpenRouter AI.
+  /// Sanitizes generated notification copy to remove any accidental AI mentions or robotic prefixes
+  static String sanitizeWeatherCopy(String text) {
+    var sanitized = text
+        .replaceAll(RegExp(r'(?:🤖\s*|🌾\s*)?Weather\s*AI:?\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\b(?:Weather\s*)?AI\s*Advisor:?\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\bAI\s*detects?\b:?\s*', caseSensitive: false), 'Telemetry indicates ')
+        .replaceAll(RegExp(r'\bWeather\s*AI\b', caseSensitive: false), 'Weather Advisory')
+        .replaceAll(RegExp(r'\[AI\]:?\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\bAI\b:?\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'🤖\s*'), '')
+        .trim();
+    // Clean any leading dashes or colons left after stripping prefixes
+    sanitized = sanitized.replaceFirst(RegExp(r'^[-:\s]+'), '').trim();
+    return sanitized;
+  }
+
+  /// Generate a dynamic agronomic weather push notification description via OpenRouter AI.
   Future<Map<String, String>> generateWeatherPush({
     required String farmName,
     String? specialty,
@@ -202,7 +218,7 @@ Your responsibilities:
     alertType: alertType,
   );
 
-  /// Generate a smart agronomic weather push notification description via OpenRouter AI.
+  /// Generate a dynamic agronomic weather push notification description via OpenRouter AI.
   Future<Map<String, String>> generateWeatherPushDescription({
     required String farmName,
     String? specialty,
@@ -213,11 +229,11 @@ Your responsibilities:
     String? alertType,
   }) async {
     final prompt = '''
-You are Kiko, the AI Agricultural & Weather Advisor for AgriDirect (Philippines).
+You are the Chief Agricultural Meteorologist and Agronomy Specialist for AgriDirect in Pangasinan, Philippines.
 Generate a highly engaging, dynamic, and realistic weather push notification tailored specifically for Filipino farmers in $farmName.
 
 Live Weather Telemetry:
-- Location: $farmName (Pangasinan)
+- Location: $farmName (Pangasinan, Philippines)
 - Target Crop: "${specialty ?? 'High-value crops & vegetables'}"
 - Live Forecast Condition: $condition
 - Temperature: ${temperature.toStringAsFixed(1)}°C
@@ -225,11 +241,18 @@ Live Weather Telemetry:
 - Wind Speed: ${windSpeed.toStringAsFixed(1)} km/h
 - Alert Level: ${alertType ?? 'general'}
 
-Dynamic Guidelines:
-1. TYPHOON & STORM IDENTIFICATION: If a typhoon, tropical storm, or strong gale is detected in the forecast (or winds > 40 km/h), explicitly mention the storm or typhoon advisory (e.g. "Bagyo Warning", "Typhoon Alert"). Provide urgent advice on canal drainage, staking tall crops (bananas/corn), and securing storage.
-2. DYNAMIC & NATURAL VARIETY: Make the message sound fresh, smart, and realistic with the real numbers (${temperature.toStringAsFixed(0)}°C, ${(rainProbability * 100).toStringAsFixed(0)}% rain). Do NOT use generic canned lines. Use natural English or Taglish.
-3. "title": Must start with "🤖 Weather AI:" or "🌾 Weather AI:" followed by emojis (e.g. "🤖 Weather AI: 🌀 Bagyo Alert & Storm Prep", "🌾 Weather AI: 🌧️ Heavy Rain Advisory", "🌾 Weather AI: ☀️ Sunny Harvest Weather", max 45 chars).
-4. "body": 1-2 concise, high-impact sentences for a mobile lock screen (max 150 chars). State the weather and a specific crop action.
+Critical Guidelines:
+1. NO AI MENTIONS: DO NOT include the words "AI", "Weather AI", "bot", "algorithm", or "artificial intelligence" in the title or body. Write as an authentic meteorological and agronomic alert directly to the farmer.
+2. DYNAMIC ADAPTATION FOR ALL WEATHER CONDITIONS (NOT ONLY RAIN):
+   - Typhoon / Storm (Bagyo) or winds > 40 km/h: Urgent bagyo warning. Advise clearing canal drainage, staking tall crops (bananas/corn), and securing storage.
+   - Extreme Heat / High Temp (>= 33°C): Heat stress warning. Advise irrigating early in the morning, shading vulnerable nursery seedlings, and protecting livestock.
+   - Sunny / Clear Weather (Rain < 20%): Highlight ideal conditions for harvesting, sun-drying palay/corn grains, field weeding, or timely foliar spraying.
+   - Strong Winds (>= 25 km/h): Advise checking trellis support, staking tall crops, and protecting nursery shades.
+   - High Humidity / Overcast / Fog: Warn of fungal blight or pest pressure. Advise preventive bio-fungicides and avoiding over-watering.
+   - Rain / Heavy Rain / Thunderstorm: Advise opening field drainage, postponing pesticide application, and securing newly harvested produce.
+   - Mild / Favorable: Highlight a productive day for crop cultivation, transplanting, and fertilizing.
+3. TITLE FORMAT: Must start with an appropriate weather emoji (e.g. 🌀, ☀️, 🌾, 🌧️, ⛈️, 💨) followed by a clear, realistic headline (e.g. "🌀 Bagyo Warning: Severe Wind & Rain", "☀️ Extreme Heat Advisory: Irrigate Early", "🌾 Optimal Harvest Window: Sunny & Dry", "🌧️ Heavy Rain Alert: Clear Drainage", "💨 Strong Wind Warning: Stake Tall Crops", "🌾 Farm Weather Update: Clear & Productive Day"). Maximum 45 characters. DO NOT include "Weather AI:" or "AI:".
+4. BODY FORMAT: 1-2 concise, high-impact sentences for a mobile lock screen (maximum 145 characters). Include real telemetry (${temperature.toStringAsFixed(0)}°C or ${(rainProbability * 100).toStringAsFixed(0)}% rain) and direct, actionable agricultural advice for ${specialty ?? 'crops'}.
 5. Return ONLY valid JSON format: {"title": "...", "body": "..."} without markdown fences.
 ''';
 
@@ -253,7 +276,7 @@ Dynamic Guidelines:
               'messages': [
                 {
                   'role': 'system',
-                  'content': 'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. You respond strictly in JSON.',
+                  'content': 'You are an expert Agricultural Meteorologist for Filipino farmers. You always respond strictly in JSON without mentioning AI.',
                 },
                 {'role': 'user', 'content': prompt},
               ],
@@ -275,10 +298,14 @@ Dynamic Guidelines:
               try {
                 final parsed = jsonDecode(content);
                 if (parsed is Map && parsed['title'] != null && parsed['body'] != null) {
-                  return {
-                    'title': parsed['title'].toString().trim(),
-                    'body': parsed['body'].toString().trim(),
-                  };
+                  final cleanTitle = sanitizeWeatherCopy(parsed['title'].toString());
+                  final cleanBody = sanitizeWeatherCopy(parsed['body'].toString());
+                  if (cleanTitle.isNotEmpty && cleanBody.isNotEmpty) {
+                    return {
+                      'title': cleanTitle,
+                      'body': cleanBody,
+                    };
+                  }
                 }
               } catch (_) {}
             }
@@ -308,23 +335,69 @@ Dynamic Guidelines:
       if (edgeRes.status == 200 && edgeRes.data is Map) {
         final data = edgeRes.data as Map;
         if (data['title'] != null && data['body'] != null) {
-          return {
-            'title': data['title'].toString().trim(),
-            'body': data['body'].toString().trim(),
-          };
+          final cleanTitle = sanitizeWeatherCopy(data['title'].toString());
+          final cleanBody = sanitizeWeatherCopy(data['body'].toString());
+          if (cleanTitle.isNotEmpty && cleanBody.isNotEmpty) {
+            return {
+              'title': cleanTitle,
+              'body': cleanBody,
+            };
+          }
         }
       }
     } catch (e) {
-      debugPrint('Supabase Edge Function AI weather error: $e');
+      debugPrint('Supabase Edge Function weather push error: $e');
     }
 
-    // Fallback if OpenRouter is unavailable
+    // Dynamic, diverse offline fallback if OpenRouter is unreachable
     final popPercent = (rainProbability * 100).toStringAsFixed(0);
+    final cropLabel = specialty ?? 'crops';
+    final condLower = condition.toLowerCase();
+    final isStorm = (alertType == 'storm') ||
+        condLower.contains('typhoon') ||
+        condLower.contains('cyclone') ||
+        condLower.contains('storm') ||
+        windSpeed >= 40;
+    final isRain = (alertType == 'rain') ||
+        condLower.contains('rain') ||
+        condLower.contains('thunderstorm') ||
+        rainProbability >= 0.5;
+    final isHeat = (alertType == 'heat') ||
+        temperature >= 34.0 ||
+        condLower.contains('heat');
+    final isWindy = (alertType == 'wind') || windSpeed >= 28.0;
+    final isSunny = !isStorm && !isRain && (rainProbability < 0.25 || condLower.contains('clear') || condLower.contains('sun'));
+
+    if (isStorm) {
+      return {
+        'title': '🌀 Bagyo Warning: Severe Wind & Rain',
+        'body': 'Strong winds (${windSpeed.toStringAsFixed(0)} km/h) & storm alert near $farmName. Clear field canals and secure $cropLabel immediately.',
+      };
+    } else if (isRain) {
+      return {
+        'title': '🌧️ Farm Rain Advisory: Field Drainage',
+        'body': 'Expect $condition ($popPercent% rain) near $farmName. Check drainage ditches and delay spraying $cropLabel.',
+      };
+    } else if (isHeat) {
+      return {
+        'title': '☀️ Extreme Heat Advisory: Irrigate Early',
+        'body': 'Temperature peaking at ${temperature.toStringAsFixed(0)}°C near $farmName. Irrigate early morning to prevent heat stress on $cropLabel.',
+      };
+    } else if (isWindy) {
+      return {
+        'title': '💨 Strong Wind Advisory: Stake Tall Crops',
+        'body': 'Gusts up to ${windSpeed.toStringAsFixed(0)} km/h near $farmName. Check trellises and stake tall $cropLabel to prevent lodging.',
+      };
+    } else if (isSunny) {
+      return {
+        'title': '🌾 Optimal Harvest Window: Sunny & Dry',
+        'body': 'Clear skies and ${temperature.toStringAsFixed(0)}°C near $farmName. Ideal conditions for sun-drying palay and harvesting $cropLabel.',
+      };
+    }
+
     return {
-      'title': rainProbability >= 0.5 ? '🌧️ Farm Rain Advisory' : '🌾 Daily Weather Update',
-      'body': rainProbability >= 0.5
-          ? 'Expect $condition ($popPercent% rain) near $farmName. Check field drainage and safeguard ${specialty ?? 'crops'}.'
-          : 'Forecast for $farmName: $condition, ${temperature.toStringAsFixed(0)}°C. Have a fruitful farming day!',
+      'title': '🌾 Farm Weather Update: Daily Briefing',
+      'body': 'Forecast for $farmName: $condition, ${temperature.toStringAsFixed(0)}°C. Favorable conditions for routine $cropLabel field operations.',
     };
   }
 

@@ -279,15 +279,64 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        child: Text(
-                          _post.userName[0].toUpperCase(),
-                          style: AppTextStyles.headline3.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 16,
-                          ),
+                      GestureDetector(
+                        onTap: () async {
+                          final uId = _post.userId;
+                          if (uId != null && uId.isNotEmpty) {
+                            final farmerId = await SupabaseDataService().getFarmerIdByUserId(uId);
+                            if (!context.mounted) return;
+                            if (farmerId != null && farmerId.isNotEmpty) {
+                              context.push(AppRoutes.farmerProfile(farmerId));
+                            }
+                          }
+                        },
+                        child: ClipOval(
+                          child: (_post.authorAvatarUrl != null && _post.authorAvatarUrl!.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: _post.authorAvatarUrl!,
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, _) => Container(
+                                    width: 44,
+                                    height: 44,
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _post.userName.isNotEmpty ? _post.userName[0].toUpperCase() : 'F',
+                                      style: AppTextStyles.headline3.copyWith(
+                                        color: AppColors.primary,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, _, _) => Container(
+                                    width: 44,
+                                    height: 44,
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _post.userName.isNotEmpty ? _post.userName[0].toUpperCase() : 'F',
+                                      style: AppTextStyles.headline3.copyWith(
+                                        color: AppColors.primary,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  width: 44,
+                                  height: 44,
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _post.userName.isNotEmpty ? _post.userName[0].toUpperCase() : 'F',
+                                    style: AppTextStyles.headline3.copyWith(
+                                      color: AppColors.primary,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -483,15 +532,53 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-            child: Text(
-              (comment.userName ?? 'U')[0].toUpperCase(),
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          ClipOval(
+            child: (comment.userAvatar != null && comment.userAvatar!.isNotEmpty)
+                ? CachedNetworkImage(
+                    imageUrl: comment.userAvatar!,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                      width: 36,
+                      height: 36,
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      alignment: Alignment.center,
+                      child: Text(
+                        (comment.userName ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      width: 36,
+                      height: 36,
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      alignment: Alignment.center,
+                      child: Text(
+                        (comment.userName ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: 36,
+                    height: 36,
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    alignment: Alignment.center,
+                    child: Text(
+                      (comment.userName ?? 'U')[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(

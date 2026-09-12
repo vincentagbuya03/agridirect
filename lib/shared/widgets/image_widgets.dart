@@ -91,7 +91,10 @@ class CircularAvatarWithFallback extends StatelessWidget {
   /// The URL of the avatar image
   final String? imageUrl;
 
-  /// The icon to show when no image is available
+  /// Optional Gmail/Google profile image fallback if no custom upload exists
+  final String? fallbackGmailUrl;
+
+  /// The icon to show when no image is available (defaults to person icon)
   final IconData fallbackIcon;
 
   /// Radius of the circle
@@ -112,7 +115,8 @@ class CircularAvatarWithFallback extends StatelessWidget {
   const CircularAvatarWithFallback({
     super.key,
     required this.imageUrl,
-    required this.fallbackIcon,
+    this.fallbackGmailUrl,
+    this.fallbackIcon = Icons.person_rounded,
     this.radius = 40,
     this.borderColor,
     this.borderWidth = 2,
@@ -120,7 +124,15 @@ class CircularAvatarWithFallback extends StatelessWidget {
     this.backgroundColor,
   });
 
-  bool get _hasImageUrl => imageUrl != null && imageUrl!.isNotEmpty;
+  String? get _effectiveUrl {
+    final primary = (imageUrl ?? '').trim();
+    if (primary.isNotEmpty) return primary;
+    final fallback = (fallbackGmailUrl ?? '').trim();
+    if (fallback.isNotEmpty) return fallback;
+    return null;
+  }
+
+  bool get _hasImageUrl => _effectiveUrl != null;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +148,7 @@ class CircularAvatarWithFallback extends StatelessWidget {
       child: ClipOval(
         child: _hasImageUrl
             ? SafeNetworkImage(
-                imageUrl: imageUrl!,
+                imageUrl: _effectiveUrl!,
                 width: radius * 2,
                 height: radius * 2,
                 fit: BoxFit.cover,
@@ -193,7 +205,6 @@ class SafeNetworkImage extends StatefulWidget {
 
 class _SafeNetworkImageState extends State<SafeNetworkImage> {
   Future<String>? _urlFuture;
-  String? _lastImageUrl;
 
   @override
   void initState() {
@@ -204,69 +215,48 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   @override
   void didUpdateWidget(SafeNetworkImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.defaultBucket != widget.defaultBucket) {
       _initFuture();
     }
   }
 
   void _initFuture() {
-    _lastImageUrl = widget.imageUrl;
-    final isSensitive = _lastImageUrl != null &&
-        (_lastImageUrl!.contains('face_scans') ||
-            _lastImageUrl!.contains('face_photo_path') ||
-            _lastImageUrl!.contains('valid_ids') ||
-            _lastImageUrl!.contains('valid_id_path') ||
-            _lastImageUrl!.contains('valid_id_back_path'));
-
-    if (_lastImageUrl == null || _lastImageUrl!.isEmpty || isSensitive) {
+    final rawUrl = widget.imageUrl?.trim();
+    if (rawUrl == null || rawUrl.isEmpty) {
       _urlFuture = null;
-    } else {
-      final rawUrl = _lastImageUrl!;
-      final isHttpUrl =
-          rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
-      final isSignedUrl = rawUrl.contains('token=');
-      // Public Supabase storage URLs (/object/public/) are already accessible
-      // and don't support signed URL generation — use them directly.
-      final isPublicStorageUrl =
-          rawUrl.contains('supabase.co/storage/v1/object/public/');
-      final needsSupabaseResolution = !isHttpUrl ||
-          (rawUrl.contains('supabase.co/storage/v1/object/') &&
-              !isPublicStorageUrl);
+      return;
+    }
 
-      if (isSignedUrl || isPublicStorageUrl || !needsSupabaseResolution) {
-        _urlFuture = Future.value(rawUrl);
-      } else {
-        _urlFuture = SupabaseDatabase.getSafeUrl(
-          rawUrl,
-          defaultBucket: widget.defaultBucket,
-        );
-      }
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      _urlFuture = Future.value(rawUrl);
+    } else {
+      _urlFuture = SupabaseDatabase.getSafeUrl(
+        rawUrl,
+        defaultBucket: widget.defaultBucket,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isSensitive = _lastImageUrl != null &&
-        (_lastImageUrl!.contains('face_scans') ||
-            _lastImageUrl!.contains('face_photo_path') ||
-            _lastImageUrl!.contains('valid_ids') ||
-            _lastImageUrl!.contains('valid_id_path') ||
-            _lastImageUrl!.contains('valid_id_back_path'));
-
-    if (_lastImageUrl == null || _lastImageUrl!.isEmpty || isSensitive) {
+    final rawUrl = widget.imageUrl?.trim();
+    if (rawUrl == null || rawUrl.isEmpty) {
       return widget.errorWidget ?? const Icon(Icons.error);
     }
 
     return FutureBuilder<String>(
       future: _urlFuture,
       builder: (context, snapshot) {
-        final url = snapshot.data ?? '';
         if (snapshot.connectionState == ConnectionState.waiting) {
           return widget.placeholder ?? const SizedBox.shrink();
         }
+
+        final url = snapshot.data ?? '';
         if (url.isEmpty) {
           return widget.errorWidget ?? const Icon(Icons.error);
         }
+
         return CachedNetworkImage(
           imageUrl: url,
           width: widget.width,
@@ -274,8 +264,17 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
           fit: widget.fit,
           placeholder: (context, url) =>
               widget.placeholder ?? const SizedBox.shrink(),
-          errorWidget: (context, url, error) =>
-              widget.errorWidget ?? const Icon(Icons.error),
+          errorWidget: (context, url, error) {
+            // Fallback to standard Image.network if CachedNetworkImage has issue on web
+            return Image.network(
+              url,
+              width: widget.width,
+              height: widget.height,
+              fit: widget.fit,
+              errorBuilder: (context, err, stack) =>
+                  widget.errorWidget ?? const Icon(Icons.error),
+            );
+          },
         );
       },
     );
@@ -285,6 +284,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
 /// A CircleAvatar replacement that handles Supabase storage URLs safely.
 class SafeCircleAvatar extends StatelessWidget {
   final String? imageUrl;
+  final String? fallbackGmailUrl;
   final double radius;
   final Color? backgroundColor;
   final Widget? child;
@@ -293,22 +293,39 @@ class SafeCircleAvatar extends StatelessWidget {
   const SafeCircleAvatar({
     super.key,
     required this.imageUrl,
+    this.fallbackGmailUrl,
     this.radius = 24,
     this.backgroundColor,
     this.child,
     this.defaultBucket,
   });
 
+  String? get _effectiveUrl {
+    final primary = (imageUrl ?? '').trim();
+    if (primary.isNotEmpty) return primary;
+    final fallback = (fallbackGmailUrl ?? '').trim();
+    if (fallback.isNotEmpty) return fallback;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final centeredChild = child != null ? Center(child: child) : null;
+    final effective = _effectiveUrl;
+    final fallbackIcon = Icon(
+      Icons.person_rounded,
+      size: radius * 1.15,
+      color: const Color(0xFF16A34A),
+    );
+
+    final centeredChild = Center(child: child ?? fallbackIcon);
+
     return CircleAvatar(
       radius: radius,
-      backgroundColor: backgroundColor,
+      backgroundColor: backgroundColor ?? const Color(0xFFDCFCE7),
       child: ClipOval(
-        child: imageUrl != null && imageUrl!.isNotEmpty
+        child: effective != null && effective.isNotEmpty
             ? SafeNetworkImage(
-                imageUrl: imageUrl,
+                imageUrl: effective,
                 defaultBucket: defaultBucket,
                 width: radius * 2,
                 height: radius * 2,

@@ -12,6 +12,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
   final int totalReviews;
   final String cropsSummary;
   final String? avatarUrl;
+  final String? coverUrl;
   final VoidCallback onVisit;
 
   const WebFarmerSpotlightCard({
@@ -23,6 +24,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
     required this.totalReviews,
     required this.cropsSummary,
     this.avatarUrl,
+    this.coverUrl,
     required this.onVisit,
   });
 
@@ -34,6 +36,8 @@ class WebFarmerSpotlightCard extends StatelessWidget {
         ? cropsSummary
         : 'San Carlos Fresh Harvest';
 
+    final hasCover = coverUrl != null && coverUrl!.trim().isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: WebDesignTokens.surface,
@@ -41,52 +45,92 @@ class WebFarmerSpotlightCard extends StatelessWidget {
         border: Border.all(color: WebDesignTokens.border),
         boxShadow: WebDesignTokens.cardRest,
       ),
-      padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: WebDesignTokens.primaryLight,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: WebDesignTokens.primary.withValues(alpha: 0.2),
+          if (hasCover)
+            SizedBox(
+              height: 70,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: coverUrl!,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF064E3B), Color(0xFF047857)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
                     ),
                   ),
-                  child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
-                      ? CachedNetworkImage(
-                          imageUrl: avatarUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => const Center(
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: WebDesignTokens.primary,
-                              ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.agriculture_rounded,
-                            color: WebDesignTokens.primaryDark,
-                            size: 26,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.agriculture_rounded,
-                          color: WebDesignTokens.primaryDark,
-                          size: 26,
-                        ),
-                ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.35),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: WebDesignTokens.primaryLight,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: WebDesignTokens.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                            ? CachedNetworkImage(
+                                imageUrl: avatarUrl!,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: WebDesignTokens.primary,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => const Icon(
+                                  Icons.person_rounded,
+                                  color: WebDesignTokens.primaryDark,
+                                  size: 26,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.person_rounded,
+                                color: WebDesignTokens.primaryDark,
+                                size: 26,
+                              ),
+                      ),
+                    ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -211,6 +255,9 @@ class WebFarmerSpotlightCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  ],
+),
+);
   }
 }

@@ -20,6 +20,7 @@ import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../../shared/utils/share_util.dart';
 import '../../../shared/widgets/flying_icon_animation.dart';
+import 'search_results_screen.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
 class FarmerPublicProfileScreen extends StatefulWidget {
@@ -36,7 +37,16 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+    });
+    FocusScope.of(context).unfocus();
+  }
   final GlobalKey _cartKey = GlobalKey();
   final List<OverlayEntry> _flyingOverlayEntries = [];
   String _calculatedDistance = 'Nearby';
@@ -129,6 +139,9 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _searchFocusNode.addListener(() {
+      if (mounted) setState(() {});
+    });
     _calculateDistance();
     _loadFollowState();
   }
@@ -240,6 +253,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _searchController.dispose();
     for (final entry in _flyingOverlayEntries) {
       if (entry.mounted) {
@@ -252,27 +266,66 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   }
 
   Widget _imagePlaceholder() {
+    return Image.asset(
+      'assets/images/banner_1.jpg',
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF064E3B), Color(0xFF059669)],
+          ),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.agriculture_rounded,
+            size: 48,
+            color: Colors.white38,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyCoverPlaceholder() {
     return Container(
-      color: AppColors.primaryLight,
-      child: const Center(
-        child: Icon(
-          Icons.agriculture_rounded,
-          size: 48,
-          color: AppColors.primary,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF064E3B)],
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 45),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_a_photo_outlined,
+                size: 16,
+                color: Colors.white.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Walang Cover Photo • I-tap ang camera icon sa itaas',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
 
-  String _getInitials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.isEmpty) return 'F';
-    if (parts.length == 1) {
-      return parts[0].substring(0, parts[0].length > 1 ? 2 : 1).toUpperCase();
-    }
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
+
 
 
 
@@ -315,6 +368,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
             _ProductsTab(
               farmerId: f['farmerId']?.toString() ?? '',
               searchQuery: _searchQuery,
+              onClearSearch: _clearSearch,
             ),
             _PostsTab(farmerUserId: f['farmerUserId']?.toString() ?? ''),
           ],
@@ -324,8 +378,15 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   }
 
   SliverAppBar _buildSliverAppBar(BuildContext context, bool innerBoxIsScrolled) {
-    final coverUrl = (f['cover_url'] ?? f['coverUrl'] ?? f['coverPath'])?.toString();
-    final avatarUrl = (f['image_url'] ?? f['imageUrl'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['avatarUrl'])?.toString();
+    final coverUrl = (_customCoverUrl ?? f['cover_url'] ?? f['coverUrl'] ?? f['coverPath'])?.toString();
+    final rawLogo = (f['logo_url'] ?? f['farm_logo'])?.toString();
+    final avatarUrl = (rawLogo != null &&
+            rawLogo.trim().isNotEmpty &&
+            !rawLogo.contains('face_photo') &&
+            !rawLogo.contains('avatar') &&
+            !rawLogo.contains('valid_id'))
+        ? rawLogo.trim()
+        : null;
 
     return SliverAppBar(
       expandedHeight: 180,
@@ -344,49 +405,84 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
         icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
       ),
       title: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: 38,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          color: Colors.black.withValues(alpha: 0.38),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _searchFocusNode.hasFocus
+                ? const Color(0xFF10B981)
+                : Colors.white.withValues(alpha: 0.30),
+            width: 1.2,
+          ),
         ),
         child: Row(
           children: [
-            const Icon(Icons.search_rounded, size: 16, color: Colors.white70),
+            const SizedBox(width: 10),
+            Icon(
+              Icons.search_rounded,
+              size: 18,
+              color: _searchFocusNode.hasFocus
+                  ? const Color(0xFF10B981)
+                  : Colors.white70,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: TextField(
                 controller: _searchController,
+                focusNode: _searchFocusNode,
+                cursorColor: Colors.white,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                onTap: () {
+                  if (_tabController.index != 0) {
+                    _tabController.animateTo(0);
+                  }
+                },
                 onChanged: (val) {
+                  if (_tabController.index != 0) {
+                    _tabController.animateTo(0);
+                  }
                   setState(() {
                     _searchQuery = val.trim();
                   });
                 },
                 style: GoogleFonts.inter(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  filled: false,
+                  fillColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                   hintText: 'Search in shop...',
                   hintStyle: GoogleFonts.inter(
-                    color: Colors.white60,
-                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 12.5,
                   ),
                 ),
               ),
             ),
             if (_searchQuery.isNotEmpty)
-              GestureDetector(
-                onTap: () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-                child: const Icon(Icons.close_rounded, size: 16, color: Colors.white70),
+              InkWell(
+                onTap: _clearSearch,
+                borderRadius: BorderRadius.circular(16),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Icon(
+                    Icons.cancel_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                ),
               ),
+            const SizedBox(width: 4),
           ],
         ),
       ),
@@ -471,13 +567,22 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
           children: [
             Hero(
               tag: 'farmer_${f['farmerId']}',
-              child: SafeNetworkImage(
-                imageUrl: _customCoverUrl ?? coverUrl,
-                defaultBucket: 'uploads',
-                fit: BoxFit.cover,
-                placeholder: _imagePlaceholder(),
-                errorWidget: _imagePlaceholder(),
-              ),
+              child: (_customCoverUrl != null && _customCoverUrl!.isNotEmpty) ||
+                      (coverUrl != null && coverUrl.isNotEmpty)
+                  ? SafeNetworkImage(
+                      imageUrl: _customCoverUrl ?? coverUrl,
+                      defaultBucket: 'uploads',
+                      fit: BoxFit.cover,
+                      placeholder: _isOwnProfile
+                          ? _emptyCoverPlaceholder()
+                          : _imagePlaceholder(),
+                      errorWidget: _isOwnProfile
+                          ? _emptyCoverPlaceholder()
+                          : _imagePlaceholder(),
+                    )
+                  : (_isOwnProfile
+                      ? _emptyCoverPlaceholder()
+                      : _imagePlaceholder()),
             ),
             // Dark Gradient Scrim (Shopee style)
             DecoratedBox(
@@ -523,9 +628,9 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                               imageUrl: avatarUrl,
                               defaultBucket: 'uploads',
                               fit: BoxFit.cover,
-                              errorWidget: _buildLogoFallback(),
+                              errorWidget: _buildLogoFallback(f['name']?.toString() ?? 'Farm'),
                             )
-                          : _buildLogoFallback(),
+                          : _buildLogoFallback(f['name']?.toString() ?? 'Farm'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -683,24 +788,14 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     );
   }
 
-  Widget _buildLogoFallback() {
+  Widget _buildLogoFallback([String name = 'Farm']) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF059669), Color(0xFF10B981)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          _getInitials(f['name'] ?? 'Farm'),
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-          ),
-        ),
+      color: const Color(0xFFF1F5F9),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.person_rounded,
+        size: 26,
+        color: Color(0xFF059669),
       ),
     );
   }
@@ -840,7 +935,12 @@ String _titleCase(String text) {
 class _ProductsTab extends StatefulWidget {
   final String farmerId;
   final String searchQuery;
-  const _ProductsTab({required this.farmerId, this.searchQuery = ''});
+  final VoidCallback? onClearSearch;
+  const _ProductsTab({
+    required this.farmerId,
+    this.searchQuery = '',
+    this.onClearSearch,
+  });
 
   @override
   State<_ProductsTab> createState() => _ProductsTabState();
@@ -849,11 +949,30 @@ class _ProductsTab extends StatefulWidget {
 class _ProductsTabState extends State<_ProductsTab> {
   int _activeSortIndex = 0;
   bool _priceAscending = true;
+  late Future<List<ProductItem>> _productsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProductsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.farmerId != widget.farmerId) {
+      _loadProducts();
+    }
+  }
+
+  void _loadProducts() {
+    _productsFuture = SupabaseDataService().getProductsByFarmerId(widget.farmerId);
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<ProductItem>>(
-      future: SupabaseDataService().getProductsByFarmerId(widget.farmerId),
+      future: _productsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -874,20 +993,96 @@ class _ProductsTabState extends State<_ProductsTab> {
           );
         }
 
-        // Apply real-time search filtering
+        // Apply real-time instant in-memory search filtering
         final filtered = rawProducts.where((p) {
           if (widget.searchQuery.isEmpty) return true;
           final q = widget.searchQuery.toLowerCase();
           return p.name.toLowerCase().contains(q) ||
-                 p.farm.toLowerCase().contains(q);
+                 p.farm.toLowerCase().contains(q) ||
+                 (p.categoryName?.toLowerCase().contains(q) ?? false) ||
+                 (p.description?.toLowerCase().contains(q) ?? false);
         }).toList();
 
         if (filtered.isEmpty && widget.searchQuery.isNotEmpty) {
-          return (context.findAncestorStateOfType<_FarmerPublicProfileScreenState>()!)
-              ._emptyState(
-            Icons.search_off_rounded,
-            'No Items Found',
-            'No products matching "${widget.searchQuery}".',
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.search_off_rounded,
+                      size: 34,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No products found',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No products matching "${widget.searchQuery}" in this shop.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: widget.onClearSearch,
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Show All Products'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF059669),
+                          side: const BorderSide(color: Color(0xFF059669)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SearchResultsScreen(query: widget.searchQuery),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.travel_explore_rounded, size: 16),
+                        label: const Text('Search Across AgriDirect'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           );
         }
 
@@ -907,7 +1102,63 @@ class _ProductsTabState extends State<_ProductsTab> {
 
         return CustomScrollView(
           physics: const BouncingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
+            // Active Search Filter Indicator (If searching)
+            if (widget.searchQuery.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(10, 8, 10, 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search_rounded, size: 16, color: Color(0xFF059669)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF065F46)),
+                            children: [
+                              TextSpan(text: '${products.length} ${products.length == 1 ? 'item' : 'items'} found for '),
+                              TextSpan(
+                                text: '"${widget.searchQuery}"',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: widget.onClearSearch,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Text(
+                            'Clear',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF059669),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Sub-filter row (Popular | Latest | Top Sales | Price ↕)
             SliverToBoxAdapter(
               child: Container(

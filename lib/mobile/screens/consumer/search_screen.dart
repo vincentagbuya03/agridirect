@@ -184,12 +184,16 @@ class _SearchScreenState extends State<SearchScreen> {
     if (trimmed.isEmpty) return;
 
     _saveRecentSearch(trimmed);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SearchResultsScreen(query: trimmed),
-      ),
-    );
+    if (Navigator.of(context).canPop() && widget.initialQuery.isNotEmpty) {
+      Navigator.of(context).pop(trimmed);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SearchResultsScreen(query: trimmed),
+        ),
+      );
+    }
   }
 
   Future<void> _openQRScanner() async {
@@ -333,6 +337,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         color: AppColors.textHeadline,
                       ),
                       decoration: const InputDecoration(
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
                         hintText: 'Search fresh crops, farms, produce...',
                         hintStyle: TextStyle(
                           color: Color(0xFF94A3B8),

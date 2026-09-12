@@ -29,6 +29,9 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   late Stream<List<ForumPostItem>> _forumStream;
+  late Future<List<ArticleItem>> _articlesFuture;
+  List<ForumPostItem>? _cachedPosts;
+  List<ArticleItem>? _cachedArticles;
   String _searchQuery = '';
   String _selectedCategory = 'All';
 
@@ -59,6 +62,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
       if (mounted) setState(() {});
     });
     _forumStream = SupabaseDataService().watchForumPosts();
+    _articlesFuture = SupabaseDataService().getArticles();
 
     if (widget.initialPostId != null && widget.initialPostId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -138,8 +142,8 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _buildForumFeed(),
-            _buildArticlesFeed(),
+            _KeepAlivePage(child: _buildForumFeed()),
+            _KeepAlivePage(child: _buildArticlesFeed()),
           ],
         ),
       ),
@@ -501,18 +505,30 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   // ─────────────────────────────────────────────────────────────
   // FORUM FEED
   // ─────────────────────────────────────────────────────────────
+  Future<void> _refreshForumPosts() async {
+    setState(() {
+      _forumStream = SupabaseDataService().watchForumPosts();
+    });
+  }
+
   Widget _buildForumFeed() {
     return StreamBuilder<List<ForumPostItem>>(
       stream: _forumStream,
+      initialData: _cachedPosts,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData && snapshot.data != null) {
+          _cachedPosts = snapshot.data;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting && _cachedPosts == null) {
           return _buildLoadingSkeleton();
         }
-        if (snapshot.hasError) {
+        if (snapshot.hasError && _cachedPosts == null) {
           return _buildErrorState();
         }
 
-        final posts = (snapshot.data ?? []).where((post) {
+        final rawList = _cachedPosts ?? snapshot.data ?? [];
+        final posts = rawList.where((post) {
           // Category filter
           if (_selectedCategory != 'All') {
             final categoryKeyword = _selectedCategory
@@ -531,23 +547,39 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         }).toList();
 
         if (posts.isEmpty) {
-          return _buildEmptyState(
-            title: 'No discussions found',
-            subtitle: _searchQuery.isNotEmpty
-                ? 'Try searching with different keywords.'
-                : 'Be the first grower to ask a question or share advice!',
-            icon: Icons.chat_bubble_outline_rounded,
+          return RefreshIndicator(
+            onRefresh: _refreshForumPosts,
+            color: _primary,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.4,
+                  child: _buildEmptyState(
+                    title: 'No discussions found',
+                    subtitle: _searchQuery.isNotEmpty
+                        ? 'Try searching with different keywords.'
+                        : 'Be the first grower to ask a question or share advice!',
+                    icon: Icons.chat_bubble_outline_rounded,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-          physics: const BouncingScrollPhysics(),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            return _buildModernPostCard(post);
-          },
+        return RefreshIndicator(
+          onRefresh: _refreshForumPosts,
+          color: _primary,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              final post = posts[index];
+              return _buildModernPostCard(post);
+            },
+          ),
         );
       },
     );
@@ -1025,15 +1057,38 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   // ─────────────────────────────────────────────────────────────
   // ARTICLES FEED
   // ─────────────────────────────────────────────────────────────
+  Future<void> _refreshArticles() async {
+    final future = SupabaseDataService().getArticles();
+    setState(() {
+      _articlesFuture = future;
+    });
+    final data = await future;
+    if (mounted) {
+      setState(() {
+        _cachedArticles = data;
+      });
+    }
+  }
+
   Widget _buildArticlesFeed() {
     return FutureBuilder<List<ArticleItem>>(
-      future: SupabaseDataService().getArticles(),
+      future: _articlesFuture,
+      initialData: _cachedArticles,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData && snapshot.data != null) {
+          _cachedArticles = snapshot.data;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting && _cachedArticles == null) {
           return _buildLoadingSkeleton();
         }
 
-        final articles = (snapshot.data ?? []).where((article) {
+        if (snapshot.hasError && _cachedArticles == null) {
+          return _buildErrorState();
+        }
+
+        final rawList = _cachedArticles ?? snapshot.data ?? [];
+        final articles = rawList.where((article) {
           if (_searchQuery.isEmpty) return true;
           final haystack =
               '${article.title} ${article.author} ${article.excerpt} ${article.content ?? ''}'.toLowerCase();
@@ -1041,21 +1096,37 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         }).toList();
 
         if (articles.isEmpty) {
-          return _buildEmptyState(
-            title: 'No articles found',
-            subtitle: 'Agricultural guides and farming tutorials will appear here.',
-            icon: Icons.article_outlined,
+          return RefreshIndicator(
+            onRefresh: _refreshArticles,
+            color: _primary,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.4,
+                  child: _buildEmptyState(
+                    title: 'No articles found',
+                    subtitle: 'Agricultural guides and farming tutorials will appear here.',
+                    icon: Icons.article_outlined,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-          physics: const BouncingScrollPhysics(),
-          itemCount: articles.length,
-          itemBuilder: (context, index) {
-            final article = articles[index];
-            return _buildModernArticleCard(article);
-          },
+        return RefreshIndicator(
+          onRefresh: _refreshArticles,
+          color: _primary,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            itemCount: articles.length,
+            itemBuilder: (context, index) {
+              final article = articles[index];
+              return _buildModernArticleCard(article);
+            },
+          ),
         );
       },
     );
@@ -1322,3 +1393,25 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     );
   }
 }
+
+/// Helper widget to keep TabBarView page state alive and prevent rebuilding/reloading
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+

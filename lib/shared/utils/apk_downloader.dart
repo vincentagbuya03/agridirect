@@ -13,21 +13,17 @@ class ApkDownloader {
     final uri = Uri.parse(apkUrl);
     if (kIsWeb) {
       try {
-        evalJs(
-          """
-          var a = document.createElement('a');
-          a.href = '$apkUrl';
-          a.download = 'AgriDirect-Installer.apk';
-          a.target = '_blank';
-          document.body.appendChild(a);
-          a.click();
+        evalJs("""
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = '$apkUrl';
+          document.body.appendChild(iframe);
           setTimeout(function() {
-            if (document.body.contains(a)) {
-              document.body.removeChild(a);
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
             }
-          }, 1000);
-          """
-        );
+          }, 60000);
+          """);
       } catch (e) {
         // Fallback to url_launcher if JS evaluation fails
         await launchUrl(uri, mode: LaunchMode.externalApplication);

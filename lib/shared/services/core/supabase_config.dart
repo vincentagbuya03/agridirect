@@ -141,6 +141,10 @@ class SupabaseConfig {
 
   /// Check if user is logged in
   static bool get isLoggedIn => currentUser != null;
+
+  /// Safe URL resolver helper
+  static Future<String> getSafeUrl(String? path, {String? defaultBucket}) =>
+      SupabaseDatabase.getSafeUrl(path, defaultBucket: defaultBucket);
 }
 
 /// Helper class for database operations
@@ -154,13 +158,14 @@ class SupabaseDatabase {
     required String name,
     String? phoneNumber,
     bool emailVerified = false,
+    String? avatarUrl,
   }) async {
     try {
       debugPrint('🔵 createUserIfNotExists called');
       debugPrint('🔵 userId: $userId');
 
       // 🔵 Always use upsert to avoid "duplicate key" errors in race conditions
-      final userData = {
+      final userData = <String, dynamic>{
         'user_id': userId,
         'email': email,
         'name': name,
@@ -170,6 +175,23 @@ class SupabaseDatabase {
 
       if (phoneNumber != null && phoneNumber.isNotEmpty) {
         userData['phone'] = phoneNumber;
+      }
+
+      if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+        // Only set default avatar_url if existing profile doesn't already have a custom one
+        try {
+          final existing = await _client
+              .from('users')
+              .select('avatar_url')
+              .eq('user_id', userId)
+              .maybeSingle();
+          final currentAvatar = (existing?['avatar_url'] as String?)?.trim() ?? '';
+          if (currentAvatar.isEmpty) {
+            userData['avatar_url'] = avatarUrl.trim();
+          }
+        } catch (_) {
+          userData['avatar_url'] = avatarUrl.trim();
+        }
       }
 
       debugPrint('🔵 Upserting user profile for $userId');
@@ -480,6 +502,28 @@ class SupabaseDatabase {
     String? reviewNotes,
   }) async {
     try {
+      // Robust resolution of active user ID
+      String effectiveUserId = userId.trim();
+      if (effectiveUserId.isEmpty) {
+        effectiveUserId = (_client.auth.currentUser?.id ??
+                SupabaseConfig.currentUser?.id ??
+                '')
+            .trim();
+      }
+      if (effectiveUserId.isEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          effectiveUserId =
+              (prefs.getString('auth.lastUserId.global') ?? '').trim();
+        } catch (_) {}
+      }
+
+      if (effectiveUserId.isEmpty) {
+        throw Exception(
+          'Authentication required: Please sign in before submitting your farmer registration.',
+        );
+      }
+
       final yearsOfExp = int.tryParse(registration.yearsOfExperience) ?? 0;
       String? faceUrl = registration.facePhotoPath;
       String? idUrl = registration.validIdPath;
@@ -489,7 +533,7 @@ class SupabaseDatabase {
         faceUrl = await uploadImage(
           bucket: 'registrations',
           path:
-              'face_scans/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              'face_scans/${effectiveUserId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
           localPath: registration.facePhotoPath,
           bytes: faceImageBytes,
         );
@@ -499,7 +543,7 @@ class SupabaseDatabase {
         idUrl = await uploadImage(
           bucket: 'registrations',
           path:
-              'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_front.jpg',
+              'valid_ids/${effectiveUserId}_${DateTime.now().millisecondsSinceEpoch}_front.jpg',
           localPath: registration.validIdPath,
           bytes: idImageBytes,
         );
@@ -509,7 +553,7 @@ class SupabaseDatabase {
         idBackUrl = await uploadImage(
           bucket: 'registrations',
           path:
-              'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_back.jpg',
+              'valid_ids/${effectiveUserId}_${DateTime.now().millisecondsSinceEpoch}_back.jpg',
           localPath: registration.validIdBackPath,
           bytes: idBackImageBytes,
         );
@@ -525,10 +569,14 @@ class SupabaseDatabase {
           .toLivestockRows()
           .cast<Map<String, dynamic>>();
 
+      final birthDateTrimmed = registration.birthDate.trim();
+      final birthDateParam =
+          birthDateTrimmed.isNotEmpty ? birthDateTrimmed : null;
+
       final Map<String, dynamic> rpcParams = {
-        'p_user_id': userId,
+        'p_user_id': effectiveUserId,
         'p_full_name': registration.fullName,
-        'p_birth_date': registration.birthDate,
+        'p_birth_date': birthDateParam,
         'p_sex': registration.sex,
         'p_place_of_birth': registration.placeOfBirth,
         'p_pcn': registration.pcn,
@@ -572,7 +620,7 @@ class SupabaseDatabase {
         await _client
             .from('farmers')
             .update(farmerProfileUpdates)
-            .eq('user_id', userId);
+            .eq('user_id', effectiveUserId);
       }
 
       // Sync user display name if changed
@@ -582,7 +630,7 @@ class SupabaseDatabase {
           await _client
               .from('users')
               .update({'name': displayName})
-              .eq('user_id', userId);
+              .eq('user_id', effectiveUserId);
         } catch (e) {
           debugPrint('User name sync warning: $e');
         }
@@ -698,35 +746,71 @@ class SupabaseDatabase {
     Uint8List? bytes,
   }) async {
     try {
-      if (kIsWeb) {
-        if (bytes == null) return null;
-        await _client.storage
-            .from(bucket)
-            .uploadBinary(
-              path,
-              bytes,
-              fileOptions: const FileOptions(
-                cacheControl: '3600',
-                upsert: true,
-              ),
-            );
-      } else {
-        if (localPath == null) return null;
+      Uint8List? uploadBytes = bytes;
+      if (uploadBytes == null && localPath != null && !kIsWeb) {
+        final file = io.File(localPath);
+        if (await file.exists()) {
+          uploadBytes = await file.readAsBytes();
+        }
+      }
+
+      if (uploadBytes != null) {
+        try {
+          await _client.storage.from(bucket).uploadBinary(
+                path,
+                uploadBytes,
+                fileOptions: const FileOptions(
+                  cacheControl: '3600',
+                  upsert: true,
+                ),
+              );
+          return '$bucket/$path';
+        } catch (e) {
+          debugPrint('Upload to $bucket failed ($e), falling back to uploads bucket...');
+          if (bucket != 'uploads') {
+            await _client.storage.from('uploads').uploadBinary(
+                  path,
+                  uploadBytes,
+                  fileOptions: const FileOptions(
+                    cacheControl: '3600',
+                    upsert: true,
+                  ),
+                );
+            return 'uploads/$path';
+          }
+          rethrow;
+        }
+      } else if (localPath != null && !kIsWeb) {
         final file = io.File(localPath);
         if (!await file.exists()) return null;
-        await _client.storage
-            .from(bucket)
-            .upload(
-              path,
-              file,
-              fileOptions: const FileOptions(
-                cacheControl: '3600',
-                upsert: true,
-              ),
-            );
+        try {
+          await _client.storage.from(bucket).upload(
+                path,
+                file,
+                fileOptions: const FileOptions(
+                  cacheControl: '3600',
+                  upsert: true,
+                ),
+              );
+          return '$bucket/$path';
+        } catch (e) {
+          if (bucket != 'uploads') {
+            await _client.storage.from('uploads').upload(
+                  path,
+                  file,
+                  fileOptions: const FileOptions(
+                    cacheControl: '3600',
+                    upsert: true,
+                  ),
+                );
+            return 'uploads/$path';
+          }
+          rethrow;
+        }
       }
-      return '$bucket/$path';
+      return null;
     } catch (e) {
+      debugPrint('Error uploading image: $e');
       return null;
     }
   }
@@ -735,37 +819,90 @@ class SupabaseDatabase {
     String? path, {
     String? defaultBucket,
   }) async {
-    if (path == null || path.isEmpty) return '';
-    String bucket = defaultBucket ?? 'uploads';
-    String fileName = path;
+    if (path == null || path.trim().isEmpty) return '';
+    final rawPath = path.trim();
 
-    if (path.startsWith('http')) {
-      if (!path.contains('supabase.co/storage/v1/object/')) return path;
-      try {
-        final uri = Uri.parse(path);
+    // If it is already a direct HTTP URL
+    if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+      // Non-Supabase external URL (Google avatar, Unsplash, external CDN), return as-is
+      if (!rawPath.contains('supabase.co/storage/v1/object/')) return rawPath;
+      // If it already has a signed access token, return as-is
+      if (rawPath.contains('token=')) return rawPath;
+    }
+
+    String bucket = defaultBucket ?? 'uploads';
+    String clean = rawPath.replaceFirst(RegExp(r'^/+'), '');
+
+    // If it's a full Supabase storage URL, parse the bucket and object path
+    if (clean.startsWith('http')) {
+      final uri = Uri.tryParse(clean);
+      if (uri != null) {
         final segments = uri.pathSegments;
-        int objectIndex = segments.indexOf('object');
+        final objectIndex = segments.indexOf('object');
         if (objectIndex != -1 && segments.length > objectIndex + 2) {
+          // segments[objectIndex + 1] is 'public' or 'authenticated'
           bucket = segments[objectIndex + 2];
-          fileName = segments.sublist(objectIndex + 3).join('/');
-        } else {
-          return path;
+          clean = segments.sublist(objectIndex + 3).join('/');
         }
-      } catch (_) {
-        return path;
-      }
-    } else {
-      final parts = path.split('/');
-      if (parts.length >= 2) {
-        bucket = parts[0];
-        fileName = parts.sublist(1).join('/');
       }
     }
 
+    clean = clean.replaceFirst(RegExp(r'^/+'), '');
+
+    // Smart bucket resolution based on folder or prefix
+    if (clean.startsWith('registrations/')) {
+      bucket = 'registrations';
+      clean = clean.replaceFirst('registrations/', '');
+    } else if (clean.startsWith('uploads/')) {
+      bucket = 'uploads';
+      clean = clean.replaceFirst('uploads/', '');
+    } else if (clean.startsWith('face_scans/') || clean.startsWith('valid_ids/')) {
+      bucket = 'registrations';
+    } else if (clean.startsWith('avatars/') ||
+        clean.startsWith('customer-profiles/') ||
+        clean.startsWith('farmer-profiles/') ||
+        clean.startsWith('covers/')) {
+      bucket = 'uploads';
+    } else {
+      final parts = clean.split('/');
+      if (parts.length >= 2 &&
+          (parts[0] == 'registrations' ||
+              parts[0] == 'uploads' ||
+              parts[0] == 'products')) {
+        bucket = parts[0];
+        clean = parts.sublist(1).join('/');
+      }
+    }
+
+    // Strip bucket name from clean path if repeated
+    if (clean.startsWith('$bucket/')) {
+      clean = clean.replaceFirst('$bucket/', '');
+    }
+
+    // 1. Try signed URL on primary bucket
     try {
-      return await _client.storage.from(bucket).createSignedUrl(fileName, 3600);
-    } catch (e) {
-      return _client.storage.from(bucket).getPublicUrl(fileName);
+      final signed = await _client.storage.from(bucket).createSignedUrl(clean, 3600);
+      if (signed.isNotEmpty) return signed;
+    } catch (_) {}
+
+    // 2. Try signed URL on alternate bucket fallback
+    final altBucket = bucket == 'registrations' ? 'uploads' : 'registrations';
+    try {
+      final altSigned = await _client.storage.from(altBucket).createSignedUrl(clean, 3600);
+      if (altSigned.isNotEmpty) return altSigned;
+    } catch (_) {}
+
+    // 3. Fallback to public URL on primary bucket
+    try {
+      final pubUrl = _client.storage.from(bucket).getPublicUrl(clean);
+      if (pubUrl.isNotEmpty) return pubUrl;
+    } catch (_) {}
+
+    // 4. Fallback to public URL on alternate bucket
+    try {
+      return _client.storage.from(altBucket).getPublicUrl(clean);
+    } catch (_) {
+      return rawPath;
     }
   }
 
@@ -862,8 +999,8 @@ class SupabaseDatabase {
               specialty,
               location,
               residential_address,
-              image_url,
-              face_photo_path,
+              logo_url,
+              cover_url,
               badge,
               user:users (name, avatar_url)
             ''')

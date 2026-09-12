@@ -50,6 +50,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   late List<AnimationController> _postControllers;
   late Future<List<ForumPostItem>> _forumPostsFuture;
   List<ForumPostItem>? _postsList;
+  late Future<List<ArticleItem>> _articlesFuture;
+  List<ArticleItem>? _cachedArticles;
   late Future<WeatherData?> _weatherFuture;
   final Set<int> _hoveredPosts = {};
 
@@ -72,6 +74,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
     _postControllers = [];
     _forumPostsFuture = SupabaseDataService().getForumPosts();
+    _articlesFuture = SupabaseDataService().getArticles();
     _weatherFuture = WeatherService().getWeatherByCity('Manila');
     _marketPricesFuture = _loadMarketPrices();
 
@@ -1072,133 +1075,144 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   Widget _buildFacebookCreatePostCard() {
     final auth = AuthService();
-    final displayName = auth.isLoggedIn ? auth.userName : 'Guest';
+    final displayName = auth.isLoggedIn ? auth.userName : 'Farmer';
     final avatarUrl = auth.isLoggedIn ? auth.userAvatarUrl : null;
+    final firstName = displayName.split(' ').first;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 14,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _primary.withValues(alpha: 0.2), width: 1.5),
-                ),
-                child: ClipOval(
-                  child: SafeNetworkImage(
-                    imageUrl: avatarUrl,
-                    defaultBucket: 'uploads',
-                    fit: BoxFit.cover,
-                    placeholder: Container(color: Colors.grey[200]),
-                    errorWidget: const Icon(Icons.person, color: _muted),
-                  ),
-                ),
+          // Elevated User Avatar with Emerald Accent Ring
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _primary.withValues(alpha: 0.35),
+                width: 2,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: _showCreatePostFlow,
-                    child: Container(
-                      height: 40,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _primary.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: SafeNetworkImage(
+                imageUrl: avatarUrl,
+                defaultBucket: 'uploads',
+                fit: BoxFit.cover,
+                placeholder: Container(color: const Color(0xFFF1F5F9)),
+                errorWidget: const Icon(Icons.person, color: _muted),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Interactive Modern Composer Input Pill
+          Expanded(
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: _showCreatePostFlow,
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        color: _primary.withValues(alpha: 0.8),
+                        size: 20,
                       ),
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "What's on your mind, ${displayName.split(' ').first}?",
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: _muted,
-                          fontWeight: FontWeight.w500,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Share updates, harvest news, or ask the community, $firstName...",
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: _muted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-          const Divider(height: 24, thickness: 1),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            alignment: WrapAlignment.spaceEvenly,
-            children: [
-              _buildCreatePostAction(
-                icon: Icons.photo_library_rounded,
-                label: 'Photo/video',
-                color: const Color(0xFF22C55E),
-                onTap: _showCreatePostFlow,
-              ),
-              _buildCreatePostAction(
-                icon: Icons.label_important_rounded,
-                label: 'Tag Farmer',
-                color: const Color(0xFF3B82F6),
-                onTap: _showCreatePostFlow,
-              ),
-              _buildCreatePostAction(
-                icon: Icons.emoji_emotions_rounded,
-                label: 'Feeling/activity',
-                color: const Color(0xFFEAB308),
-                onTap: _showCreatePostFlow,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(width: 12),
 
-  Widget _buildCreatePostAction({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _muted,
+          // High-End Gradient Post CTA Button
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _showCreatePostFlow,
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_primary, Color(0xFF047857)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primary.withValues(alpha: 0.28),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Post',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1268,17 +1282,21 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   Widget _buildArticlesFeed() {
     return FutureBuilder<List<ArticleItem>>(
-      future: SupabaseDataService().getArticles(),
+      future: _articlesFuture,
+      initialData: _cachedArticles,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData && snapshot.data != null) {
+          _cachedArticles = snapshot.data;
+        }
+        if (snapshot.connectionState == ConnectionState.waiting && _cachedArticles == null) {
           return const Center(child: AppShimmerLoader());
         }
 
-        if (snapshot.hasError) {
+        if (snapshot.hasError && _cachedArticles == null) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
-        final articles = snapshot.data ?? [];
+        final articles = _cachedArticles ?? snapshot.data ?? [];
         if (articles.isEmpty) {
           return Container(
             padding: const EdgeInsets.symmetric(vertical: 48),

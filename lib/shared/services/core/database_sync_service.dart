@@ -399,7 +399,7 @@ class DatabaseSyncService extends ChangeNotifier {
     try {
       final farmers = await _client
           .from('farmers')
-          .select('farmer_id, user_id, image_url, farm_name')
+          .select('farmer_id, user_id, logo_url, cover_url, farm_name')
           .eq('user_id', userId)
           .limit(1);
 

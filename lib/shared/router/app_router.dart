@@ -13,6 +13,7 @@ import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
 import '../../mobile/screens/farmer/farmer_followers_screen.dart';
+import '../../mobile/screens/farmer/weather_map_screen.dart';
 import '../../mobile/screens/farmer/farmer_vouchers_screen.dart';
 import '../../mobile/screens/consumer/claimed_vouchers_screen.dart';
 import '../../mobile/screens/consumer/cart_screen.dart';
@@ -603,7 +604,34 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.weatherRadar,
-        builder: (context, state) => const WebConsumerWeatherRadarScreen(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (kIsWeb || constraints.maxWidth > 800) {
+              return const WebConsumerWeatherRadarScreen();
+            }
+            return const WeatherMapScreen(
+              latitude: 15.9281,
+              longitude: 120.3489,
+              locationName: 'Pangasinan',
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/farmer/weather',
+        builder: (context, state) => const WeatherMapScreen(
+          latitude: 15.9281,
+          longitude: 120.3489,
+          locationName: 'Pangasinan',
+        ),
+      ),
+      GoRoute(
+        path: '/consumer/orders',
+        builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
+        path: '/consumer/vouchers',
+        builder: (context, state) => const VouchersScreen(),
       ),
       GoRoute(
         path: AppRoutes.preorders,

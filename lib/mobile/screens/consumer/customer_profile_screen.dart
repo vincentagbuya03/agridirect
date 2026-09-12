@@ -92,6 +92,20 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   Future<void> _loadCustomerData({int attempt = 0}) async {
     final auth = AuthService();
     final userId = (SupabaseConfig.currentUser?.id ?? auth.userId).trim();
+
+    // Fast local fallback to auth.userAvatarUrl (e.g., Gmail picture) if available
+    if ((_customerImageUrl == null || _customerImageUrl!.isEmpty) && auth.userAvatarUrl.isNotEmpty) {
+      final cachedSafeUrl = await SupabaseDatabase.getSafeUrl(
+        auth.userAvatarUrl,
+        defaultBucket: 'uploads',
+      );
+      if (mounted && cachedSafeUrl.isNotEmpty) {
+        setState(() {
+          _customerImageUrl = cachedSafeUrl;
+        });
+      }
+    }
+
     if (userId.isEmpty) {
       if (attempt < 5) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -109,12 +123,16 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           .limit(1);
 
       if (users.isNotEmpty && mounted) {
-        final rawUrl = users[0]['avatar_url'] as String?;
+        final dbAvatar = (users[0]['avatar_url'] as String?)?.trim();
+        final rawUrl = (dbAvatar != null && dbAvatar.isNotEmpty)
+            ? dbAvatar
+            : auth.userAvatarUrl;
+
         final safeUrl = await SupabaseDatabase.getSafeUrl(
           rawUrl,
           defaultBucket: 'uploads',
         );
-        if (mounted) {
+        if (mounted && safeUrl.isNotEmpty) {
           setState(() {
             _customerImageUrl = safeUrl;
           });
@@ -223,33 +241,66 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Avatar
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: (_customerImageUrl != null &&
-                              _customerImageUrl!.isNotEmpty)
-                          ? CachedNetworkImage(
-                              key: ValueKey(_customerImageUrl),
-                              imageUrl: _customerImageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) =>
-                                  Container(color: Colors.white24),
-                              errorWidget: (_, _, _) => const Icon(
-                                  Icons.person,
-                                  size: 32,
-                                  color: Colors.white54),
-                            )
-                          : Container(
-                              color: Colors.white24,
-                              child: const Icon(Icons.person,
-                                  size: 32, color: Colors.white54),
+                  // Avatar with upload indicator
+                  GestureDetector(
+                    onTap: () async {
+                      await context.push(AppRoutes.myDetails);
+                      if (mounted) _loadCustomerData();
+                    },
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: (_customerImageUrl != null &&
+                                    _customerImageUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    key: ValueKey(_customerImageUrl),
+                                    imageUrl: _customerImageUrl!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, _) =>
+                                        Container(color: Colors.white24),
+                                    errorWidget: (_, _, _) => const Icon(
+                                        Icons.person,
+                                        size: 32,
+                                        color: Colors.white54),
+                                  )
+                                : Container(
+                                    color: Colors.white24,
+                                    child: const Icon(Icons.person,
+                                        size: 32, color: Colors.white54),
+                                  ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
                             ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 13,
+                              color: Color(0xFF059669),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -269,7 +320,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         ),
                         const SizedBox(height: 4),
                         GestureDetector(
-                          onTap: () => context.push(AppRoutes.myDetails),
+                          onTap: () async {
+                            await context.push(AppRoutes.myDetails);
+                            if (mounted) _loadCustomerData();
+                          },
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

@@ -384,7 +384,7 @@ class ProductService {
     }
   }
 
-  /// Delete product
+  /// Delete or archive product
   Future<void> deleteProduct(String productId) async {
     try {
       final existing = await _supabase
@@ -393,7 +393,57 @@ class ProductService {
           .eq('product_id', productId)
           .maybeSingle();
 
-      await _supabase.from('products').delete().eq('product_id', productId);
+      // Clean up cart references if any
+      try {
+        await _supabase.from('cart_items').delete().eq('product_id', productId);
+      } catch (_) {}
+
+      // Check if product has past order items (foreign key constraint fk_order_items_product)
+      bool hasOrders = false;
+      try {
+        final orderItems = await _supabase
+            .from('order_items')
+            .select('order_item_id')
+            .eq('product_id', productId)
+            .limit(1);
+        hasOrders = (orderItems as List).isNotEmpty;
+      } catch (_) {}
+
+      if (hasOrders) {
+        // Soft delete / archive product so order history integrity is preserved
+        await _supabase
+            .from('products')
+            .update({'is_active': false})
+            .eq('product_id', productId);
+        try {
+          await _supabase
+              .from('product_inventory')
+              .update({'available_quantity': 0})
+              .eq('product_id', productId);
+        } catch (_) {}
+      } else {
+        // Safe to hard delete: delete inventory and images first
+        try {
+          await _supabase.from('product_inventory').delete().eq('product_id', productId);
+        } catch (_) {}
+        try {
+          await _supabase.from('product_images').delete().eq('product_id', productId);
+        } catch (_) {}
+
+        try {
+          await _supabase.from('products').delete().eq('product_id', productId);
+        } on PostgrestException catch (e) {
+          // If foreign key constraint is encountered, fallback to soft delete
+          if (e.code == '23503') {
+            await _supabase
+                .from('products')
+                .update({'is_active': false})
+                .eq('product_id', productId);
+          } else {
+            rethrow;
+          }
+        }
+      }
 
       await _activityLogger.log(
         action: 'product_archived',

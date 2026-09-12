@@ -270,22 +270,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
+  void _navigateBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.login);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.login);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  onPressed: _navigateBack,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               const SizedBox(height: 32),
               Text('Create Account', style: AppTextStyles.headline1),
               const SizedBox(height: 8),
@@ -431,7 +446,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: _navigateBack,
                     child: Text(
                       'Sign In',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -447,8 +462,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInputLabel(String text) {
     return Text(

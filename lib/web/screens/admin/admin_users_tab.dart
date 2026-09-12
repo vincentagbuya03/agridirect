@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'admin_ui.dart';
 
@@ -11,11 +12,6 @@ class AdminUsersTab extends StatefulWidget {
   final AdminService adminService;
   const AdminUsersTab({super.key, required this.adminService});
 
-  @override
-  State<AdminUsersTab> createState() => _AdminUsersTabState();
-}
-
-class _AdminUsersTabState extends State<AdminUsersTab> {
   static String? resolveAvatarUrl(dynamic rawUrl) {
     if (rawUrl == null) return null;
     final url = rawUrl.toString().trim();
@@ -24,22 +20,31 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
       return url;
     }
     try {
-      String cleanPath = url;
-      String bucket = 'customer-profiles';
+      String cleanPath = url.replaceFirst(RegExp(r'^/+'), '');
+      String bucket = 'uploads';
+
       if (cleanPath.startsWith('uploads/')) {
         cleanPath = cleanPath.replaceFirst('uploads/', '');
+        bucket = 'uploads';
+      } else if (cleanPath.startsWith('registrations/')) {
+        cleanPath = cleanPath.replaceFirst('registrations/', '');
+        bucket = 'registrations';
+      } else if (cleanPath.startsWith('face_scans/') || cleanPath.startsWith('valid_ids/')) {
+        bucket = 'registrations';
       }
-      if (cleanPath.startsWith('customer-profiles/')) {
-        cleanPath = cleanPath.replaceFirst('customer-profiles/', '');
-      } else if (cleanPath.startsWith('avatars/')) {
-        bucket = 'avatars';
-        cleanPath = cleanPath.replaceFirst('avatars/', '');
-      }
+
       return SupabaseConfig.client.storage.from(bucket).getPublicUrl(cleanPath);
     } catch (_) {
       return null;
     }
   }
+
+  @override
+  State<AdminUsersTab> createState() => _AdminUsersTabState();
+}
+
+class _AdminUsersTabState extends State<AdminUsersTab> {
+  static String? resolveAvatarUrl(dynamic rawUrl) => AdminUsersTab.resolveAvatarUrl(rawUrl);
 
   late Future<List<Map<String, dynamic>>> _usersFuture;
 
@@ -821,6 +826,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
     final totalSpent = ((user['total_spent'] as num?)?.toDouble() ?? 0.0);
     final isActive = user['is_active'] != false;
     final isVip = totalSpent >= 1000 || ordersCount >= 2;
+    final isSystemVerified = user['is_system_verified'] == true || user['email_verified'] == true || user['is_verified'] == true;
 
     final rawDate = user['created_at']?.toString();
     String formattedJoined = 'Recently';
@@ -858,16 +864,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                   Builder(
                     builder: (context) {
                       final avatarUrl = resolveAvatarUrl(user['avatar_url']);
-                      return CircleAvatar(
+                      final gmailAvatarUrl = user['gmail_avatar_url'] as String?;
+                      return SafeCircleAvatar(
                         radius: 20,
-                        backgroundColor: AdminUi.brandSoft,
-                        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl == null
+                        imageUrl: avatarUrl,
+                        fallbackGmailUrl: gmailAvatarUrl,
+                        child: name.isNotEmpty
                             ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                name[0].toUpperCase(),
                                 style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
                               )
-                            : null,
+                            : const Icon(Icons.person_rounded, size: 20, color: AdminUi.brand),
                       );
                     },
                   ),
@@ -944,6 +951,31 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                                     color: AdminUi.brand,
                                     fontWeight: FontWeight.w800,
                                   ),
+                                ),
+                              ),
+                            if (isSystemVerified)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                                  borderRadius: AdminUi.radiusSm,
+                                  border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF0284C7)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'VERIFIED',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 9,
+                                        color: const Color(0xFF0284C7),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             InkWell(
@@ -1142,16 +1174,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                     Builder(
                       builder: (context) {
                         final avatarUrl = resolveAvatarUrl(user['avatar_url']);
-                        return CircleAvatar(
+                        final gmailAvatarUrl = user['gmail_avatar_url'] as String?;
+                        return SafeCircleAvatar(
                           radius: 20,
-                          backgroundColor: AdminUi.brandSoft,
-                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl == null
+                          imageUrl: avatarUrl,
+                          fallbackGmailUrl: gmailAvatarUrl,
+                          child: name.isNotEmpty
                               ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                  name[0].toUpperCase(),
                                   style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
                                 )
-                              : null,
+                              : const Icon(Icons.person_rounded, size: 20, color: AdminUi.brand),
                         );
                       },
                     ),
@@ -1454,16 +1487,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                         Builder(
                           builder: (context) {
                             final avatarUrl = resolveAvatarUrl(profile['avatar_url']);
-                            return CircleAvatar(
+                            final gmailAvatarUrl = profile['gmail_avatar_url'] as String?;
+                            return SafeCircleAvatar(
                               radius: isMobile ? 22 : 28,
-                              backgroundColor: AdminUi.brandSoft,
-                              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                              child: avatarUrl == null
+                              imageUrl: avatarUrl,
+                              fallbackGmailUrl: gmailAvatarUrl,
+                              child: name.isNotEmpty
                                   ? Text(
-                                      name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                      name[0].toUpperCase(),
                                       style: AdminUi.title(size: isMobile ? 18 : 22, color: AdminUi.brand),
                                     )
-                                  : null,
+                                  : Icon(Icons.person_rounded, size: isMobile ? 22 : 28, color: AdminUi.brand),
                             );
                           },
                         ),
@@ -1498,6 +1532,32 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                                       ),
                                     ),
                                   ),
+                                  if (profile['is_system_verified'] == true || profile['email_verified'] == true || profile['is_verified'] == true) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                                        borderRadius: AdminUi.radiusSm,
+                                        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF0284C7)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'VERIFIED BY SYSTEM',
+                                            style: AdminUi.label(
+                                              size: 9,
+                                              color: const Color(0xFF0284C7),
+                                              weight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 3),

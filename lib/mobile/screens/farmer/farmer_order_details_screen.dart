@@ -112,7 +112,8 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   Future<void> _loadDetails() async {
     setState(() => _isLoading = true);
     try {
-      final items = await _orderService.getOrderItems(widget.order.orderId);
+      final itemsFuture = _orderService.getOrderItems(widget.order.orderId);
+
       String? deliveryAddressId = widget.order.deliveryAddressId;
       if (deliveryAddressId == null || deliveryAddressId.isEmpty) {
         try {
@@ -120,84 +121,31 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
               .from('orders')
               .select('delivery_address_id')
               .eq('order_id', widget.order.orderId)
-              .maybeSingle();
+              .maybeSingle()
+              .timeout(const Duration(seconds: 4));
           if (orderData != null) {
             deliveryAddressId = orderData['delivery_address_id']?.toString();
           }
         } catch (_) {}
       }
 
-      Map<String, dynamic>? address;
-      if (deliveryAddressId != null && deliveryAddressId.isNotEmpty) {
-        address = await _orderService.getDeliveryAddress(deliveryAddressId);
+      final addressFuture = (deliveryAddressId != null && deliveryAddressId.isNotEmpty)
+          ? _orderService.getDeliveryAddress(deliveryAddressId)
+          : Future<Map<String, dynamic>?>.value(null);
 
-        if (address != null && (address['latitude'] == null || address['longitude'] == null)) {
-          try {
-            final street = address['street']?.toString() ?? '';
-            final barangay = address['barangay']?.toString() ?? '';
-            final city = address['city']?.toString() ?? '';
-            final province = address['province']?.toString() ?? '';
+      final farmerProfileFuture = widget.order.farmerId.isNotEmpty
+          ? FarmerService().getFarmerProfileByFarmerId(widget.order.farmerId)
+          : Future<FarmerProfile?>.value(null);
 
-            String cleanBrgy(String val) =>
-                val.replaceAll(RegExp(r'\b(brgy|brgy\.|barangay)\b', caseSensitive: false), '').trim();
-            String cleanStreet(String val) =>
-                val.replaceAll(RegExp(r'#\d+'), '').replaceAll(RegExp(r'\d+'), '').trim();
+      final results = await Future.wait([
+        itemsFuture.timeout(const Duration(seconds: 5), onTimeout: () => []),
+        addressFuture.timeout(const Duration(seconds: 5), onTimeout: () => null),
+        farmerProfileFuture.timeout(const Duration(seconds: 5), onTimeout: () => null),
+      ]);
 
-            final listQueries = <String>[];
-            final parts1 = <String>[street, barangay, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts1.isNotEmpty) listQueries.add(parts1.join(', '));
-
-            final cStreet = cleanStreet(street);
-            final cBrgy = cleanBrgy(barangay);
-            final parts2 = <String>[cStreet, cBrgy, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts2.isNotEmpty) listQueries.add(parts2.join(', '));
-
-            final parts3 = <String>[cBrgy, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts3.isNotEmpty) listQueries.add(parts3.join(', '));
-
-            final parts4 = <String>[city, province].where((s) => s.isNotEmpty).toList();
-            if (parts4.isNotEmpty) listQueries.add(parts4.join(', '));
-
-            LatLng? foundCoords;
-            for (final q in listQueries) {
-              if (q.trim().isEmpty) continue;
-              final encodedAddr = Uri.encodeComponent(q);
-              final searchUri = Uri.parse(
-                'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
-              );
-              final res = await http.get(
-                searchUri,
-                headers: const {
-                  'User-Agent': 'AgriDirect/1.0 (support: noreplyagridirect@gmail.com)',
-                },
-              );
-              if (res.statusCode == 200) {
-                final list = jsonDecode(res.body) as List;
-                if (list.isNotEmpty) {
-                  final first = list.first as Map<String, dynamic>;
-                  final latVal = double.tryParse(first['lat']?.toString() ?? '');
-                  final lonVal = double.tryParse(first['lon']?.toString() ?? '');
-                  if (latVal != null && lonVal != null) {
-                    foundCoords = LatLng(latVal, lonVal);
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (foundCoords != null) {
-              address = Map<String, dynamic>.from(address);
-              address['latitude'] = foundCoords.latitude;
-              address['longitude'] = foundCoords.longitude;
-            }
-          } catch (_) {}
-        }
-      }
-
-      FarmerProfile? farmerProfile;
-      if (widget.order.farmerId.isNotEmpty) {
-        farmerProfile = await FarmerService().getFarmerProfileByFarmerId(widget.order.farmerId);
-      }
+      final items = results[0] as List<OrderItem>;
+      final address = results[1] as Map<String, dynamic>?;
+      final farmerProfile = results[2] as FarmerProfile?;
 
       if (mounted) {
         setState(() {
@@ -207,10 +155,83 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           _isLoading = false;
         });
       }
+
+      // Background geocoding without blocking the screen
+      if (address != null && (address['latitude'] == null || address['longitude'] == null)) {
+        _geocodeAddressInBackground(address);
+      }
     } catch (e) {
       debugPrint('Error loading order details: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _geocodeAddressInBackground(Map<String, dynamic> address) async {
+    try {
+      final street = address['street']?.toString() ?? '';
+      final barangay = address['barangay']?.toString() ?? '';
+      final city = address['city']?.toString() ?? '';
+      final province = address['province']?.toString() ?? '';
+
+      String cleanBrgy(String val) =>
+          val.replaceAll(RegExp(r'\b(brgy|brgy\.|barangay)\b', caseSensitive: false), '').trim();
+      String cleanStreet(String val) =>
+          val.replaceAll(RegExp(r'#\d+'), '').replaceAll(RegExp(r'\d+'), '').trim();
+
+      final listQueries = <String>[];
+      final parts1 = <String>[street, barangay, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts1.isNotEmpty) listQueries.add(parts1.join(', '));
+
+      final cStreet = cleanStreet(street);
+      final cBrgy = cleanBrgy(barangay);
+      final parts2 = <String>[cStreet, cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts2.isNotEmpty) listQueries.add(parts2.join(', '));
+
+      final parts3 = <String>[cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts3.isNotEmpty) listQueries.add(parts3.join(', '));
+
+      final parts4 = <String>[city, province].where((s) => s.isNotEmpty).toList();
+      if (parts4.isNotEmpty) listQueries.add(parts4.join(', '));
+
+      LatLng? foundCoords;
+      for (final q in listQueries.take(2)) {
+        if (q.trim().isEmpty) continue;
+        final encodedAddr = Uri.encodeComponent(q);
+        final searchUri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
+        );
+        try {
+          final res = await http.get(
+            searchUri,
+            headers: const {
+              'User-Agent': 'AgriDirect/1.0 (support: noreplyagridirect@gmail.com)',
+            },
+          ).timeout(const Duration(seconds: 2));
+
+          if (res.statusCode == 200) {
+            final list = jsonDecode(res.body) as List;
+            if (list.isNotEmpty) {
+              final first = list.first as Map<String, dynamic>;
+              final latVal = double.tryParse(first['lat']?.toString() ?? '');
+              final lonVal = double.tryParse(first['lon']?.toString() ?? '');
+              if (latVal != null && lonVal != null) {
+                foundCoords = LatLng(latVal, lonVal);
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (foundCoords != null && mounted) {
+        setState(() {
+          final updated = Map<String, dynamic>.from(_address ?? address);
+          updated['latitude'] = foundCoords!.latitude;
+          updated['longitude'] = foundCoords.longitude;
+          _address = updated;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -262,34 +283,47 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         icon: const Icon(Icons.arrow_back_rounded, color: _dark),
         tooltip: 'Back to Orders',
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isDesktop) ...[
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Text(
-                  'Orders',
-                  style: GoogleFonts.inter(fontSize: 14, color: _muted, fontWeight: FontWeight.w600),
+      title: isDesktop
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Text(
+                      'Orders',
+                      style: GoogleFonts.inter(fontSize: 14, color: _muted, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Order #${widget.order.orderNumber}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              'Order #${widget.order.orderNumber}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: _dark,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            'Order #${widget.order.orderNumber}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: isDesktop ? 16 : 15,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-        ],
-      ),
       actions: [
         IconButton(
           onPressed: _loadDetails,

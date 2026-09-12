@@ -6,6 +6,7 @@ import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import 'admin_ui.dart';
+import 'admin_users_tab.dart';
 
 class AdminFarmersTab extends StatefulWidget {
   final AdminService adminService;
@@ -48,7 +49,9 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     setState(() {
       _currentPage = 1;
       _farmersFuture = widget.adminService.getAllFarmerRegistrations(
-        status: _filterStatus == 'all' ? null : _filterStatus,
+        status: (_filterStatus == 'all' || _filterStatus == 'system_verified')
+            ? null
+            : _filterStatus,
       );
       _pendingFuture = widget.adminService.getPendingFarmerRegistrations();
     });
@@ -298,12 +301,14 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
             _filterChip(Icons.tune_rounded, 'Specialty: $_filterSpecialty', () {}),
             _filterChip(
               Icons.verified_user_outlined,
-              'Status: ${_filterStatus == 'all' ? 'All' : _filterStatus.substring(0, 1).toUpperCase() + _filterStatus.substring(1)}',
+              'Status: ${_filterStatus == 'all' ? 'All' : (_filterStatus == 'system_verified' ? '⚡ System Verified' : _filterStatus.substring(0, 1).toUpperCase() + _filterStatus.substring(1))}',
               () {
                 setState(() {
                   if (_filterStatus == 'all') {
                     _filterStatus = 'pending';
                   } else if (_filterStatus == 'pending') {
+                    _filterStatus = 'system_verified';
+                  } else if (_filterStatus == 'system_verified') {
                     _filterStatus = 'verified';
                   } else {
                     _filterStatus = 'all';
@@ -504,20 +509,35 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     final date = farmer['created_at'] != null
         ? DateFormat('MMM d, yyyy').format(DateTime.parse(farmer['created_at']))
         : 'N/A';
-    final avatarUrl = farmer['avatar_url'] ?? farmer['users']?['avatar_url'];
+    // Farm Logo: strictly loaded from logo_url (NEVER image_url or face_photo_path)
+    final rawLogo = farmer['logo_url'] ?? farmer['farm_logo'];
+    final logoUrl = AdminUsersTab.resolveAvatarUrl(rawLogo);
 
-    final isAiVerified = farmer['verification_method'] == 'ai_auto_verified';
+    final vMethod = (farmer['verification_method'] ?? '').toString().toLowerCase();
+    final isAiVerified = vMethod == 'ai_auto_verified' || vMethod == 'system_verified';
+    final aiScore = (farmer['ai_confidence_score'] as num?)?.toDouble();
+
     String statusLabel;
     Color statusColor;
-    if (isVerified) {
-      statusLabel = isAiVerified ? 'AI VERIFIED' : 'VERIFIED';
+    Color statusBgColor;
+
+    if (isAiVerified) {
+      final scoreStr = aiScore != null ? ' ${(aiScore * 100).toStringAsFixed(0)}%' : '';
+      statusLabel = '⚡ SYSTEM VERIFIED$scoreStr';
+      statusColor = const Color(0xFF059669);
+      statusBgColor = const Color(0xFFECFDF5);
+    } else if (isVerified) {
+      statusLabel = 'VERIFIED';
       statusColor = AdminUi.success;
+      statusBgColor = AdminUi.success.withValues(alpha: 0.1);
     } else if (isPending) {
       statusLabel = 'PENDING';
       statusColor = AdminUi.warning;
+      statusBgColor = AdminUi.warning.withValues(alpha: 0.1);
     } else {
       statusLabel = 'UNVERIFIED';
       statusColor = AdminUi.danger;
+      statusBgColor = AdminUi.danger.withValues(alpha: 0.1);
     }
 
     return Material(
@@ -537,12 +557,12 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     SafeCircleAvatar(
                       radius: 22,
                       backgroundColor: AdminUi.brandSoft,
-                      imageUrl: avatarUrl,
+                      imageUrl: logoUrl,
                       defaultBucket: 'uploads',
-                      child: Icon(
-                        Icons.agriculture_rounded,
+                      child: const Icon(
+                        Icons.person_rounded,
                         color: AdminUi.brand,
-                        size: 20,
+                        size: 22,
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -614,36 +634,41 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
               // Status
               Expanded(
                 flex: 2,
-                child: Row(
-                  children: [
-                    if (isAiVerified)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Icon(
-                          Icons.auto_awesome_rounded,
-                          size: 14,
-                          color: statusColor,
-                        ),
-                      )
-                    else
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    Text(
-                      statusLabel,
-                      style: AdminUi.label(
-                        size: 11,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isAiVerified
+                            ? Icons.verified_rounded
+                            : (isVerified
+                                ? Icons.check_circle_rounded
+                                : (isPending
+                                    ? Icons.hourglass_top_rounded
+                                    : Icons.cancel_rounded)),
+                        size: 13,
                         color: statusColor,
-                        weight: FontWeight.w700,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          statusLabel,
+                          style: AdminUi.label(
+                            size: 10,
+                            color: statusColor,
+                            weight: FontWeight.w800,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               // Date
@@ -843,10 +868,17 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   List<Map<String, dynamic>> _getFilteredFarmers(
     List<Map<String, dynamic>> farmers,
   ) {
-    if (_searchQuery.isEmpty) return farmers;
+    var result = farmers;
+    if (_filterStatus == 'system_verified') {
+      result = result.where((f) {
+        final vm = (f['verification_method'] ?? '').toString().toLowerCase();
+        return vm == 'ai_auto_verified' || vm == 'system_verified';
+      }).toList();
+    }
+    if (_searchQuery.isEmpty) return result;
 
     final query = _searchQuery.toLowerCase();
-    return farmers.where((f) {
+    return result.where((f) {
       final name = (f['farm_name'] ?? '').toString().toLowerCase();
       final owner = (f['name'] ?? f['applicant_name'] ?? '')
           .toString()
@@ -1280,6 +1312,16 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     final specialty = farmer['specialty'] ?? 'General Agriculture';
     final facePhoto = farmer['face_photo_path'] ?? farmer['face_photo'];
     final validId = farmer['valid_id_path'] ?? farmer['valid_id'];
+    // Farm Logo: strictly loaded from logo_url (NEVER image_url or face_photo_path)
+    final rawLogo = farmer['logo_url'] ?? farmer['farm_logo'];
+    final farmLogo = AdminUsersTab.resolveAvatarUrl(rawLogo);
+    final rawCover = farmer['cover_url'] ?? farmer['cover_image'] ?? farmer['banner_url'];
+    final farmCover = AdminUsersTab.resolveAvatarUrl(rawCover);
+
+    final vMethod = (farmer['verification_method'] ?? '').toString().toLowerCase();
+    final isAiVerified = vMethod == 'ai_auto_verified' || vMethod == 'system_verified';
+    final confidenceScore = (farmer['ai_confidence_score'] as num?)?.toDouble();
+    final reviewNotes = farmer['ai_verification_notes']?.toString() ?? farmer['review_notes']?.toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1316,15 +1358,71 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                 ],
               ),
               const SizedBox(height: 16),
+              if (farmCover != null && farmCover.isNotEmpty) ...[
+                Container(
+                  height: 110,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AdminUi.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      SafeNetworkImage(
+                        imageUrl: farmCover,
+                        fit: BoxFit.cover,
+                        defaultBucket: 'uploads',
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.6),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.panorama_rounded, size: 12, color: Colors.white70),
+                              const SizedBox(width: 4),
+                              Text(
+                                'FARM COVER',
+                                style: AdminUi.label(size: 10, color: Colors.white, weight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Row(
                 children: [
                   SafeCircleAvatar(
                     radius: 32,
                     backgroundColor: AdminUi.brandSoft,
-                    imageUrl: facePhoto,
+                    imageUrl: farmLogo,
                     defaultBucket: 'uploads',
-                    child: Icon(
-                      Icons.agriculture_rounded,
+                    child: const Icon(
+                      Icons.person_rounded,
                       color: AdminUi.brand,
                       size: 32,
                     ),
@@ -1349,6 +1447,28 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                             color: AdminUi.textSecondary,
                           ),
                         ),
+                        if (isAiVerified) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF059669)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '⚡ VERIFIED BY SYSTEM (AI Biometrics${confidenceScore != null ? ' • ${(confidenceScore * 100).toStringAsFixed(0)}%' : ''})',
+                                  style: AdminUi.label(size: 10, color: const Color(0xFF059669), weight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1404,6 +1524,12 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     farmer['place_of_birth'] ?? 'Not provided',
                     Icons.map_rounded,
                   ),
+                  if (reviewNotes != null && reviewNotes.isNotEmpty)
+                    _detailItem(
+                      'AI Verification Notes',
+                      reviewNotes,
+                      Icons.smart_toy_rounded,
+                    ),
                 ]),
                 const SizedBox(height: 32),
                 FutureBuilder<Map<String, dynamic>>(
@@ -1616,10 +1742,13 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         status.toLowerCase() == 'verified' ||
         status.toLowerCase() == 'approved';
     final isPending = status.toLowerCase() == 'pending';
-    final isAiVerified = verificationMethod == 'ai_auto_verified';
-    final color = isVerified
-        ? AdminUi.success
-        : (isPending ? AdminUi.warning : AdminUi.danger);
+    final vmLower = (verificationMethod ?? '').toLowerCase();
+    final isAiVerified = vmLower == 'ai_auto_verified' || vmLower == 'system_verified';
+    final color = isAiVerified
+        ? const Color(0xFF059669)
+        : (isVerified
+            ? AdminUi.success
+            : (isPending ? AdminUi.warning : AdminUi.danger));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1635,9 +1764,9 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
             children: [
               Icon(
                 isAiVerified
-                    ? Icons.auto_awesome_rounded
+                    ? Icons.verified_rounded
                     : (isVerified
-                        ? Icons.verified_rounded
+                        ? Icons.check_circle_rounded
                         : Icons.pending_actions_rounded),
                 color: color,
                 size: 24,
@@ -1650,7 +1779,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     Row(
                       children: [
                         Text(
-                          status.toUpperCase(),
+                          isAiVerified ? 'VERIFIED BY SYSTEM' : status.toUpperCase(),
                           style: AdminUi.label(
                             size: 13,
                             color: color,
@@ -1665,14 +1794,14 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AdminUi.brand.withValues(alpha: 0.12),
+                              color: const Color(0xFF059669).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '🤖 AI VERIFIED ${confidenceScore != null ? "(${(confidenceScore * 100).toStringAsFixed(0)}%)" : ""}',
+                              '⚡ AI VERIFIED ${confidenceScore != null ? "(${(confidenceScore * 100).toStringAsFixed(0)}%)" : ""}',
                               style: AdminUi.label(
                                 size: 10,
-                                color: AdminUi.brand,
+                                color: const Color(0xFF059669),
                                 weight: FontWeight.w800,
                               ),
                             ),
@@ -1683,7 +1812,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     const SizedBox(height: 2),
                     Text(
                       isAiVerified
-                          ? 'Automated on-device computer vision & PhilSys QR validation passed'
+                          ? 'Automated biometric face match & PhilSys QR/PCN validation passed by system'
                           : (isVerified
                               ? 'All credentials verified by administrator'
                               : 'Awaiting administrator verification'),
@@ -1743,7 +1872,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
       borderRadius: AdminUi.radiusMd,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AdminUi.background,
           borderRadius: AdminUi.radiusMd,
@@ -1751,8 +1880,42 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: hasDoc ? AdminUi.brand : AdminUi.textMuted),
-            const SizedBox(width: 16),
+            if (hasDoc)
+              Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(right: 14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AdminUi.border),
+                  color: Colors.white,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: SafeNetworkImage(
+                    imageUrl: path,
+                    defaultBucket: 'registrations',
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    placeholder: const Center(
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                    ),
+                    errorWidget: Center(
+                      child: Icon(icon, size: 20, color: AdminUi.brand),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: Icon(icon, color: AdminUi.textMuted, size: 26),
+              ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1767,7 +1930,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                   ),
                   if (hasDoc)
                     Text(
-                      'Document attached',
+                      'Document attached • Click to view full image',
                       style: AdminUi.body(
                         size: 11,
                         color: AdminUi.success,
@@ -1783,12 +1946,19 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
               ),
             ),
             if (hasDoc)
-              Text(
-                'VIEW',
-                style: AdminUi.label(
-                  size: 11,
-                  color: AdminUi.brand,
-                  weight: FontWeight.w800,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AdminUi.brand.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'VIEW',
+                  style: AdminUi.label(
+                    size: 11,
+                    color: AdminUi.brand,
+                    weight: FontWeight.w800,
+                  ),
                 ),
               )
             else
@@ -1818,12 +1988,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     if (!mounted) return;
     Navigator.pop(context); // Close loading
 
-    if (signedUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate secure preview URL')),
-      );
-      return;
-    }
+    final resolvedUrl = signedUrl ?? path;
 
     showDialog(
       context: context,
@@ -1856,17 +2021,17 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   child: ClipRRect(
                     borderRadius: AdminUi.radiusMd,
-                    child: Image.network(
-                      signedUrl,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const SizedBox(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 550),
+                      child: SafeNetworkImage(
+                        imageUrl: resolvedUrl,
+                        defaultBucket: 'registrations',
+                        fit: BoxFit.contain,
+                        placeholder: const SizedBox(
                           height: 300,
                           child: Center(child: CircularProgressIndicator()),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
+                        ),
+                        errorWidget: Container(
                           height: 300,
                           color: AdminUi.background,
                           child: const Center(
@@ -1874,8 +2039,8 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                               'Failed to load image. Path may be invalid.',
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -136,7 +136,16 @@ class AuthService extends ChangeNotifier {
 
   String get userName => _userName;
   String get userEmail => _userEmail;
-  String get userId => _userId;
+  String get userId {
+    if (_userId.trim().isNotEmpty) return _userId.trim();
+    if (_pendingUserId.trim().isNotEmpty) return _pendingUserId.trim();
+    final authUser = _client.auth.currentUser ?? SupabaseConfig.currentUser;
+    if (authUser != null && authUser.id.trim().isNotEmpty) {
+      _userId = authUser.id.trim();
+      return _userId;
+    }
+    return '';
+  }
   String get userAvatarUrl => _userAvatarUrl;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -648,6 +657,13 @@ class AuthService extends ChangeNotifier {
       var profile = await SupabaseDatabase.getUserProfile(
         user.id,
       ).timeout(const Duration(seconds: 8), onTimeout: () => null);
+
+      // Extract Gmail photo from user metadata (Google OAuth provider)
+      final metaAvatar = (user.userMetadata?['avatar_url'] ??
+              user.userMetadata?['picture'])
+          ?.toString()
+          .trim();
+
       if (profile == null) {
         final metadata = user.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
@@ -659,12 +675,28 @@ class AuthService extends ChangeNotifier {
             name: metaName,
             phoneNumber: metaPhone,
             emailVerified: user.appMetadata['provider'] == 'google',
+            avatarUrl: metaAvatar,
           );
           profile = await SupabaseDatabase.getUserProfile(
             user.id,
           ).timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e) {
           debugPrint('Error creating user profile on initialize: $e');
+        }
+      } else {
+        // If profile exists and avatar_url is missing or empty, set Gmail photo as default!
+        final dbAvatar = (profile['avatar_url'] as String?)?.trim() ?? '';
+        if (dbAvatar.isEmpty && metaAvatar != null && metaAvatar.isNotEmpty) {
+          try {
+            await _client
+                .from('users')
+                .update({'avatar_url': metaAvatar})
+                .eq('user_id', user.id);
+            profile['avatar_url'] = metaAvatar;
+            debugPrint('✅ Synced default Gmail avatar to user profile: $metaAvatar');
+          } catch (e) {
+            debugPrint('Could not sync Gmail avatar: $e');
+          }
         }
       }
 
@@ -708,7 +740,10 @@ class AuthService extends ChangeNotifier {
         }
       }
       _userName = resolvedName;
-      _userAvatarUrl = (profile?['avatar_url'] as String?) ?? '';
+      final resolvedAvatar = (profile?['avatar_url'] as String?)?.trim() ?? '';
+      _userAvatarUrl = resolvedAvatar.isNotEmpty
+          ? resolvedAvatar
+          : (metaAvatar?.isNotEmpty == true ? metaAvatar! : '');
 
       // Ensure admin profile exists for known admin emails
       try {
@@ -1126,10 +1161,13 @@ class AuthService extends ChangeNotifier {
     await _persistCachedUserState();
     notifyListeners();
 
-    try {
-      await SupabaseDatabase.addUserRole(userId: _userId, roleName: 'seller');
-    } catch (e) {
-      debugPrint('Failed to sync seller role: $e');
+    final activeUserId = userId;
+    if (activeUserId.isNotEmpty) {
+      try {
+        await SupabaseDatabase.addUserRole(userId: activeUserId, roleName: 'seller');
+      } catch (e) {
+        debugPrint('Failed to sync seller role: $e');
+      }
     }
   }
 
@@ -1149,10 +1187,11 @@ class AuthService extends ChangeNotifier {
 
   /// Manually refresh the farmer registration status and sync verified name
   Future<void> refreshRegistrationStatus() async {
-    if (_userId.isEmpty) return;
+    final activeUserId = userId;
+    if (activeUserId.isEmpty) return;
     try {
       // Sync user profile name (e.g. verified legal name from ID)
-      final userProfile = await SupabaseDatabase.getUserProfile(_userId);
+      final userProfile = await SupabaseDatabase.getUserProfile(activeUserId);
       if (userProfile != null) {
         final profileName = (userProfile['name'] as String?)?.trim() ?? '';
         if (profileName.isNotEmpty) {
@@ -1160,7 +1199,7 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
+      final reg = await SupabaseDatabase.getFarmerRegistration(activeUserId);
       if (reg != null) {
         final regStatus = reg['status'] as String?;
         final isVerified = reg['is_verified'] == true;
@@ -1182,15 +1221,23 @@ class AuthService extends ChangeNotifier {
   /// Explicitly updates user display name locally and in database
   Future<void> updateUserName(String newName) async {
     final cleanName = newName.trim();
-    if (cleanName.isEmpty || _userId.isEmpty) return;
+    final activeUserId = userId;
+    if (cleanName.isEmpty || activeUserId.isEmpty) return;
     _userName = cleanName;
     try {
-      await SupabaseDatabase.updateUserName(userId: _userId, name: cleanName);
+      await SupabaseDatabase.updateUserName(userId: activeUserId, name: cleanName);
       await _persistCachedUserState();
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating user name: $e');
     }
+  }
+
+  /// Explicitly updates user avatar locally and in cache
+  Future<void> updateUserAvatarUrl(String newAvatarUrl) async {
+    _userAvatarUrl = newAvatarUrl.trim();
+    await _persistCachedUserState();
+    notifyListeners();
   }
 
   void _startWatchingRegistrationStatus(String userId) {
@@ -1336,6 +1383,11 @@ class AuthService extends ChangeNotifier {
 
       final user = response.user!;
       var profile = await SupabaseDatabase.getUserProfile(user.id);
+      final googlePhotoUrl = googleUser.photoUrl ??
+          (user.userMetadata?['avatar_url'] ?? user.userMetadata?['picture'])
+              ?.toString()
+              .trim();
+
       final isIncompleteProfile =
           profile == null ||
           profile['phone'] == null ||
@@ -1347,6 +1399,9 @@ class AuthService extends ChangeNotifier {
         _pendingEmail = user.email ?? '';
         _pendingName =
             user.userMetadata?['full_name'] ?? googleUser.displayName ?? '';
+        if (googlePhotoUrl != null && googlePhotoUrl.isNotEmpty) {
+          _userAvatarUrl = googlePhotoUrl;
+        }
         _isLoading = false;
         notifyListeners();
         return true;
@@ -1356,7 +1411,23 @@ class AuthService extends ChangeNotifier {
       _userEmail = user.email ?? '';
       _userName = (profile['name'] as String?) ?? '';
 
-      _userAvatarUrl = (profile['avatar_url'] as String?) ?? '';
+      // If user profile has no avatar, use Gmail photo as default!
+      final currentAvatar = (profile['avatar_url'] as String?)?.trim() ?? '';
+      if (currentAvatar.isEmpty &&
+          googlePhotoUrl != null &&
+          googlePhotoUrl.isNotEmpty) {
+        try {
+          await _client
+              .from('users')
+              .update({'avatar_url': googlePhotoUrl})
+              .eq('user_id', user.id);
+          _userAvatarUrl = googlePhotoUrl;
+        } catch (_) {
+          _userAvatarUrl = googlePhotoUrl;
+        }
+      } else {
+        _userAvatarUrl = currentAvatar;
+      }
       _isLoggedIn = true;
 
       final roles = await SupabaseDatabase.getUserRoles(_userId);
@@ -1639,6 +1710,10 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
+      final currentMeta = _client.auth.currentUser?.userMetadata;
+      final metaAvatar = (currentMeta?['avatar_url'] ?? currentMeta?['picture'])?.toString() ??
+          (_userAvatarUrl.isNotEmpty ? _userAvatarUrl : null);
+
       await SupabaseDatabase.createUserIfNotExists(
         userId: _pendingUserId,
         email: _pendingEmail,
@@ -1646,6 +1721,7 @@ class AuthService extends ChangeNotifier {
         phoneNumber: phoneNumber,
         emailVerified:
             true, // If we reach here, they must be verified or have a session
+        avatarUrl: metaAvatar,
       );
 
       try {
@@ -1664,6 +1740,9 @@ class AuthService extends ChangeNotifier {
       _userId = _pendingUserId;
       _userEmail = _pendingEmail;
       _userName = _pendingName;
+      if (metaAvatar != null && metaAvatar.isNotEmpty) {
+        _userAvatarUrl = metaAvatar;
+      }
       _needsProfileCompletion = false;
       _isAdmin = await _resolveAdminStatus(
         _pendingUserId,

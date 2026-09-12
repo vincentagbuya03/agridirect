@@ -63,7 +63,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
       var query = SupabaseConfig.client
           .from('v_farmer_profiles')
           .select(
-            'farmer_id, user_id, farm_name, full_name, specialty, location, farm_latitude, farm_longitude, image_url, avatar_url, badge, years_of_experience, farmer_phone, farming_history, is_verified, free_delivery_min_amount',
+            'farmer_id, user_id, farm_name, full_name, specialty, location, farm_latitude, farm_longitude, logo_url, cover_url, avatar_url, badge, years_of_experience, farmer_phone, farming_history, is_verified, free_delivery_min_amount',
           );
       
       if (auth.isLoggedIn && auth.userId.isNotEmpty) {
@@ -291,7 +291,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
             final longitude = (farmer['farm_longitude'] as num).toDouble();
             final farmName = (farmer['farm_name'] ?? 'Farm').toString();
             final avatarUrl = farmer['avatar_url']?.toString();
-            final farmImageUrl = farmer['image_url']?.toString();
+            final farmImageUrl = (farmer['logo_url'] ?? farmer['cover_url'])?.toString();
             final displayImage = (farmImageUrl != null && farmImageUrl.isNotEmpty) ? farmImageUrl : avatarUrl;
             final isSelected = index == _selectedIndex;
 
@@ -551,7 +551,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     final specialty = (farmer['specialty'] ?? 'General Farming').toString();
     final location = (farmer['location'] ?? 'Location unavailable').toString();
     final avatarUrl = farmer['avatar_url']?.toString();
-    final farmImageUrl = farmer['image_url']?.toString();
+    final farmImageUrl = (farmer['logo_url'] ?? farmer['cover_url'])?.toString();
     final displayImage = (farmImageUrl != null && farmImageUrl.isNotEmpty) ? farmImageUrl : avatarUrl;
     final isVerified = farmer['is_verified'] == true;
     final exp = farmer['years_of_experience']?.toString() ?? '0';
@@ -738,7 +738,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     final phone = (farmer['farmer_phone'] ?? '').toString().trim();
     final experience = farmer['years_of_experience']?.toString() ?? '0';
     final avatarUrl = farmer['avatar_url']?.toString();
-    final farmImageUrl = farmer['image_url']?.toString();
+    final farmImageUrl = (farmer['logo_url'] ?? farmer['cover_url'])?.toString();
     final displayImage = (farmImageUrl != null && farmImageUrl.isNotEmpty) ? farmImageUrl : avatarUrl;
     final isVerified = farmer['is_verified'] == true;
     final farmerId = (farmer['farmer_id'] ?? '').toString();

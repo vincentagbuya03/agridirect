@@ -16,6 +16,7 @@ import '../../../shared/services/commerce/voucher_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/widgets/image_widgets.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -31,6 +32,67 @@ class _CartScreenState extends State<CartScreen> {
   bool _isLoadingAddress = true;
   final _instructionsController = TextEditingController();
   final Map<String, Map<String, dynamic>> _selectedVouchersByFarmer = {};
+  final Map<String, String> _farmLogos = {};
+  final Set<String> _requestedFarmerIds = {};
+
+  Future<void> _fetchMissingFarmLogos(List<String> farmerIds) async {
+    final missing = farmerIds
+        .where((id) => id.isNotEmpty && !_requestedFarmerIds.contains(id))
+        .toList();
+    if (missing.isEmpty) return;
+    _requestedFarmerIds.addAll(missing);
+
+    try {
+      final response = await Supabase.instance.client
+          .from('farmers')
+          .select('farmer_id, user_id, logo_url')
+          .inFilter('farmer_id', missing);
+
+      bool updated = false;
+      for (final row in (response as List)) {
+        final fId = row['farmer_id']?.toString();
+        final uId = row['user_id']?.toString();
+        final rawLogo = row['logo_url']?.toString();
+        final isValidLogo = rawLogo != null &&
+            rawLogo.isNotEmpty &&
+            !rawLogo.contains('face_photo') &&
+            !rawLogo.contains('valid_id');
+        if (isValidLogo) {
+          if (fId != null) _farmLogos[fId] = rawLogo;
+          if (uId != null) _farmLogos[uId] = rawLogo;
+          updated = true;
+        }
+      }
+
+      final stillMissing = missing.where((id) => !_farmLogos.containsKey(id)).toList();
+      if (stillMissing.isNotEmpty) {
+        final userRes = await Supabase.instance.client
+            .from('farmers')
+            .select('farmer_id, user_id, logo_url')
+            .inFilter('user_id', stillMissing);
+        for (final row in (userRes as List)) {
+          final fId = row['farmer_id']?.toString();
+          final uId = row['user_id']?.toString();
+          final rawLogo = row['logo_url']?.toString();
+          final isValidLogo = rawLogo != null &&
+              rawLogo.isNotEmpty &&
+              !rawLogo.contains('face_photo') &&
+              !rawLogo.contains('valid_id');
+          if (isValidLogo) {
+            if (fId != null) _farmLogos[fId] = rawLogo;
+            if (uId != null) _farmLogos[uId] = rawLogo;
+            updated = true;
+          }
+        }
+      }
+
+      if (updated && mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error fetching farm logos for cart: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -125,6 +187,7 @@ class _CartScreenState extends State<CartScreen> {
             groupedItems.putIfAbsent(key, () => []).add(item);
           }
           final groupKeys = groupedItems.keys.toList();
+          _fetchMissingFarmLogos(groupKeys);
 
           return Column(
             children: [
@@ -260,6 +323,10 @@ class _CartScreenState extends State<CartScreen> {
         farmItems.isNotEmpty && farmItems.every((item) => item.isSelected);
     final firstItem = farmItems.first;
     final farmName = firstItem.farm.isNotEmpty ? firstItem.farm : 'Direct Farm Shop';
+    final farmLogo = _farmLogos[firstItem.farmerId] ??
+        farmItems
+            .map((i) => i.farmLogoUrl)
+            .firstWhere((url) => url != null && url.isNotEmpty, orElse: () => null);
 
     return Container(
       decoration: BoxDecoration(
@@ -310,17 +377,55 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.storefront_rounded,
-                    size: 16,
-                    color: AppColors.primary,
-                  ),
+                // Farm Logo with Storefront Fallback
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: (farmLogo != null && farmLogo.isNotEmpty)
+                      ? SafeNetworkImage(
+                          imageUrl: farmLogo,
+                          width: 26,
+                          height: 26,
+                          fit: BoxFit.cover,
+                          placeholder: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.storefront_rounded,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          errorWidget: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.storefront_rounded,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.storefront_rounded,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(

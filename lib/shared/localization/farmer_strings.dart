@@ -406,6 +406,14 @@ class FarmerStrings {
       'en': 'Delivery address and order conditions',
       'fil': 'Address ng sakahan at pamantayan sa paghahatid',
     },
+    'save_details_btn': {
+      'en': 'Save Details',
+      'fil': 'I-save ang mga Detalye',
+    },
+    'phone_empty': {
+      'en': 'No mobile number',
+      'fil': 'Walang numero ng mobile',
+    },
   };
 
   /// Retrieve localized string for [key] in specified [lang] or fallback to English.

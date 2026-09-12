@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../shared/models/farmer_registration.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'dart:convert';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
@@ -1524,68 +1525,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             'Capture both front and back sides clearly without glare.',
             style: GoogleFonts.inter(fontSize: 12, color: _muted),
           ),
-          const SizedBox(height: 12),
-
-          // ─── AgriDirect AI Verification Card ───
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF86EFAC)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'AgriDirect AI Verification',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF065F46),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Powered by On-Device Computer Vision & Machine Learning. AgriDirect automatically detects ID boundaries, eliminates shadows, and securely extracts your legal credentials to speed up farmer approval.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    height: 1.45,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF047857),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 14),
 
           // ID FRONT CARD
@@ -2566,7 +2505,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showError('Failed to capture ID: $e');
+        _showError(_formatFriendlyErrorMessage(e, fallbackPrefix: 'Failed to capture ID'));
       }
     }
   }
@@ -3068,6 +3007,27 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
     try {
       final auth = AuthService();
+      String effectiveUserId = auth.userId.trim();
+      if (effectiveUserId.isEmpty) {
+        effectiveUserId = (SupabaseConfig.client.auth.currentUser?.id ??
+                SupabaseConfig.currentUser?.id ??
+                '')
+            .trim();
+      }
+      if (effectiveUserId.isEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          effectiveUserId =
+              (prefs.getString('auth.lastUserId.global') ?? '').trim();
+        } catch (_) {}
+      }
+
+      if (effectiveUserId.isEmpty) {
+        _showError(
+          'Authentication required: Please log in again to submit your farmer registration.',
+        );
+        return;
+      }
 
       // ── Step 1: Run 1-to-1 Biometric Facial Comparison ──
       BiometricFaceMatchResult? faceMatchResult;
@@ -3111,7 +3071,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
       // ── Step 2: Submit registration to Supabase with AI Auto-Verification result ──
       await SupabaseDatabase.submitFarmerRegistration(
-        userId: auth.userId,
+        userId: effectiveUserId,
         registration: _registration,
         faceImageBytes: _faceImageBytes,
         idImageBytes: _idImageBytes,
@@ -3168,7 +3128,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 const SizedBox(height: 16),
                 Text(
                   aiResult.isAutoApproved
-                      ? 'AI Auto-Verified!'
+                      ? 'Auto-Verified!'
                       : 'Submitted for Review',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
@@ -3186,7 +3146,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                   ),
                   child: Text(
                     aiResult.isAutoApproved
-                        ? '🤖 AgriDirect AI • ${(aiResult.confidenceScore * 100).toStringAsFixed(0)}% Confidence'
+                        ? '⚡ Instant Verification • ${(aiResult.confidenceScore * 100).toStringAsFixed(0)}% Confidence'
                         : '📋 In Queue • Admin Review',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
@@ -3198,7 +3158,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 const SizedBox(height: 12),
                 Text(
                   aiResult.isAutoApproved
-                      ? 'Congratulations! AgriDirect AI has verified your Philippine National ID credentials. Your farm store is officially unlocked and ready to sell!'
+                      ? 'Congratulations! Your Philippine National ID credentials have been verified. Your farm store is officially unlocked and ready to sell!'
                       : 'Your farmer registration has been received. Our admin team will review your credentials within 24 hours.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
@@ -3255,19 +3215,83 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showError('Registration failed: $e');
+        _showError(_formatFriendlyErrorMessage(e));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
+  String _formatFriendlyErrorMessage(dynamic error, {String fallbackPrefix = 'Registration failed'}) {
+    final errStr = error.toString();
+    debugPrint('[$fallbackPrefix Debug]: $errStr');
+
+    final lower = errStr.toLowerCase();
+
+    if (lower.contains('uuid') || lower.contains('22p02')) {
+      return 'Authentication session issue. Please sign in again before submitting.';
+    }
+    if (lower.contains('authentication required') || lower.contains('not authenticated')) {
+      return 'Your session has expired. Please sign in again to submit your application.';
+    }
+    if (lower.contains('network') ||
+        lower.contains('socketexception') ||
+        lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('timeout')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    if (lower.contains('duplicate') || lower.contains('already exists') || lower.contains('23505')) {
+      return 'A registration for this farm or account has already been submitted.';
+    }
+    if (lower.contains('postgrestexception') || lower.contains('bad request')) {
+      return 'Unable to process registration details. Please verify your entries and try again.';
+    }
+    if (errStr.startsWith('Exception: ')) {
+      final clean = errStr.replaceFirst('Exception: ', '').trim();
+      if (clean.isNotEmpty && !clean.contains('PostgrestException')) {
+        return clean;
+      }
+    }
+
+    return '$fallbackPrefix. Please check your information and try again.';
+  }
+
   void _showError(String message) {
+    String displayMessage = message;
+    if (displayMessage.contains('PostgrestException') ||
+        displayMessage.contains('22P02') ||
+        displayMessage.contains('uuid:')) {
+      displayMessage =
+          'Authentication session issue. Please log in again before submitting.';
+    } else if (displayMessage.startsWith('Exception: ')) {
+      displayMessage = displayMessage.replaceFirst('Exception: ', '').trim();
+    }
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[400],
-        behavior: SnackBarBehavior.fixed,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                displayMessage,
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        duration: const Duration(seconds: 4),
       ),
     );
   }

@@ -319,13 +319,29 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
               alertType = 'storm';
               code = 'weather_storm_warning';
               linkType = 'weather';
-            } else if (maxRainProb >= 0.6) {
+            } else if (maxRainProb >= 0.5 ||
+                condition.toLowerCase().contains('rain') ||
+                condition.toLowerCase().contains('thunderstorm')) {
               alertType = 'rain';
               code = 'weather_heavy_rain';
               linkType = 'weather';
-            } else if (temp >= 36.0) {
+            } else if (temp >= 33.0) {
               alertType = 'heat';
               code = 'weather_extreme_heat';
+              linkType = 'weather';
+            } else if (maxWind >= 28.0) {
+              alertType = 'wind';
+              code = 'weather_high_wind';
+              linkType = 'weather';
+            } else if (maxRainProb < 0.25 &&
+                (condition.toLowerCase().contains('clear') ||
+                    condition.toLowerCase().contains('sun'))) {
+              alertType = 'clear';
+              code = 'weather_sunny_harvest';
+              linkType = 'weather';
+            } else {
+              alertType = 'daily_summary';
+              code = 'weather_daily_summary';
               linkType = 'weather';
             }
           }
@@ -343,20 +359,32 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
         targetAudience: 'farmers',
       );
 
-      String aiImg =
-          'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=600&auto=format&fit=crop&q=80';
+      String weatherImg =
+          'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&auto=format&fit=crop&q=80';
       if (alertType == 'storm') {
-        aiImg =
+        weatherImg =
             'https://images.unsplash.com/photo-1514632595-4944383f2737?w=600&auto=format&fit=crop&q=80';
       } else if (alertType == 'rain') {
-        aiImg =
+        weatherImg =
             'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80';
+      } else if (alertType == 'heat') {
+        weatherImg =
+            'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=600&auto=format&fit=crop&q=80';
+      } else if (alertType == 'wind') {
+        weatherImg =
+            'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=600&auto=format&fit=crop&q=80';
+      } else if (alertType == 'clear') {
+        weatherImg =
+            'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=600&auto=format&fit=crop&q=80';
       }
 
+      final cleanTitle = AiService.sanitizeWeatherCopy(aiRes['title'] ?? '');
+      final cleanBody = AiService.sanitizeWeatherCopy(aiRes['body'] ?? '');
+
       setState(() {
-        _titleController.text = aiRes['title'] ?? '';
-        _messageController.text = aiRes['body'] ?? '';
-        _imageUrlController.text = aiImg;
+        _titleController.text = cleanTitle;
+        _messageController.text = cleanBody;
+        _imageUrlController.text = weatherImg;
         _notificationCode = code;
         _linkType = linkType;
         _linkIdController.clear();
@@ -367,7 +395,7 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
           const SnackBar(
             backgroundColor: _primary,
             behavior: SnackBarBehavior.floating,
-            content: Text('✨ Live OpenWeather + AI Push copy updated!'),
+            content: Text('✨ Live weather push generated via OpenRouter!'),
           ),
         );
       }

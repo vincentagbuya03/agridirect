@@ -114,7 +114,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 profile['farm_latitude']?.toString() ?? '';
             _longitudeController.text =
                 profile['farm_longitude']?.toString() ?? '';
-            _avatarUrl = (profile['image_url'] ?? profile['logo_url'] ?? profile['avatar_url'])?.toString() ?? auth.userAvatarUrl;
+            _avatarUrl = (profile['logo_url'] ?? profile['avatar_url'])?.toString() ?? auth.userAvatarUrl;
             _coverImageUrl = (profile['cover_url'] ?? profile['cover_image_url'])?.toString();
           }
         });
@@ -269,7 +269,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         if (userId.isNotEmpty) {
           await SupabaseConfig.client
               .from('farmers')
-              .update({'image_url': publicUrl})
+              .update({'cover_url': publicUrl})
               .eq('user_id', userId);
         }
 
@@ -329,7 +329,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           'farm_longitude': _parseCoordinate(_longitudeController.text),
         };
         if (_coverImageUrl != null && _coverImageUrl!.isNotEmpty) {
-          farmerUpdates['image_url'] = _coverImageUrl;
+          farmerUpdates['cover_url'] = _coverImageUrl;
         }
         await SupabaseConfig.client
             .from('farmers')
@@ -452,7 +452,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     final profileImageUrl = _avatarUrl.isNotEmpty
         ? _avatarUrl
         : ((isFarmer && _farmerProfile != null)
-            ? (_farmerProfile!['image_url'] ?? _farmerProfile!['logo_url'] ?? _farmerProfile!['avatar_url'] ?? auth.userAvatarUrl)?.toString()
+            ? (_farmerProfile!['logo_url'] ?? _farmerProfile!['avatar_url'] ?? auth.userAvatarUrl)?.toString()
             : auth.userAvatarUrl);
 
     return Column(
@@ -700,7 +700,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     final profileImageUrl = _avatarUrl.isNotEmpty
         ? _avatarUrl
         : ((isFarmer && _farmerProfile != null)
-            ? (_farmerProfile!['image_url'] ?? _farmerProfile!['logo_url'] ?? _farmerProfile!['avatar_url'] ?? auth.userAvatarUrl)?.toString()
+            ? (_farmerProfile!['logo_url'] ?? _farmerProfile!['avatar_url'] ?? auth.userAvatarUrl)?.toString()
             : auth.userAvatarUrl);
 
     return Column(

@@ -134,7 +134,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             final latitudeText = (rawLatitude ?? '').toString();
             final longitudeText = (rawLongitude ?? '').toString();
             var storedLocation = (farmer['location'] ?? '').toString().trim();
-            var rawImagePath = (farmer['image_url'] ?? '').toString().trim();
+            var rawImagePath = (farmer['logo_url'] ?? '').toString().trim();
             final updates = <String, dynamic>{};
 
             if (storedLocation.isEmpty) {
@@ -170,21 +170,22 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _freeDeliveryMinAmountController.text = (farmer['free_delivery_min_amount'] ?? '0').toString();
             _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
             
-            // 1. Personal Avatar / Farm Logo is strictly loaded from image_url, logo_url, or user avatar (NEVER face_photo_path)
-            final userProfile = await SupabaseDatabase.getUserProfile(userId);
-            final rawLogoPath = (farmer['image_url'] as String?)?.trim().isNotEmpty == true
-                ? (farmer['image_url'] as String).trim()
-                : (farmer['logo_url'] as String?)?.trim().isNotEmpty == true
-                    ? (farmer['logo_url'] as String).trim()
-                    : ((userProfile?['avatar_url'] as String?)?.trim().isNotEmpty == true
-                        ? (userProfile!['avatar_url'] as String).trim()
-                        : _auth.userAvatarUrl);
+            // 1. Farm Logo is strictly loaded from logo_url (NEVER personal user avatar or face_photo_path)
+            final rawLogoPath = (farmer['logo_url'] as String?)?.trim().isNotEmpty == true
+                ? (farmer['logo_url'] as String).trim()
+                : '';
 
-            _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
-              rawLogoPath,
-              defaultBucket: 'uploads',
-            );
-            await _precacheProfileImage(_farmerImageUrl);
+            if (rawLogoPath.isNotEmpty &&
+                !rawLogoPath.contains('face_photo') &&
+                !rawLogoPath.contains('valid_id')) {
+              _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
+                rawLogoPath,
+                defaultBucket: 'uploads',
+              );
+              await _precacheProfileImage(_farmerImageUrl);
+            } else {
+              _farmerImageUrl = null;
+            }
 
             // 2. Farm Cover Banner is loaded ONLY from cover_url (NEVER image_url or face_photo_path)
             final rawCoverPath = (farmer['cover_url'] as String?)?.trim() ?? '';
@@ -376,24 +377,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 .select('user_id');
             
             updateSuccessful = result.isNotEmpty;
+            await _auth.updateUserAvatarUrl(publicUrl);
             if (isFarmer) {
               try {
                 await SupabaseConfig.client
                     .from('farmers')
                     .update({
-                      'image_url': dbPath,
                       'logo_url': dbPath,
                     })
                     .eq('user_id', userId);
               } catch (logoColErr) {
-                // If logo_url column does not exist yet, update image_url only
-                debugPrint('⚠️ logo_url column might not exist yet, updating image_url only: $logoColErr');
-                await SupabaseConfig.client
-                    .from('farmers')
-                    .update({
-                      'image_url': dbPath,
-                    })
-                    .eq('user_id', userId);
+                debugPrint('⚠️ Error updating logo_url on farmers: $logoColErr');
               }
             }
           }
@@ -564,7 +558,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           'free_delivery_min_amount': double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
         };
         if (_imageUrlController.text.trim().isNotEmpty) {
-          farmerUpdates['image_url'] = _imageUrlController.text.trim();
+          farmerUpdates['logo_url'] = _imageUrlController.text.trim();
         }
         if (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty) {
           farmerUpdates['cover_url'] = _farmerCoverUrl;
@@ -676,7 +670,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 40),
+                  padding: const EdgeInsets.only(bottom: 120),
                   child: Form(
                     key: _infoKey,
                     child: Column(
@@ -1118,13 +1112,23 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     filterQuality: FilterQuality.high,
                     placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
                     errorWidget: (_, _, _) => Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(12),
+                      child: Image.asset(
+                        'assets/icon/logo_v3.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                      ),
                     ),
                   )
                 : Container(
-                    color: const Color(0xFFF1F5F9),
-                    child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      'assets/icon/logo_v3.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                    ),
                   ),
           ),
         ),

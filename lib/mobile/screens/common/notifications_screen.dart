@@ -3,8 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/community/notification_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/router/app_routes.dart';
+import '../consumer/product_view_screen.dart';
+import '../farmer/weather_map_screen.dart';
+import '../../../shared/screens/post_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -23,6 +29,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _fetchNotifications();
+  }
+
+  @override
+  void dispose() {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    super.dispose();
   }
 
   Future<void> _fetchNotifications() async {
@@ -111,11 +123,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {}
   }
 
-  Future<void> _handleNotificationTap(Map<String, dynamic> item, int index) async {
+  Future<void> _handleNotificationTap(Map<String, dynamic> item) async {
+    ScaffoldMessenger.of(context).clearSnackBars();
     final id = item['notification_id']?.toString() ?? '';
-    final linkType = (item['link_type']?.toString() ?? '').toLowerCase();
-    final linkId = item['link_id']?.toString() ?? '';
+    String linkType = (item['link_type'] ?? item['type'] ?? '').toString().toLowerCase().trim();
+    String linkId = (item['link_id'] ?? item['reference_id'] ?? item['product_id'] ?? item['order_id'] ?? item['post_id'] ?? '').toString().trim();
     final isRead = item['is_read'] as bool? ?? false;
+
+    // Check inside nested data map if available
+    if (item['data'] is Map) {
+      final d = item['data'] as Map;
+      if (linkType.isEmpty || linkType == 'system' || linkType == 'general') {
+        linkType = (d['link_type'] ?? d['linkType'] ?? d['type'] ?? '').toString().toLowerCase().trim();
+      }
+      if (linkId.isEmpty) {
+        linkId = (d['link_id'] ?? d['linkId'] ?? d['productId'] ?? d['orderId'] ?? d['postId'] ?? d['id'] ?? '').toString().trim();
+      }
+    }
 
     HapticFeedback.lightImpact();
 
@@ -127,36 +151,250 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationService().markAsRead(id);
     }
 
-    // Deep-Link Navigation
+    // Infer linkType if empty or general from title & body
+    final title = (item['title']?.toString() ?? '').toLowerCase();
+    final body = (item['body']?.toString() ?? '').toLowerCase();
+    final combined = '$title $body';
+
+    if (linkType.isEmpty || linkType == 'system' || linkType == 'general') {
+      if (combined.contains('weather') ||
+          combined.contains('rain') ||
+          combined.contains('storm') ||
+          combined.contains('typhoon') ||
+          combined.contains('heat') ||
+          combined.contains('cloud')) {
+        linkType = 'weather';
+      } else if (combined.contains('order') ||
+          combined.contains('pre-order') ||
+          combined.contains('shipment') ||
+          combined.contains('delivery')) {
+        linkType = 'order';
+      } else if (combined.contains('voucher') ||
+          combined.contains('discount') ||
+          combined.contains('coupon')) {
+        linkType = 'voucher';
+      } else if (combined.contains('flash sale') || combined.contains('flash deal')) {
+        linkType = 'flash_sale';
+      } else if (combined.contains('post') ||
+          combined.contains('comment') ||
+          combined.contains('story') ||
+          combined.contains('community') ||
+          combined.contains('forum')) {
+        linkType = 'post';
+      } else if (combined.contains('product') ||
+          combined.contains('available from') ||
+          combined.contains('harvest') ||
+          combined.contains('kilo') ||
+          title.startsWith('new product')) {
+        linkType = 'product';
+      } else if (combined.contains('farm') || combined.contains('farmer')) {
+        linkType = 'farm';
+      }
+    }
+
     try {
-      if (linkType.isNotEmpty) {
-        await NotificationService().navigateFromLink(
-          linkType: linkType,
-          linkId: linkId,
+      // 1. PRODUCTS
+      if (linkType == 'product' || linkType == 'products') {
+        // If linkId is missing, attempt to extract product name from body e.g. "Karne ng Baboy is now available..."
+        if (linkId.isEmpty) {
+          final bodyRaw = item['body']?.toString() ?? '';
+          if (bodyRaw.contains(' is now available')) {
+            final extractedName = bodyRaw.split(' is now available').first.trim();
+            if (extractedName.isNotEmpty) {
+              try {
+                final match = await Supabase.instance.client
+                    .from('products')
+                    .select('product_id')
+                    .ilike('name', '%$extractedName%')
+                    .limit(1)
+                    .maybeSingle();
+                if (match != null && match['product_id'] != null) {
+                  linkId = match['product_id'].toString();
+                }
+              } catch (_) {}
+            }
+          }
+        }
+
+        // If still empty, attempt to extract farm name and open farm profile
+        if (linkId.isEmpty) {
+          final titleRaw = item['title']?.toString() ?? '';
+          if (titleRaw.contains('from ')) {
+            final farmName = titleRaw.split('from ').last.trim();
+            if (farmName.isNotEmpty) {
+              try {
+                final match = await Supabase.instance.client
+                    .from('farmers')
+                    .select('farmer_id')
+                    .ilike('farm_name', '%$farmName%')
+                    .limit(1)
+                    .maybeSingle();
+                if (match != null && match['farmer_id'] != null && mounted) {
+                  context.push(AppRoutes.farmerProfile(match['farmer_id'].toString()));
+                  return;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (linkId.isNotEmpty) {
+          final product = await SupabaseDataService().getProductById(linkId);
+          if (product != null && mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProductViewScreen(product: product),
+              ),
+            );
+            return;
+          } else if (mounted) {
+            context.push(AppRoutes.product(linkId));
+            return;
+          }
+        } else if (mounted) {
+          context.push(AppRoutes.shop);
+          return;
+        }
+      }
+
+      if (!mounted) return;
+
+      // 2. WEATHER & RADAR
+      if (linkType == 'weather' ||
+          linkType == 'radar' ||
+          linkType == 'weather_radar' ||
+          linkType == 'rain' ||
+          linkType == 'storm') {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const WeatherMapScreen(
+              latitude: 15.9281,
+              longitude: 120.3489,
+              locationName: 'Pangasinan',
+            ),
+          ),
         );
         return;
       }
 
-      // Contextual fallbacks if linkType was empty
-      final title = (item['title']?.toString() ?? '').toLowerCase();
-      if (title.contains('weather') || title.contains('storm') || title.contains('rain')) {
-        context.push('/farmer/weather');
-      } else if (title.contains('order')) {
-        context.push('/consumer/orders');
-      } else if (title.contains('voucher') || title.contains('discount')) {
-        context.push('/consumer/vouchers');
+      if (!mounted) return;
+
+      // 3. ORDERS
+      if (linkType == 'order' || linkType == 'orders') {
+        final isFarmer = AuthService().isViewingAsFarmer;
+        if (isFarmer) {
+          if (linkId.isNotEmpty) {
+            context.push('/farmer/orders/$linkId');
+          } else {
+            context.push(AppRoutes.farmerDashboard);
+          }
+        } else {
+          if (linkId.isNotEmpty) {
+            context.push('/orders/$linkId');
+          } else {
+            context.push(AppRoutes.customerOrders);
+          }
+        }
+        return;
       }
+
+      // 4. COMMUNITY POST / STORIES
+      if (linkType == 'post' ||
+          linkType == 'community' ||
+          linkType == 'forum' ||
+          linkType == 'comment' ||
+          linkType == 'story') {
+        if (linkId.isNotEmpty) {
+          try {
+            final post = await SupabaseDataService().getForumPostById(linkId);
+            if (post != null && mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+              );
+              return;
+            }
+          } catch (_) {}
+        }
+        if (mounted) {
+          context.push(AppRoutes.community);
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      // 5. FARM / FARMER PROFILE
+      if (linkType == 'farm' || linkType == 'farmer') {
+        if (linkId.isNotEmpty) {
+          context.push(AppRoutes.farmerProfile(linkId));
+        } else {
+          context.push(AppRoutes.farmersMap);
+        }
+        return;
+      }
+
+      // 6. VOUCHERS / PROMOTIONS
+      if (linkType == 'voucher' || linkType == 'vouchers' || linkType == 'promo') {
+        context.push(AppRoutes.vouchers);
+        return;
+      }
+
+      // 7. FLASH SALE
+      if (linkType == 'flash_sale' || linkType == 'flash_harvest') {
+        context.push(AppRoutes.flashSale);
+        return;
+      }
+
+      // 8. PRE-ORDERS
+      if (linkType == 'preorder' || linkType == 'preorders') {
+        if (linkId.isNotEmpty) {
+          context.push(AppRoutes.preorder(linkId));
+        } else {
+          context.push(AppRoutes.preorders);
+        }
+        return;
+      }
+
+      // 9. CHAT / CONVERSATION
+      if (linkType == 'conversation' || linkType == 'chat' || linkType == 'message') {
+        context.push(
+          AppRoutes.messages,
+          extra: {
+            'conversationId': linkId,
+            'asFarmer': AuthService().isViewingAsFarmer,
+          },
+        );
+        return;
+      }
+
+      // Default fallback
+      await NotificationService().navigateFromLink(
+        linkType: linkType,
+        linkId: linkId,
+      );
     } catch (e) {
       debugPrint('Navigation error on notification tap: $e');
     }
   }
 
-  Future<void> _deleteNotification(String id, int index) async {
-    final removedItem = _notifications[index];
+  Future<void> _deleteNotification(Map<String, dynamic> item) async {
+    final id = item['notification_id']?.toString() ?? '';
+
+    // Find original index before removing so UNDO can restore to the right place
+    final originalIndex = _notifications.indexWhere(
+      (n) => (id.isNotEmpty && n['notification_id']?.toString() == id) || identical(n, item),
+    );
+    final restoreIndex = originalIndex != -1 ? originalIndex : 0;
+
     HapticFeedback.selectionClick();
 
+    // Synchronously remove the exact dismissed item from _notifications
     setState(() {
-      _notifications.removeAt(index);
+      if (id.isNotEmpty) {
+        _notifications.removeWhere((n) => n['notification_id']?.toString() == id);
+      } else {
+        _notifications.remove(item);
+      }
     });
 
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -164,22 +402,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       SnackBar(
         content: const Text('Notification removed'),
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         action: SnackBarAction(
           label: 'UNDO',
           textColor: const Color(0xFF34D399),
           onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
             setState(() {
-              _notifications.insert(index, removedItem);
+              if (restoreIndex >= 0 && restoreIndex <= _notifications.length) {
+                _notifications.insert(restoreIndex, item);
+              } else {
+                _notifications.add(item);
+              }
             });
           },
         ),
       ),
     );
 
-    try {
-      await NotificationService().deleteNotification(id);
-    } catch (_) {}
+    if (id.isNotEmpty) {
+      try {
+        await NotificationService().deleteNotification(id);
+      } catch (_) {}
+    }
   }
 
   Future<void> _clearAllNotifications() async {
@@ -324,61 +570,65 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final grouped = _groupNotifications(filtered);
     final unread = _unreadCount;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(unread),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Category Filter Pills
-            if (_notifications.isNotEmpty) _buildFilterCarousel(),
+    return ScaffoldMessenger(
+      child: PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: _buildAppBar(unread),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Category Filter Pills
+                if (_notifications.isNotEmpty) _buildFilterCarousel(),
 
-            // Notification List or Empty State
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Color(0xFF059669),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _fetchNotifications,
-                      color: const Color(0xFF059669),
-                      backgroundColor: Colors.white,
-                      child: filtered.isEmpty
-                          ? _buildEmptyState()
-                          : ListView(
-                              physics: const AlwaysScrollableScrollPhysics(
-                                parent: BouncingScrollPhysics(),
-                              ),
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                              children: [
-                                if (grouped['Today']!.isNotEmpty) ...[
-                                  _buildSectionHeader('TODAY'),
-                                  ...grouped['Today']!.asMap().entries.map(
-                                    (e) => _buildNotificationCard(e.value, e.key),
+                // Notification List or Empty State
+                Expanded(
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Color(0xFF059669),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _fetchNotifications,
+                          color: const Color(0xFF059669),
+                          backgroundColor: Colors.white,
+                          child: filtered.isEmpty
+                              ? _buildEmptyState()
+                              : ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(
+                                    parent: BouncingScrollPhysics(),
                                   ),
-                                  const SizedBox(height: 14),
-                                ],
-                                if (grouped['Yesterday']!.isNotEmpty) ...[
-                                  _buildSectionHeader('YESTERDAY'),
-                                  ...grouped['Yesterday']!.asMap().entries.map(
-                                    (e) => _buildNotificationCard(e.value, e.key),
-                                  ),
-                                  const SizedBox(height: 14),
-                                ],
-                                if (grouped['Earlier']!.isNotEmpty) ...[
-                                  _buildSectionHeader('EARLIER'),
-                                  ...grouped['Earlier']!.asMap().entries.map(
-                                    (e) => _buildNotificationCard(e.value, e.key),
-                                  ),
-                                ],
-                              ],
-                            ),
-                    ),
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                                  children: [
+                                    if (grouped['Today']!.isNotEmpty) ...[
+                                      _buildSectionHeader('TODAY'),
+                                      ...grouped['Today']!.map(_buildNotificationCard),
+                                      const SizedBox(height: 14),
+                                    ],
+                                    if (grouped['Yesterday']!.isNotEmpty) ...[
+                                      _buildSectionHeader('YESTERDAY'),
+                                      ...grouped['Yesterday']!.map(_buildNotificationCard),
+                                      const SizedBox(height: 14),
+                                    ],
+                                    if (grouped['Earlier']!.isNotEmpty) ...[
+                                      _buildSectionHeader('EARLIER'),
+                                      ...grouped['Earlier']!.map(_buildNotificationCard),
+                                    ],
+                                  ],
+                                ),
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -392,6 +642,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       backgroundColor: Colors.white,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
+      centerTitle: false,
+      titleSpacing: 0,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(color: const Color(0xFFE2E8F0), height: 1),
@@ -402,38 +654,45 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           color: Color(0xFF0F172A),
           size: 18,
         ),
-        onPressed: () => context.pop(),
+        onPressed: () {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          context.pop();
+        },
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Notifications',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          if (unread > 0) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF059669),
-                borderRadius: BorderRadius.circular(12),
+      title: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Notifications',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
               ),
-              child: Text(
-                '$unread New',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+            ),
+            if (unread > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$unread New',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         if (_notifications.isNotEmpty) ...[
@@ -566,8 +825,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ===========================================================================
   // 3. RICH CLICKABLE NOTIFICATION CARD
   // ===========================================================================
-  Widget _buildNotificationCard(Map<String, dynamic> item, int index) {
-    final id = item['notification_id']?.toString() ?? '$index';
+  Widget _buildNotificationCard(Map<String, dynamic> item) {
+    final notifId = item['notification_id']?.toString() ?? '';
+    final uniqueId = notifId.isNotEmpty
+        ? notifId
+        : '${item['created_at']}_${item['title']}_${item.hashCode}';
     final title = item['title']?.toString() ?? 'Notification';
     final body = item['body']?.toString() ?? '';
     final linkType = (item['link_type']?.toString() ?? '').toLowerCase();
@@ -579,7 +841,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final iconColor = _getIconColor(linkType, title);
 
     return Dismissible(
-      key: Key(id),
+      key: ValueKey('notif_$uniqueId'),
       direction: DismissDirection.endToStart,
       background: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -591,7 +853,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: const EdgeInsets.only(right: 20),
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
       ),
-      onDismissed: (_) => _deleteNotification(id, index),
+      onDismissed: (_) => _deleteNotification(item),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
@@ -614,7 +876,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => _handleNotificationTap(item, index),
+            onTap: () => _handleNotificationTap(item),
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.all(14),
