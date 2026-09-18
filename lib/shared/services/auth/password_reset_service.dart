@@ -4,22 +4,58 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'otp_service.dart';
+import 'textbee_otp_service.dart';
+import 'auth_service.dart';
 import '../integration/email_service.dart';
 import '../core/supabase_config.dart';
 
 enum PasswordResetDeliveryMode { code, recoveryLink }
 
 /// Password Reset Service - High-Security 3NF Implementation
-/// Handles sending reset codes and updating passwords via secure DB RPCs.
+/// Handles sending reset codes via Email or TextBee SMS OTP and updating passwords via secure DB RPCs.
 class PasswordResetService {
   static final _client = SupabaseConfig.client;
 
   static String _normalizeEmail(String email) => email.trim().toLowerCase();
 
-  static Future<String?> _findUserIdByEmail(String email) async {
-    final normalized = _normalizeEmail(email);
-    if (normalized.isEmpty) return null;
+  static Future<String?> _findUserIdByIdentifier(String identifier) async {
+    final clean = identifier.trim();
+    if (clean.isEmpty) return null;
 
+    if (!clean.contains('@')) {
+      final digits = clean.replaceAll(RegExp(r'[^\d]'), '');
+      if (digits.isNotEmpty) {
+        String tenDigits = digits;
+        if (digits.length >= 12 && digits.startsWith('639')) {
+          tenDigits = digits.substring(2, 12);
+        } else if (digits.length >= 11 && digits.startsWith('09')) {
+          tenDigits = digits.substring(1, 11);
+        } else if (digits.length >= 10 && digits.startsWith('9')) {
+          tenDigits = digits.substring(0, 10);
+        }
+
+        final variantE164 = '+63$tenDigits';
+        final variant63 = '63$tenDigits';
+        final variant09 = '0$tenDigits';
+        final variant10 = tenDigits;
+        final syntheticEmail = '$variant63@phone.agridirect.ph';
+
+        try {
+          final row = await _client
+              .from('users')
+              .select('user_id')
+              .or('phone.eq.$variantE164,phone.eq.$variant63,phone.eq.$variant09,phone.eq.$variant10,phone.ilike.%$tenDigits,email.eq.$syntheticEmail')
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (row != null && row['user_id'] != null) {
+            return row['user_id'].toString();
+          }
+        } catch (_) {}
+      }
+    }
+
+    final normalized = clean.toLowerCase();
     try {
       final usersRow = await _client
           .from('users')
@@ -64,9 +100,9 @@ class PasswordResetService {
       return 'We could not send the password reset email right now. Please try again later or contact support.';
     }
     if (_isRetryableRecoveryError(e)) {
-      return 'Temporary email delivery issue. Please try again in a moment.';
+      return 'Temporary delivery issue. Please try again in a moment.';
     }
-    return 'Unable to send reset link right now. Please try again later.';
+    return e.toString().replaceAll('Exception:', '').trim();
   }
 
   static Future<void> _sendRecoveryEmailWithFallback({
@@ -98,40 +134,48 @@ class PasswordResetService {
 
     final currentOrigin = Uri.base.origin;
     final host = Uri.base.host.toLowerCase();
-    if (host != 'localhost' && host != '127.0.0.1' && host != '::1') {
-      return currentOrigin;
+    final isLocalhost = host == 'localhost' || host == '127.0.0.1';
+    if (isLocalhost) {
+      return 'http://localhost:3000';
     }
 
-    return 'https://agridirect-app.vercel.app';
+    return currentOrigin;
   }
 
   static Future<void> _sendResetCodeViaWebApi(String normalizedEmail) async {
-    final uri = Uri.parse('$_webEmailApiBase/api/password-reset/send-code');
+    final baseUrl = _webEmailApiBase;
+    final endpoint = Uri.parse('$baseUrl/api/auth/send-email');
 
     try {
       final response = await http
           .post(
-            uri,
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': normalizedEmail}),
+            endpoint,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': normalizedEmail,
+              'type': 'password_reset',
+            }),
           )
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return;
       }
 
-      final data = jsonDecode(response.body);
-      if (data is Map && data['error'] is String) {
-        throw data['error'] as String;
-      }
+      String message = 'Failed to send password reset code via web service.';
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['error'] is String) {
+          message = body['error'] as String;
+        }
+      } catch (_) {}
 
-      throw 'Unable to send password reset email right now.';
+      throw message;
     } catch (e) {
-      debugPrint('[PasswordResetService] Web reset-code API failed: $e');
+      debugPrint('[PasswordResetService] Error sending reset code via web API: $e');
       final message = e.toString().toLowerCase();
       if (message.contains('failed to fetch') ||
-          message.contains('xmlhttprequest error') ||
+          message.contains('xmlhttprequest') ||
           message.contains('clientexception')) {
         throw 'Password reset email service is not reachable. Please deploy the web email API or check its environment variables.';
       }
@@ -140,11 +184,53 @@ class PasswordResetService {
     }
   }
 
-  /// Send a 6-digit password reset code to the user's email
-  static Future<PasswordResetDeliveryMode> sendResetCode(String email) async {
+  /// Send a 6-digit password reset code to user's email or mobile number
+  static Future<PasswordResetDeliveryMode> sendResetCode(String identifier) async {
     try {
-      final normalizedEmail = _normalizeEmail(email);
-      final userId = await _findUserIdByEmail(normalizedEmail);
+      final clean = identifier.trim();
+      final isPhone = !clean.contains('@');
+
+      if (isPhone) {
+        final digits = clean.replaceAll(RegExp(r'[^\d]'), '');
+        String tenDigits = digits;
+        if (digits.length >= 12 && digits.startsWith('639')) {
+          tenDigits = digits.substring(2, 12);
+        } else if (digits.length >= 11 && digits.startsWith('09')) {
+          tenDigits = digits.substring(1, 11);
+        } else if (digits.length >= 10 && digits.startsWith('9')) {
+          tenDigits = digits.substring(0, 10);
+        }
+
+        final e164 = '+63$tenDigits';
+        final userId = await _findUserIdByIdentifier(clean);
+        if (userId == null) {
+          throw 'No account found for mobile number $clean. Please check the number or sign up.';
+        }
+
+        final code = await _getOrCreatePasswordResetCode(userId);
+
+        final smsSent = await TextBeeOtpService().sendOtp(
+          phoneNumber: e164,
+          customCode: code,
+          customMessage: 'AgriDirect: Your password reset code is: $code. Valid for 10 minutes. Do not share this code.',
+          onSuccess: (_) {
+            debugPrint('✅ TextBee password reset SMS sent to $e164');
+          },
+          onError: (err) {
+            debugPrint('❌ TextBee password reset SMS error: $err');
+          },
+        );
+
+        if (!smsSent) {
+          throw 'Failed to send SMS reset code to $clean. Please check your signal and try again.';
+        }
+
+        return PasswordResetDeliveryMode.code;
+      }
+
+      // Email flow
+      final normalizedEmail = _normalizeEmail(clean);
+      final userId = await _findUserIdByIdentifier(normalizedEmail);
 
       if (kIsWeb) {
         await _sendResetCodeViaWebApi(normalizedEmail);
@@ -207,7 +293,7 @@ class PasswordResetService {
     required String newPassword,
   }) async {
     try {
-      final normalizedEmail = _normalizeEmail(email);
+      final resolvedEmail = await AuthService.resolveEmailForIdentifier(email);
 
       if (newPassword.trim().isEmpty || newPassword.trim().length < 6) {
         throw 'Password must be at least 6 characters.';
@@ -216,7 +302,7 @@ class PasswordResetService {
       final response = await _client.functions.invoke(
         'reset-password-with-code',
         body: {
-          'email': normalizedEmail,
+          'email': resolvedEmail,
           'code': code.trim(),
           'newPassword': newPassword,
         },
@@ -230,8 +316,10 @@ class PasswordResetService {
         throw 'Password reset failed. Please try again.';
       }
 
-      // Security notification should not block successful reset.
-      await EmailService.sendPasswordChangedAlert(email: normalizedEmail);
+      // Security notification for email users
+      if (!resolvedEmail.endsWith('@phone.agridirect.ph')) {
+        await EmailService.sendPasswordChangedAlert(email: resolvedEmail);
+      }
     } catch (e) {
       debugPrint('[PasswordResetService] Error resetting password: $e');
       rethrow;
@@ -246,7 +334,7 @@ class PasswordResetService {
     required String newPassword,
   }) async {
     final normalizedEmail = _normalizeEmail(email);
-    final userId = await _findUserIdByEmail(normalizedEmail);
+    final userId = await _findUserIdByIdentifier(normalizedEmail);
 
     if (userId == null) {
       throw 'Account identification failed.';
@@ -274,8 +362,7 @@ class PasswordResetService {
     required String code,
   }) async {
     try {
-      final normalizedEmail = _normalizeEmail(email);
-      final userId = await _findUserIdByEmail(normalizedEmail);
+      final userId = await _findUserIdByIdentifier(email);
       if (userId == null) {
         throw 'Account identification failed.';
       }

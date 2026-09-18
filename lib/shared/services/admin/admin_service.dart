@@ -588,6 +588,10 @@ class AdminService extends ChangeNotifier {
         user['orders_count'] = orderCounts[id] ?? 0;
         user['total_spent'] = totalSpends[id] ?? 0.0;
         user['last_order_date'] = lastOrderDates[id] ?? '';
+
+        final isEmailVerified = user['email_verified'] == true;
+        user['is_system_verified'] = isEmailVerified;
+        user['gmail_avatar_url'] = user['avatar_url'];
       }
 
       return users;
@@ -663,16 +667,31 @@ class AdminService extends ChangeNotifier {
             .from('v_users_with_roles')
             .select('*')
             .eq('user_id', userId)
-            .maybeSingle(),
+            .maybeSingle()
+            .catchError((e) {
+              debugPrint('Failed to load user profile: $e');
+              return null;
+            }),
         // 1: Orders
         _client
             .from('orders')
             .select('order_id, total_amount, created_at')
             .eq('customer_id', userId)
             .order('created_at', ascending: false)
-            .limit(10),
-        // 2: Addresses
-        _client.from('addresses').select('*').eq('user_id', userId),
+            .limit(10)
+            .catchError((e) {
+              debugPrint('Failed to load orders: $e');
+              return [];
+            }),
+        // 2: Delivery Addresses
+        _client
+            .from('delivery_addresses')
+            .select('*')
+            .eq('user_id', userId)
+            .catchError((e) {
+              debugPrint('Failed to load delivery addresses: $e');
+              return [];
+            }),
       ]);
 
       final profile = results[0] as Map<String, dynamic>? ?? {};
@@ -1367,10 +1386,12 @@ class AdminService extends ChangeNotifier {
           .from('farmer_registrations')
           .select('''
             registration_id, farmer_id, status,
+            verification_method, ai_confidence_score, ai_verification_notes, review_notes,
             farmers!inner(full_name, user_id, farm_name, specialty, birth_date, id_type, sex, place_of_birth, pcn,
             years_of_experience, residential_address, face_photo_path,
             valid_id_path, valid_id_back_path, farming_history, is_verified, is_active, 
             farm_latitude, farm_longitude, created_at, updated_at,
+            verification_method, ai_confidence_score, ai_verification_notes,
             users!fk_farmers_user(name, email, phone, avatar_url))
           ''')
           .eq('status', 'pending')
@@ -1425,6 +1446,16 @@ class AdminService extends ChangeNotifier {
           farmName: farmers?['farm_name'],
           userId: farmers?['user_id'],
         );
+
+        final verificationMethod = row['verification_method'] ?? farmers?['verification_method'] ?? 'manual_admin';
+        final aiScore = (row['ai_confidence_score'] ?? farmers?['ai_confidence_score'] as num?)?.toDouble();
+        final aiNotes = row['ai_verification_notes'] ?? farmers?['ai_verification_notes'] ?? row['review_notes'];
+        final facePhoto = farmers?['face_photo_path'];
+        final validId = farmers?['valid_id_path'];
+        final validIdBack = farmers?['valid_id_back_path'];
+        final gmailAvatar = users?['avatar_url'];
+        final resolvedAvatar = (farmers?['logo_url'] ?? farmers?['image_url'] ?? facePhoto ?? gmailAvatar)?.toString();
+
         return {
           'registration_id': row['registration_id'],
           'farmer_id': row['farmer_id'],
@@ -1440,9 +1471,11 @@ class AdminService extends ChangeNotifier {
           'birth_date': farmers?['birth_date'],
           'years_of_experience': farmers?['years_of_experience'],
           'residential_address': farmers?['residential_address'],
-          'face_photo_path': farmers?['face_photo_path'],
-          'valid_id_path': farmers?['valid_id_path'],
-          'valid_id_back_path': farmers?['valid_id_back_path'],
+          'face_photo_path': facePhoto,
+          'face_photo': facePhoto,
+          'valid_id_path': validId,
+          'valid_id': validId,
+          'valid_id_back_path': validIdBack,
           'farming_history': farmers?['farming_history'],
           'farm_latitude': farmers?['farm_latitude'],
           'farm_longitude': farmers?['farm_longitude'],
@@ -1452,11 +1485,16 @@ class AdminService extends ChangeNotifier {
           'name': applicantName,
           'email': users?['email'],
           'phone': users?['phone'],
-          'avatar_url': users?['avatar_url'],
+          'avatar_url': resolvedAvatar,
+          'gmail_avatar_url': gmailAvatar,
           'applicant_name': applicantName,
           'farmer_name': applicantName,
           'farmer_email': users?['email'],
           'farmer_phone': users?['phone'],
+          'verification_method': verificationMethod,
+          'ai_confidence_score': aiScore,
+          'ai_verification_notes': aiNotes,
+          'review_notes': aiNotes,
         };
       }).toList();
 
@@ -1495,11 +1533,14 @@ class AdminService extends ChangeNotifier {
             .from('farmer_registrations')
             .select('''
               registration_id, farmer_id, status, created_at,
+              verification_method, ai_confidence_score, ai_verification_notes, review_notes,
               farmers (
                 full_name, user_id, farm_name, specialty, birth_date, id_type, sex, 
                 place_of_birth, pcn, years_of_experience, residential_address,
+                logo_url, cover_url,
                 face_photo_path, valid_id_path, valid_id_back_path, 
                 farming_history, is_verified, is_active,
+                verification_method, ai_confidence_score, ai_verification_notes,
                 users (name, email, phone, avatar_url)
               )
             ''')
@@ -1520,6 +1561,16 @@ class AdminService extends ChangeNotifier {
             userId: farmer?['user_id'],
           );
 
+          final verificationMethod = row['verification_method'] ?? farmer?['verification_method'] ?? 'manual_admin';
+          final aiScore = (row['ai_confidence_score'] ?? farmer?['ai_confidence_score'] as num?)?.toDouble();
+          final aiNotes = row['ai_verification_notes'] ?? farmer?['ai_verification_notes'] ?? row['review_notes'];
+          final facePhoto = farmer?['face_photo_path'];
+          final validId = farmer?['valid_id_path'];
+          final validIdBack = farmer?['valid_id_back_path'];
+          final gmailAvatar = user?['avatar_url'];
+          // Farm Logo: strictly loaded from logo_url (NEVER face_photo_path)
+          final resolvedLogo = (farmer?['logo_url'] ?? farmer?['farm_logo'])?.toString();
+
           return {
             'registration_id': row['registration_id'],
             'farmer_id': row['farmer_id'],
@@ -1538,18 +1589,35 @@ class AdminService extends ChangeNotifier {
             'created_at': row['created_at'],
             'email': user?['email'],
             'phone': user?['phone'],
-            'avatar_url': user?['avatar_url'],
+            'avatar_url': resolvedLogo,
+            'logo_url': resolvedLogo,
+            'gmail_avatar_url': gmailAvatar,
             'applicant_name': applicantName,
+            'face_photo_path': facePhoto,
+            'face_photo': facePhoto,
+            'valid_id_path': validId,
+            'valid_id': validId,
+            'valid_id_back_path': validIdBack,
+            'birth_date': farmer?['birth_date'],
+            'years_of_experience': farmer?['years_of_experience'],
+            'residential_address': farmer?['residential_address'],
+            'farming_history': farmer?['farming_history'],
+            'verification_method': verificationMethod,
+            'ai_confidence_score': aiScore,
+            'ai_verification_notes': aiNotes,
+            'review_notes': aiNotes,
           };
         }).toList();
       } else {
         // Query all/verified from farmers table (base)
         var query = _client.from('farmers').select('''
           farmer_id, user_id, farm_name, specialty, location,
+          logo_url, cover_url,
           birth_date, years_of_experience, residential_address,
           farming_history, face_photo_path, valid_id_path, valid_id_back_path,
           id_type, sex, place_of_birth, pcn,
           is_verified, is_active, created_at, updated_at,
+          verification_method, ai_confidence_score, ai_verification_notes,
           users (name, email, phone, avatar_url)
         ''');
 
@@ -1570,17 +1638,28 @@ class AdminService extends ChangeNotifier {
             userId: row['user_id'],
           );
 
+          final facePhoto = row['face_photo_path'];
+          final validId = row['valid_id_path'];
+          final validIdBack = row['valid_id_back_path'];
+          final gmailAvatar = user?['avatar_url'];
+          // Farm Logo: strictly loaded from logo_url (NEVER face_photo_path)
+          final resolvedLogo = (row['logo_url'] ?? row['farm_logo'])?.toString();
+
           return {
             ...Map<String, dynamic>.from(row as Map),
             'name': applicantName,
             'applicant_name': applicantName,
             'email': user?['email'],
             'phone': user?['phone'],
-            'avatar_url': user?['avatar_url'],
+            'avatar_url': resolvedLogo,
+            'logo_url': resolvedLogo,
+            'gmail_avatar_url': gmailAvatar,
             'status': row['is_verified'] == true ? 'verified' : 'unverified',
-            'face_photo_path': row['face_photo_path'],
-            'valid_id_path': row['valid_id_path'],
-            'valid_id_back_path': row['valid_id_back_path'],
+            'face_photo_path': facePhoto,
+            'face_photo': facePhoto,
+            'valid_id_path': validId,
+            'valid_id': validId,
+            'valid_id_back_path': validIdBack,
             'birth_date': row['birth_date'],
             'years_of_experience': row['years_of_experience'],
             'residential_address': row['residential_address'],
@@ -1589,6 +1668,9 @@ class AdminService extends ChangeNotifier {
             'sex': row['sex'],
             'place_of_birth': row['place_of_birth'],
             'pcn': row['pcn'],
+            'verification_method': row['verification_method'] ?? 'manual_admin',
+            'ai_confidence_score': (row['ai_confidence_score'] as num?)?.toDouble(),
+            'ai_verification_notes': row['ai_verification_notes'],
           };
         }).toList();
 
@@ -1597,9 +1679,11 @@ class AdminService extends ChangeNotifier {
           try {
             final pendingRegs = await _client
                 .from('farmer_registrations')
-                .select(
-                  'registration_id, farmer_id, status, created_at, farmers(full_name)',
-                )
+                .select('''
+                  registration_id, farmer_id, status, created_at,
+                  verification_method, ai_confidence_score, ai_verification_notes, review_notes,
+                  farmers(full_name, user_id, farm_name, specialty, logo_url, cover_url, face_photo_path, valid_id_path, users(name, email, phone, avatar_url))
+                ''')
                 .eq('status', 'pending');
 
             final existingFarmerIds = response
@@ -1608,14 +1692,32 @@ class AdminService extends ChangeNotifier {
 
             for (var reg in (pendingRegs as List)) {
               if (!existingFarmerIds.contains(reg['farmer_id'].toString())) {
+                final f = reg['farmers'];
+                final u = f?['users'];
+                final facePhoto = f?['face_photo_path'];
+                final gmailAvatar = u?['avatar_url'];
+                // Farm Logo: strictly loaded from logo_url (NEVER face_photo_path)
+                final resolvedLogo = (f?['logo_url'] ?? f?['farm_logo'])?.toString();
+
                 response.add({
                   'registration_id': reg['registration_id'],
                   'farmer_id': reg['farmer_id'],
                   'status': 'pending',
-                  'name': reg['farmers']?['full_name'],
-                  'farm_name': 'Pending Registration',
+                  'name': f?['full_name'] ?? u?['name'] ?? 'Pending Farmer',
+                  'farm_name': f?['farm_name'] ?? 'Pending Registration',
+                  'specialty': f?['specialty'] ?? 'General',
                   'created_at': reg['created_at'],
                   'is_verified': false,
+                  'face_photo_path': facePhoto,
+                  'face_photo': facePhoto,
+                  'valid_id_path': f?['valid_id_path'],
+                  'valid_id': f?['valid_id_path'],
+                  'avatar_url': resolvedLogo,
+                  'logo_url': resolvedLogo,
+                  'gmail_avatar_url': gmailAvatar,
+                  'verification_method': reg['verification_method'] ?? 'manual_admin',
+                  'ai_confidence_score': (reg['ai_confidence_score'] as num?)?.toDouble(),
+                  'ai_verification_notes': reg['ai_verification_notes'] ?? reg['review_notes'],
                 });
               }
             }
@@ -1649,7 +1751,7 @@ class AdminService extends ChangeNotifier {
       Map<String, dynamic>? farmer;
 
       final profileQuery = _client.from('v_farmer_profiles').select('''
-        farmer_id, user_id, farm_name, specialty, location, badge, image_url,
+        farmer_id, user_id, farm_name, specialty, location, badge, logo_url, cover_url,
         face_photo_path, valid_id_path, valid_id_back_path, years_of_experience,
         residential_address, farming_history, birth_date,
         is_verified, is_active, created_at, updated_at,
@@ -1669,6 +1771,7 @@ class AdminService extends ChangeNotifier {
           .from('farmers')
           .select('''
             farmer_id, user_id, farm_name, specialty, birth_date,
+            logo_url, cover_url,
             years_of_experience, residential_address, face_photo_path,
             valid_id_path, valid_id_back_path, farming_history, location,
             id_type, sex, place_of_birth, pcn, is_verified,
@@ -3863,26 +3966,38 @@ class AdminService extends ChangeNotifier {
   /// Get signed URL for a file in storage
   Future<String?> getSignedUrl(String path) async {
     try {
+      final trimmed = path.trim();
+      if (trimmed.isEmpty) return null;
+
+      // If it's a direct non-Supabase external URL (Google avatar, Unsplash, external CDN), return as-is
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        if (!trimmed.contains('supabase.co/storage')) {
+          return trimmed;
+        }
+        if (trimmed.contains('token=')) {
+          return trimmed;
+        }
+      }
+
       String bucket;
       String fileName;
 
-      if (path.startsWith('http')) {
+      if (trimmed.startsWith('http')) {
         // Handle full Supabase URL: https://.../storage/v1/object/public/bucket/path/to/file
-        final uri = Uri.parse(path);
+        final uri = Uri.parse(trimmed);
         final segments = uri.pathSegments;
 
         // Find 'public' or 'authenticated' in segments
         int objectIndex = segments.indexOf('object');
         if (objectIndex != -1 && segments.length > objectIndex + 2) {
-          // segments[objectIndex+1] is 'public' or 'authenticated'
           bucket = segments[objectIndex + 2];
           fileName = segments.sublist(objectIndex + 3).join('/');
         } else {
-          return null;
+          return trimmed;
         }
       } else {
         // Determine bucket from relative path: bucket/path/to/file
-        final parts = path.split('/');
+        final parts = trimmed.split('/');
         if (parts.length >= 2 &&
             (parts[0] == 'registrations' ||
                 parts[0] == 'uploads' ||
@@ -3892,7 +4007,7 @@ class AdminService extends ChangeNotifier {
         } else {
           // Fallback to registrations bucket for farmer documents if no bucket prefix
           bucket = 'registrations';
-          fileName = path;
+          fileName = trimmed;
         }
       }
 
@@ -3903,9 +4018,10 @@ class AdminService extends ChangeNotifier {
       }
 
       try {
-        return await _client.storage
+        final signed = await _client.storage
             .from(bucket)
             .createSignedUrl(fileName, 3600);
+        if (signed.isNotEmpty) return signed;
       } catch (e) {
         // Fallback Strategy: Try alternative common buckets
         final fallbacks = [
@@ -3919,23 +4035,36 @@ class AdminService extends ChangeNotifier {
         for (final fbBucket in fallbacks) {
           if (fbBucket == bucket) continue;
           try {
-            // Also try stripping the bucket name from the fileName if it's redundant
             String fbFileName = fileName;
             if (pathParts.isNotEmpty && pathParts[0] == fbBucket) {
               fbFileName = pathParts.sublist(1).join('/');
             }
-            return await _client.storage
+            final altSigned = await _client.storage
                 .from(fbBucket)
                 .createSignedUrl(fbFileName, 3600);
+            if (altSigned.isNotEmpty) return altSigned;
           } catch (_) {}
         }
 
+        // Final fallback: try getting public URL
+        try {
+          final pubUrl = _client.storage.from(bucket).getPublicUrl(fileName);
+          if (pubUrl.isNotEmpty) return pubUrl;
+        } catch (_) {}
+
+        final altBucket = bucket == 'registrations' ? 'uploads' : 'registrations';
+        try {
+          final altPubUrl = _client.storage.from(altBucket).getPublicUrl(fileName);
+          if (altPubUrl.isNotEmpty) return altPubUrl;
+        } catch (_) {}
+
         debugPrint('Error generating signed URL for $path: $e');
-        return null;
+        return trimmed.startsWith('http') ? trimmed : null;
       }
+      return null;
     } catch (e) {
       debugPrint('Error generating signed URL: $e');
-      return null;
+      return path.startsWith('http') ? path : null;
     }
   }
 

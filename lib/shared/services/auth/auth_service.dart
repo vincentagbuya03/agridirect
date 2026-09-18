@@ -136,7 +136,16 @@ class AuthService extends ChangeNotifier {
 
   String get userName => _userName;
   String get userEmail => _userEmail;
-  String get userId => _userId;
+  String get userId {
+    if (_userId.trim().isNotEmpty) return _userId.trim();
+    if (_pendingUserId.trim().isNotEmpty) return _pendingUserId.trim();
+    final authUser = _client.auth.currentUser ?? SupabaseConfig.currentUser;
+    if (authUser != null && authUser.id.trim().isNotEmpty) {
+      _userId = authUser.id.trim();
+      return _userId;
+    }
+    return '';
+  }
   String get userAvatarUrl => _userAvatarUrl;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -145,6 +154,8 @@ class AuthService extends ChangeNotifier {
   String get pendingName => _pendingName;
   String? get registrationStatus => _registrationStatus;
   bool get isEmailVerified => _isEmailVerified;
+  bool get isPhoneOnlyAccount =>
+      _userEmail.trim().toLowerCase().endsWith('@phone.agridirect.ph');
   SupabaseClient get client => _client;
 
   // Brute-force getters
@@ -648,6 +659,13 @@ class AuthService extends ChangeNotifier {
       var profile = await SupabaseDatabase.getUserProfile(
         user.id,
       ).timeout(const Duration(seconds: 8), onTimeout: () => null);
+
+      // Extract Gmail photo from user metadata (Google OAuth provider)
+      final metaAvatar = (user.userMetadata?['avatar_url'] ??
+              user.userMetadata?['picture'])
+          ?.toString()
+          .trim();
+
       if (profile == null) {
         final metadata = user.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
@@ -659,12 +677,28 @@ class AuthService extends ChangeNotifier {
             name: metaName,
             phoneNumber: metaPhone,
             emailVerified: user.appMetadata['provider'] == 'google',
+            avatarUrl: metaAvatar,
           );
           profile = await SupabaseDatabase.getUserProfile(
             user.id,
           ).timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e) {
           debugPrint('Error creating user profile on initialize: $e');
+        }
+      } else {
+        // If profile exists and avatar_url is missing or empty, set Gmail photo as default!
+        final dbAvatar = (profile['avatar_url'] as String?)?.trim() ?? '';
+        if (dbAvatar.isEmpty && metaAvatar != null && metaAvatar.isNotEmpty) {
+          try {
+            await _client
+                .from('users')
+                .update({'avatar_url': metaAvatar})
+                .eq('user_id', user.id);
+            profile['avatar_url'] = metaAvatar;
+            debugPrint('✅ Synced default Gmail avatar to user profile: $metaAvatar');
+          } catch (e) {
+            debugPrint('Could not sync Gmail avatar: $e');
+          }
         }
       }
 
@@ -708,7 +742,10 @@ class AuthService extends ChangeNotifier {
         }
       }
       _userName = resolvedName;
-      _userAvatarUrl = (profile?['avatar_url'] as String?) ?? '';
+      final resolvedAvatar = (profile?['avatar_url'] as String?)?.trim() ?? '';
+      _userAvatarUrl = resolvedAvatar.isNotEmpty
+          ? resolvedAvatar
+          : (metaAvatar?.isNotEmpty == true ? metaAvatar! : '');
 
       // Ensure admin profile exists for known admin emails
       try {
@@ -861,7 +898,230 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Login with email & password
+  /// Resolves an identifier (either email or Philippine mobile number) to an email address.
+  /// If [identifier] contains '@', it is treated as a direct email.
+  /// If [identifier] is a phone number, it queries public.users to find the registered email,
+  /// or constructs the deterministic synthetic email '$digits@phone.agridirect.ph'.
+  static Future<String> resolveEmailForIdentifier(String identifier) async {
+    final clean = identifier.trim();
+    if (clean.contains('@')) {
+      return clean.toLowerCase();
+    }
+
+    final digits = clean.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isNotEmpty) {
+      String tenDigits = digits;
+      if (digits.length >= 12 && digits.startsWith('639')) {
+        tenDigits = digits.substring(2, 12);
+      } else if (digits.length >= 11 && digits.startsWith('09')) {
+        tenDigits = digits.substring(1, 11);
+      } else if (digits.length >= 10 && digits.startsWith('9')) {
+        tenDigits = digits.substring(0, 10);
+      }
+
+      final variantE164 = '+63$tenDigits';
+      final variant63 = '63$tenDigits';
+      final variant09 = '0$tenDigits';
+      final variant10 = tenDigits;
+      final syntheticEmail = '$variant63@phone.agridirect.ph';
+
+      try {
+        final response = await SupabaseConfig.client
+            .from('users')
+            .select('email, phone')
+            .or('phone.eq.$variantE164,phone.eq.$variant63,phone.eq.$variant09,phone.eq.$variant10,phone.ilike.%$tenDigits,email.eq.$syntheticEmail')
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (response != null && response['email'] != null) {
+          final resolved = (response['email'] as String).trim();
+          if (resolved.isNotEmpty) {
+            return resolved.toLowerCase();
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice: resolveEmailForIdentifier phone lookup error: $e');
+      }
+
+      // Fallback to deterministic synthetic email for this phone
+      return syntheticEmail;
+    }
+
+    return clean.toLowerCase();
+  }
+
+  /// Link or update the user's real personal email address on an existing account.
+  /// Checks that the new email is not already taken, updates Supabase Auth,
+  /// synchronizes public.users, and updates local state.
+  Future<void> linkRealEmail({
+    required String newEmail,
+    required String password,
+  }) async {
+    final cleanEmail = newEmail.trim().toLowerCase();
+    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+      throw 'Please enter a valid email address.';
+    }
+
+    final currentAuthUser = _client.auth.currentUser;
+    final currentUid = userId;
+    if (currentUid.isEmpty || currentAuthUser == null) {
+      throw 'Please sign in to link your email address.';
+    }
+
+    // 1. Check if new email is already claimed by another user in public.users
+    final existingUser = await _client
+        .from('users')
+        .select('user_id')
+        .ilike('email', cleanEmail)
+        .neq('user_id', currentUid)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (existingUser != null) {
+      throw 'This email address is already linked to another account.';
+    }
+
+    // 2. Re-authenticate with current credentials to verify ownership
+    final authEmail = currentAuthUser.email ?? _userEmail;
+    if (authEmail.isNotEmpty && password.isNotEmpty) {
+      final reauth = await _client.auth.signInWithPassword(
+        email: authEmail,
+        password: password,
+      );
+      if (reauth.user == null) {
+        throw 'Incorrect password provided.';
+      }
+    }
+
+    // 3. Update Supabase Auth email
+    await _client.auth.updateUser(
+      UserAttributes(email: cleanEmail),
+    );
+
+    // 4. Synchronize public.users table email
+    await _client
+        .from('users')
+        .update({
+          'email': cleanEmail,
+          'email_verified': true,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('user_id', currentUid);
+
+    // 5. Update local state and cached preferences
+    _userEmail = cleanEmail;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_emailKey(currentUid), cleanEmail);
+    notifyListeners();
+  }
+
+  /// Register a new user with a mobile phone number and password/PIN (No email required).
+  /// Creates the account using a synthetic proxy email in Supabase Auth and auto-confirms profile in public.users.
+  Future<String?> registerWithPhone({
+    required String name,
+    required String phoneNumber,
+    required String password,
+    bool autoSignIn = false,
+  }) async {
+    if (_isLoading) return null;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    // 🛡️ Brute-force protection check
+    if (isLockedOut) {
+      _errorMessage =
+          'Too many attempts. Try again in $remainingLockoutSeconds seconds.';
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+
+    try {
+      final e164 = normalizeToE164(phoneNumber);
+      final isTaken = await isPhoneAlreadyRegistered(e164);
+      if (isTaken) {
+        _errorMessage =
+            'This mobile number is already registered to another account. Please log in instead.';
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
+
+      final digits = e164.replaceAll('+', '');
+      final syntheticEmail = '$digits@phone.agridirect.ph';
+
+      // Sign up with Supabase Auth
+      final response = await _client.auth.signUp(
+        email: syntheticEmail,
+        password: password,
+        data: {
+          'name': name,
+          'phone_number': e164,
+          'phone_registration': true,
+        },
+      );
+
+      if (response.user == null) {
+        _errorMessage = 'Registration failed. Please try again.';
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
+
+      final String newUserId = response.user!.id;
+
+      // Create user profile in public.users
+      try {
+        await SupabaseDatabase.createUserIfNotExists(
+          userId: newUserId,
+          email: syntheticEmail,
+          name: name,
+          phoneNumber: e164,
+          emailVerified: autoSignIn,
+        );
+        debugPrint('✅ Phone user profile ensured in DB for $e164 (verified=$autoSignIn)');
+      } catch (e) {
+        debugPrint('⚠️ Warning: Failed to create user profile in DB: $e');
+      }
+
+      if (autoSignIn) {
+        // Auto sign-in if session was not attached by signUp
+        if (_client.auth.currentSession == null) {
+          try {
+            await _client.auth.signInWithPassword(
+              email: syntheticEmail,
+              password: password,
+            );
+          } catch (signInErr) {
+            debugPrint('Auto sign-in notice after phone register: $signInErr');
+          }
+        }
+
+        await initialize(event: AuthChangeEvent.signedIn);
+      } else {
+        // Keep signed out until OTP is verified
+        try {
+          await _client.auth.signOut();
+        } catch (_) {}
+        _resetSessionState();
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return newUserId;
+    } catch (e) {
+      debugPrint('Registration with phone error: $e');
+      _errorMessage = _extractErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Login with email or phone number & password
   Future<bool> login({required String email, required String password}) async {
     if (_isLoading) return false;
     _isLoading = true;
@@ -880,11 +1140,12 @@ class AuthService extends ChangeNotifier {
     }
 
     try {
+      final resolvedEmail = await resolveEmailForIdentifier(email);
       debugPrint(
-        '🔵 AuthService.login: Attempting signInWithPassword for $email',
+        '🔵 AuthService.login: Resolved "$email" to "$resolvedEmail"',
       );
       final response = await _client.auth
-          .signInWithPassword(email: email, password: password)
+          .signInWithPassword(email: resolvedEmail, password: password)
           .timeout(const Duration(seconds: 20));
 
       debugPrint(
@@ -898,8 +1159,10 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      // Check if email is confirmed
-      if (response.user!.emailConfirmedAt == null) {
+      // Check if email is confirmed (synthetic phone accounts bypass email inbox confirmation)
+      final isSyntheticPhoneEmail =
+          resolvedEmail.endsWith('@phone.agridirect.ph');
+      if (response.user!.emailConfirmedAt == null && !isSyntheticPhoneEmail) {
         _errorMessage =
             'Please confirm your email before logging in. Check your inbox.';
         await _client.auth.signOut();
@@ -917,7 +1180,11 @@ class AuthService extends ChangeNotifier {
         return true; // Password correct, but UI must prompt for MFA
       }
 
-      return await _finalizeSession(response.user!.id, email, response.user!);
+      return await _finalizeSession(
+        response.user!.id,
+        resolvedEmail,
+        response.user!,
+      );
     } catch (e) {
       _errorMessage = _extractErrorMessage(e);
       if (_errorMessage!.toLowerCase().contains('invalid') ||
@@ -1126,10 +1393,13 @@ class AuthService extends ChangeNotifier {
     await _persistCachedUserState();
     notifyListeners();
 
-    try {
-      await SupabaseDatabase.addUserRole(userId: _userId, roleName: 'seller');
-    } catch (e) {
-      debugPrint('Failed to sync seller role: $e');
+    final activeUserId = userId;
+    if (activeUserId.isNotEmpty) {
+      try {
+        await SupabaseDatabase.addUserRole(userId: activeUserId, roleName: 'seller');
+      } catch (e) {
+        debugPrint('Failed to sync seller role: $e');
+      }
     }
   }
 
@@ -1149,10 +1419,11 @@ class AuthService extends ChangeNotifier {
 
   /// Manually refresh the farmer registration status and sync verified name
   Future<void> refreshRegistrationStatus() async {
-    if (_userId.isEmpty) return;
+    final activeUserId = userId;
+    if (activeUserId.isEmpty) return;
     try {
       // Sync user profile name (e.g. verified legal name from ID)
-      final userProfile = await SupabaseDatabase.getUserProfile(_userId);
+      final userProfile = await SupabaseDatabase.getUserProfile(activeUserId);
       if (userProfile != null) {
         final profileName = (userProfile['name'] as String?)?.trim() ?? '';
         if (profileName.isNotEmpty) {
@@ -1160,7 +1431,7 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
+      final reg = await SupabaseDatabase.getFarmerRegistration(activeUserId);
       if (reg != null) {
         final regStatus = reg['status'] as String?;
         final isVerified = reg['is_verified'] == true;
@@ -1182,15 +1453,23 @@ class AuthService extends ChangeNotifier {
   /// Explicitly updates user display name locally and in database
   Future<void> updateUserName(String newName) async {
     final cleanName = newName.trim();
-    if (cleanName.isEmpty || _userId.isEmpty) return;
+    final activeUserId = userId;
+    if (cleanName.isEmpty || activeUserId.isEmpty) return;
     _userName = cleanName;
     try {
-      await SupabaseDatabase.updateUserName(userId: _userId, name: cleanName);
+      await SupabaseDatabase.updateUserName(userId: activeUserId, name: cleanName);
       await _persistCachedUserState();
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating user name: $e');
     }
+  }
+
+  /// Explicitly updates user avatar locally and in cache
+  Future<void> updateUserAvatarUrl(String newAvatarUrl) async {
+    _userAvatarUrl = newAvatarUrl.trim();
+    await _persistCachedUserState();
+    notifyListeners();
   }
 
   void _startWatchingRegistrationStatus(String userId) {
@@ -1336,6 +1615,11 @@ class AuthService extends ChangeNotifier {
 
       final user = response.user!;
       var profile = await SupabaseDatabase.getUserProfile(user.id);
+      final googlePhotoUrl = googleUser.photoUrl ??
+          (user.userMetadata?['avatar_url'] ?? user.userMetadata?['picture'])
+              ?.toString()
+              .trim();
+
       final isIncompleteProfile =
           profile == null ||
           profile['phone'] == null ||
@@ -1347,6 +1631,9 @@ class AuthService extends ChangeNotifier {
         _pendingEmail = user.email ?? '';
         _pendingName =
             user.userMetadata?['full_name'] ?? googleUser.displayName ?? '';
+        if (googlePhotoUrl != null && googlePhotoUrl.isNotEmpty) {
+          _userAvatarUrl = googlePhotoUrl;
+        }
         _isLoading = false;
         notifyListeners();
         return true;
@@ -1356,7 +1643,23 @@ class AuthService extends ChangeNotifier {
       _userEmail = user.email ?? '';
       _userName = (profile['name'] as String?) ?? '';
 
-      _userAvatarUrl = (profile['avatar_url'] as String?) ?? '';
+      // If user profile has no avatar, use Gmail photo as default!
+      final currentAvatar = (profile['avatar_url'] as String?)?.trim() ?? '';
+      if (currentAvatar.isEmpty &&
+          googlePhotoUrl != null &&
+          googlePhotoUrl.isNotEmpty) {
+        try {
+          await _client
+              .from('users')
+              .update({'avatar_url': googlePhotoUrl})
+              .eq('user_id', user.id);
+          _userAvatarUrl = googlePhotoUrl;
+        } catch (_) {
+          _userAvatarUrl = googlePhotoUrl;
+        }
+      } else {
+        _userAvatarUrl = currentAvatar;
+      }
       _isLoggedIn = true;
 
       final roles = await SupabaseDatabase.getUserRoles(_userId);
@@ -1473,29 +1776,28 @@ class AuthService extends ChangeNotifier {
     final clean = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '').trim();
     if (clean.isEmpty) return false;
 
-    final e164 = normalizeToE164(clean);
-    final raw09 = e164.startsWith('+63') ? '0${e164.substring(3)}' : e164;
-
-    try {
-      final rpcRes = await SupabaseConfig.client.rpc(
-        'check_phone_availability',
-        params: {
-          'p_phone': e164,
-          'p_exclude_user_id': ?excludeUserId,
-        },
-      );
-      if (rpcRes is bool) {
-        return !rpcRes; // available = true means isRegistered = false
-      }
-    } catch (_) {
-      // Fallback to direct table query if RPC is not yet applied
+    final digits = clean.replaceAll(RegExp(r'[^\d]'), '');
+    String tenDigits = digits;
+    if (digits.length >= 12 && digits.startsWith('639')) {
+      tenDigits = digits.substring(2, 12);
+    } else if (digits.length >= 11 && digits.startsWith('09')) {
+      tenDigits = digits.substring(1, 11);
+    } else if (digits.length >= 10 && digits.startsWith('9')) {
+      tenDigits = digits.substring(0, 10);
     }
 
+    final variantE164 = '+63$tenDigits';
+    final variant63 = '63$tenDigits';
+    final variant09 = '0$tenDigits';
+    final variant10 = tenDigits;
+    final syntheticEmail = '$variant63@phone.agridirect.ph';
+
+    // 1. Direct table query checking all phone representations (+63, 63, 09, 10-digit, formatted, and synthetic email)
     try {
       final response = await SupabaseConfig.client
           .from('users')
-          .select('user_id, phone')
-          .or('phone.eq.$e164,phone.eq.$raw09');
+          .select('user_id, phone, email')
+          .or('phone.eq.$variantE164,phone.eq.$variant63,phone.eq.$variant09,phone.eq.$variant10,phone.ilike.%$tenDigits,email.eq.$syntheticEmail');
 
       if (response.isNotEmpty) {
         for (var row in response) {
@@ -1507,8 +1809,23 @@ class AuthService extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error checking phone uniqueness: $e');
+      debugPrint('Notice: Direct phone uniqueness check error: $e');
     }
+
+    // 2. RPC check as additional guard
+    try {
+      final rpcRes = await SupabaseConfig.client.rpc(
+        'check_phone_availability',
+        params: {
+          'p_phone': variantE164,
+          'p_exclude_user_id': ?excludeUserId,
+        },
+      );
+      if (rpcRes is bool && !rpcRes) {
+        return true; // RPC confirmed it is taken
+      }
+    } catch (_) {}
+
     return false;
   }
 
@@ -1639,6 +1956,10 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
+      final currentMeta = _client.auth.currentUser?.userMetadata;
+      final metaAvatar = (currentMeta?['avatar_url'] ?? currentMeta?['picture'])?.toString() ??
+          (_userAvatarUrl.isNotEmpty ? _userAvatarUrl : null);
+
       await SupabaseDatabase.createUserIfNotExists(
         userId: _pendingUserId,
         email: _pendingEmail,
@@ -1646,6 +1967,7 @@ class AuthService extends ChangeNotifier {
         phoneNumber: phoneNumber,
         emailVerified:
             true, // If we reach here, they must be verified or have a session
+        avatarUrl: metaAvatar,
       );
 
       try {
@@ -1664,6 +1986,9 @@ class AuthService extends ChangeNotifier {
       _userId = _pendingUserId;
       _userEmail = _pendingEmail;
       _userName = _pendingName;
+      if (metaAvatar != null && metaAvatar.isNotEmpty) {
+        _userAvatarUrl = metaAvatar;
+      }
       _needsProfileCompletion = false;
       _isAdmin = await _resolveAdminStatus(
         _pendingUserId,

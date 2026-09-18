@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/router/app_routes.dart';
+import '../../../shared/widgets/tour/spotlight_tour_controller.dart';
 
 class AppTourScreen extends StatefulWidget {
   const AppTourScreen({super.key});
@@ -204,14 +208,29 @@ class _AppTourScreenState extends State<AppTourScreen> {
                   ),
                   // Next / Finish Button
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (_currentPage < _tourSlides.length - 1) {
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
                         );
                       } else {
-                        Navigator.pop(context);
+                        final auth = AuthService();
+                        if (auth.isViewingAsFarmer) {
+                          await SpotlightTourController.resetTourStatus(
+                            SpotlightTourController.farmerTourKey,
+                          );
+                          if (context.mounted) {
+                            context.go(AppRoutes.farmerDashboard);
+                          }
+                        } else {
+                          await SpotlightTourController.resetTourStatus(
+                            SpotlightTourController.consumerTourKey,
+                          );
+                          if (context.mounted) {
+                            context.go(AppRoutes.home);
+                          }
+                        }
                       }
                     },
                     style: ElevatedButton.styleFrom(

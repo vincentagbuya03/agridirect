@@ -449,8 +449,7 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
         farmer['user_id']?.toString() ??
         farmer['id']?.toString() ??
         '';
-    final imageUrl = farmer['image_url']?.toString() ??
-        farmer['logo_url']?.toString() ??
+    final imageUrl = farmer['logo_url']?.toString() ??
         farmer['avatar_url']?.toString() ??
         farmer['profile_picture']?.toString();
     final isSelected = _selectedFarmer != null &&
@@ -616,8 +615,7 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
       if (lat is! num || lng is! num) return null;
 
       final isSelected = _selectedFarmer != null && _selectedFarmer!['farmer_id'] == f['farmer_id'];
-      final imageUrl = f['image_url']?.toString() ??
-          f['logo_url']?.toString() ??
+      final imageUrl = f['logo_url']?.toString() ??
           f['avatar_url']?.toString() ??
           f['profile_picture']?.toString();
 
@@ -759,8 +757,7 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
                     child: Row(
                       children: [
                         SafeCircleAvatar(
-                          imageUrl: _selectedFarmer!['image_url']?.toString() ??
-                              _selectedFarmer!['logo_url']?.toString() ??
+                          imageUrl: _selectedFarmer!['logo_url']?.toString() ??
                               _selectedFarmer!['avatar_url']?.toString() ??
                               _selectedFarmer!['profile_picture']?.toString(),
                           radius: 20,

@@ -255,7 +255,7 @@ class FarmerAiVerificationService {
         (idType != 'national_id' || qrValid);
 
     final summaryNotes = isAutoApproved
-        ? 'AI Auto-Verified: Confidence ${(confidenceScore * 100).toStringAsFixed(1)}%. ${passedChecks.join(', ')}.'
+        ? 'Auto-Verified: Confidence ${(confidenceScore * 100).toStringAsFixed(1)}%. ${passedChecks.join(', ')}.'
         : 'Requires Admin Review: Confidence ${(confidenceScore * 100).toStringAsFixed(1)}%. Reasons: ${flaggedReasons.join('; ')}.';
 
     return FarmerAiVerificationResult(

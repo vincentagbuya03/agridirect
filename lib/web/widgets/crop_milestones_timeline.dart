@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../shared/models/product/crop_milestone_model.dart';
 import '../../shared/widgets/image_widgets.dart';
+import '../../shared/localization/farmer_locale_service.dart';
 
 class CropMilestonesTimeline extends StatelessWidget {
   final List<CropMilestone> milestones;
@@ -13,69 +14,76 @@ class CropMilestonesTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (milestones.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.spa_outlined, size: 36, color: Color(0xFF94A3B8)),
-            const SizedBox(height: 12),
-            Text(
-              'No growth updates yet',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF64748B),
-              ),
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        if (milestones.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'The farmer hasn\'t posted any development updates for this batch yet.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF94A3B8),
-              ),
+            child: Column(
+              children: [
+                const Icon(Icons.spa_outlined, size: 36, color: Color(0xFF94A3B8)),
+                const SizedBox(height: 12),
+                Text(
+                  loc.s('No growth updates yet', 'Wala pang mga update sa paglaki'),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  loc.s(
+                    'The farmer hasn\'t posted any development updates for this batch yet.',
+                    'Hindi pa nagpo-post ng update sa paglaki para sa batch na ito.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          );
+        }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.spa_rounded,
-                color: Color(0xFF10B981),
-                size: 20,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.spa_rounded,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  loc.s('Crop Development Journey', 'Pag-unlad ng Pananim'),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(
-              'Crop Development Journey',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 28),
         ListView.builder(
           shrinkWrap: true,
@@ -221,7 +229,9 @@ class CropMilestonesTimeline extends StatelessWidget {
         ),
       ],
     );
-  }
+  },
+);
+}
 
   String _formatDate(DateTime dt) {
     // Simple readable date formatter

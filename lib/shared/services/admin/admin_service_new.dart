@@ -189,17 +189,54 @@ class AdminService {
   /// Get signed URL for a file in storage
   Future<String?> getSignedUrl(String path) async {
     try {
-      // Determine bucket from path
-      final parts = path.split('/');
-      if (parts.isEmpty) return null;
-      final bucket = parts[0];
-      final fileName = parts.sublist(1).join('/');
+      if (path.trim().isEmpty) return null;
+      final rawPath = path.trim();
 
-      final response = await _supabase.storage
-          .from(bucket)
-          .createSignedUrl(fileName, 3600); // 1 hour
+      if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+        if (!rawPath.contains('supabase.co/storage/v1/object/')) return rawPath;
+        if (rawPath.contains('/object/public/') || rawPath.contains('token=')) return rawPath;
+      }
 
-      return response;
+      String bucket = 'uploads';
+      String clean = rawPath.replaceFirst(RegExp(r'^/+'), '');
+
+      if (clean.startsWith('registrations/')) {
+        bucket = 'registrations';
+        clean = clean.replaceFirst('registrations/', '');
+      } else if (clean.startsWith('uploads/')) {
+        bucket = 'uploads';
+        clean = clean.replaceFirst('uploads/', '');
+      } else if (clean.startsWith('face_scans/') || clean.startsWith('valid_ids/')) {
+        bucket = 'registrations';
+      } else if (clean.startsWith('avatars/') ||
+          clean.startsWith('customer-profiles/') ||
+          clean.startsWith('farmer-profiles/') ||
+          clean.startsWith('covers/')) {
+        bucket = 'uploads';
+      } else {
+        final parts = clean.split('/');
+        if (parts.length >= 2 &&
+            (parts[0] == 'registrations' ||
+                parts[0] == 'uploads' ||
+                parts[0] == 'products')) {
+          bucket = parts[0];
+          clean = parts.sublist(1).join('/');
+        }
+      }
+
+      try {
+        final response = await _supabase.storage
+            .from(bucket)
+            .createSignedUrl(clean, 3600);
+        if (response.isNotEmpty) return response;
+      } catch (_) {}
+
+      try {
+        final publicUrl = _supabase.storage.from(bucket).getPublicUrl(clean);
+        if (publicUrl.isNotEmpty) return publicUrl;
+      } catch (_) {}
+
+      return null;
     } catch (e) {
       return null;
     }

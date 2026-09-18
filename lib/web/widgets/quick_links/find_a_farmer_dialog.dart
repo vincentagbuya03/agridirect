@@ -164,7 +164,7 @@ class _FindAFarmerDialogState extends State<FindAFarmerDialog> {
                         final location = farmer['location']?.toString() ?? 'Philippines';
                         final specialty = farmer['specialty']?.toString() ?? 'Fresh Produce';
                         final farmerId = farmer['farmer_id']?.toString() ?? '';
-                        final imageUrl = farmer['image_url']?.toString();
+                        final imageUrl = (farmer['logo_url'] ?? farmer['avatar_url'])?.toString();
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 /// TextBee Free SMS Gateway Service
@@ -10,10 +11,26 @@ class TextBeeOtpService {
   factory TextBeeOtpService() => _instance;
   TextBeeOtpService._internal();
 
-  static const String _apiKey =
-      String.fromEnvironment('TEXTBEE_API_KEY', defaultValue: '');
-  static const String _fallbackDeviceId =
-      String.fromEnvironment('TEXTBEE_DEVICE_ID', defaultValue: '');
+  static String get _apiKey {
+    const env = String.fromEnvironment('TEXTBEE_API_KEY', defaultValue: '');
+    if (env.isNotEmpty) return env;
+    try {
+      return dotenv.env['TEXTBEE_API_KEY'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static String get _fallbackDeviceId {
+    const env = String.fromEnvironment('TEXTBEE_DEVICE_ID', defaultValue: '');
+    if (env.isNotEmpty) return env;
+    try {
+      return dotenv.env['TEXTBEE_DEVICE_ID'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   static const String _baseUrl = 'https://api.textbee.dev/api/v1/gateway';
 
   final Map<String, _TextBeeOtpRecord> _pendingOtps = {};
@@ -37,6 +54,11 @@ class TextBeeOtpService {
   /// Automatically discovers the active paired device ID
   Future<String> resolveActiveDeviceId() async {
     if (_cachedDeviceId != null && _cachedDeviceId!.isNotEmpty) {
+      return _cachedDeviceId!;
+    }
+
+    if (_fallbackDeviceId.isNotEmpty) {
+      _cachedDeviceId = _fallbackDeviceId;
       return _cachedDeviceId!;
     }
 
@@ -70,21 +92,32 @@ class TextBeeOtpService {
   /// Sends a REAL SMS OTP directly to any Philippine mobile number
   Future<bool> sendOtp({
     required String phoneNumber,
+    String? customCode,
+    String? customMessage,
     required Function(String code) onSuccess,
     required Function(String error) onError,
   }) async {
     final formattedPhone = formatE164(phoneNumber);
 
     final random = Random();
-    final otpCode = (100000 + random.nextInt(900000)).toString();
+    final otpCode = customCode ?? (100000 + random.nextInt(900000)).toString();
 
     _pendingOtps[formattedPhone] = _TextBeeOtpRecord(
       code: otpCode,
-      expiresAt: DateTime.now().add(const Duration(minutes: 5)),
+      expiresAt: DateTime.now().add(const Duration(minutes: 10)),
     );
+
+    if (_apiKey.isEmpty) {
+      debugPrint('⚠️ TextBee: TEXTBEE_API_KEY is not set in .env');
+      debugPrint('📲 [SIMULATED SMS OTP]: Generated code $otpCode for $formattedPhone');
+      onSuccess(otpCode);
+      return true;
+    }
 
     try {
       final targetDeviceId = await resolveActiveDeviceId();
+      final messageBody = customMessage ??
+          'AgriDirect: Your verification code is: $otpCode. Valid for 10 minutes.';
 
       debugPrint('📲 TextBee: Dispatching Real SMS to $formattedPhone via device $targetDeviceId with code $otpCode');
       final response = await http.post(
@@ -95,7 +128,7 @@ class TextBeeOtpService {
         },
         body: jsonEncode({
           'recipients': [formattedPhone],
-          'message': 'Your AgriDirect verification code is: $otpCode. Valid for 5 minutes.',
+          'message': messageBody,
         }),
       ).timeout(const Duration(seconds: 12));
 

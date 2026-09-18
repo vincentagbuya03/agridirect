@@ -35,8 +35,8 @@ class FarmerProfile {
   @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
 
-  // Helper getters for clarity (image_url is the logo, cover_url is the cover)
-  String? get farmLogo => imageUrl ?? logoUrl;
+  // Helper getters for clarity (logo_url is the logo, cover_url is the cover)
+  String? get farmLogo => logoUrl;
   String? get farmCover => coverUrl;
 
   // Related data from view
@@ -122,7 +122,8 @@ class FarmerProfile {
       farmerPhone: farmerPhone ?? this.farmerPhone,
       averageRating: averageRating ?? this.averageRating,
       totalReviews: totalReviews ?? this.totalReviews,
-      freeDeliveryMinAmount: freeDeliveryMinAmount ?? this.freeDeliveryMinAmount,
+      freeDeliveryMinAmount:
+          freeDeliveryMinAmount ?? this.freeDeliveryMinAmount,
     );
   }
 }

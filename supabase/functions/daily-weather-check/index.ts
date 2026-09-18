@@ -23,6 +23,19 @@ type WeatherAlertPayload = {
   severity: number
 }
 
+function sanitizeWeatherCopy(text: string): string {
+  let sanitized = text
+    .replace(/(?:🤖\s*|🌾\s*)?Weather\s*AI:?\s*/gi, '')
+    .replace(/\b(?:Weather\s*)?AI\s*Advisor:?\s*/gi, '')
+    .replace(/\bAI\s*detects?\b:?\s*/gi, 'Telemetry indicates ')
+    .replace(/\bWeather\s*AI\b/gi, 'Weather Advisory')
+    .replace(/\[AI\]:?\s*/gi, '')
+    .replace(/\bAI\b:?\s*/gi, '')
+    .replace(/🤖\s*/g, '')
+    .trim()
+  return sanitized.replace(/^[-:\s]+/, '').trim()
+}
+
 async function generateAiWeatherAlert(
   envKeys: {
     geminiKey?: string
@@ -42,8 +55,8 @@ async function generateAiWeatherAlert(
   const cropLabel = specialty && specialty.trim().length > 0 ? specialty.trim() : 'crops & vegetables'
   const rainPct = Math.round(weatherSummary.rainProb * 100)
 
-  const prompt = `You are Kiko, the AI Agricultural & Weather Advisor for AgriDirect (Philippines).
-Generate a concise, smart, and dynamic weather push notification tailored specifically for Filipino farmers in "${farmName}".
+  const prompt = `You are the Chief Agricultural Meteorologist and Agronomy Specialist for AgriDirect in Pangasinan, Philippines.
+Generate a concise, smart, dynamic, and realistic weather push notification tailored specifically for Filipino farmers in "${farmName}".
 
 Live Weather Telemetry:
 - Location / Farm: "${farmName}" (Pangasinan, Philippines)
@@ -55,8 +68,9 @@ Live Weather Telemetry:
 - Alert Context: ${baseAlert.notificationCode} (${baseAlert.title})
 
 Requirements:
-1. Title format: Must start with "🤖 Weather AI:" or "🌾 Weather AI:" followed by emojis (e.g. "🌾 Weather AI: 🌧️ Rain in 2 hrs", "🤖 Weather AI: 🌀 Bagyo Alert", "🌾 Weather AI: ☀️ High Heat Warning"). Max 45 characters.
-2. Body format: 1-2 practical, high-impact sentences for mobile lock screen (Max 140 characters). Mention actual metrics (${rainPct}% rain or ${weatherSummary.temp.toFixed(0)}°C) and clear crop action for ${cropLabel} (e.g., clear field canals, delay spraying, harvest early, irrigate early).
+1. Title format: Must start with an appropriate weather emoji (e.g. 🌀, ☀️, 🌾, 🌧️, 💨, ⛈️) followed by a clear, impactful headline (e.g. "🌾 Sunny Harvest Advisory", "🌀 Bagyo Warning: Strong Winds", "☀️ Extreme Heat Advisory", "🌧️ Heavy Rain Alert", "💨 High Wind Warning"). Max 45 characters.
+CRITICAL: NEVER mention "AI", "Weather AI", "bot", "algorithm", or use "🤖" in the title or body.
+2. Body format: 1-2 practical, high-impact sentences for mobile lock screen (Max 140 characters). Mention actual metrics (${rainPct}% rain or ${weatherSummary.temp.toFixed(0)}°C) and clear crop action for ${cropLabel} (e.g., clear field canals, delay spraying, harvest early, irrigate early, sun-dry palay).
 3. Return STRICTLY valid JSON without codeblocks: {"title": "...", "body": "..."}`
 
   // 1. Primary: OpenRouter AI
@@ -87,7 +101,7 @@ Requirements:
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. You always reply strictly in JSON.' },
+              { role: 'system', content: 'You are an expert Agricultural Meteorologist for Filipino farmers. You always reply strictly in JSON without mentioning AI.' },
               { role: 'user', content: prompt },
             ],
             temperature: 0.5,
@@ -108,11 +122,15 @@ Requirements:
 
           const parsed = JSON.parse(rawContent)
           if (parsed.title && parsed.body) {
-            return {
-              title: String(parsed.title).trim(),
-              body: String(parsed.body).trim(),
-              notificationCode: baseAlert.notificationCode,
-              severity: baseAlert.severity,
+            const cleanTitle = sanitizeWeatherCopy(String(parsed.title))
+            const cleanBody = sanitizeWeatherCopy(String(parsed.body))
+            if (cleanTitle && cleanBody) {
+              return {
+                title: cleanTitle,
+                body: cleanBody,
+                notificationCode: baseAlert.notificationCode,
+                severity: baseAlert.severity,
+              }
             }
           }
         }
@@ -122,37 +140,51 @@ Requirements:
     }
   }
 
-  // 2. Intelligent AI-Style Template fallback if OpenRouter is unreachable
+  // 2. Intelligent Dynamic Template fallback if OpenRouter is unreachable
   const isRain = baseAlert.notificationCode.includes('rain')
   const isStorm = baseAlert.notificationCode.includes('storm') || baseAlert.notificationCode.includes('typhoon')
   const isHeat = baseAlert.notificationCode.includes('heat') || baseAlert.notificationCode.includes('temp')
 
   if (isStorm) {
     return {
-      title: '🤖 Weather AI: 🌀 Bagyo & Storm Alert',
+      title: '🌀 Bagyo & Storm Alert',
       body: `Storm telemetry detected near ${farmName} (${Math.round(weatherSummary.windSpeed)} km/h winds). Clear canals and secure ${cropLabel} immediately.`,
       notificationCode: baseAlert.notificationCode,
       severity: baseAlert.severity,
     }
   } else if (isRain) {
     return {
-      title: '🌾 Weather AI: 🌧️ Rain Advisory',
-      body: `AI detects ${rainPct}% rain probability (${weatherSummary.condition}) near ${farmName}. Check drainage and harvest ripe ${cropLabel} early.`,
+      title: '🌧️ Farm Rain Advisory',
+      body: `Telemetry indicates ${rainPct}% rain probability (${weatherSummary.condition}) near ${farmName}. Check drainage and safeguard ${cropLabel}.`,
       notificationCode: baseAlert.notificationCode,
       severity: baseAlert.severity,
     }
   } else if (isHeat) {
     return {
-      title: '🌾 Weather AI: ☀️ High Heat Advisory',
+      title: '☀️ High Heat Advisory',
       body: `Forecast peaks at ${weatherSummary.temp.toFixed(0)}°C near ${farmName}. Irrigate early morning to prevent heat stress on ${cropLabel}.`,
       notificationCode: baseAlert.notificationCode,
       severity: baseAlert.severity,
     }
+  } else if (weatherSummary.windSpeed >= 28) {
+    return {
+      title: '💨 Strong Wind Advisory',
+      body: `Gusts reaching ${Math.round(weatherSummary.windSpeed)} km/h near ${farmName}. Check trellises and stake tall ${cropLabel}.`,
+      notificationCode: 'weather_wind',
+      severity: 0.75,
+    }
+  } else if (rainPct < 25 && weatherSummary.temp >= 26) {
+    return {
+      title: '🌾 Optimal Harvest & Drying Weather',
+      body: `Clear skies and ${weatherSummary.temp.toFixed(0)}°C near ${farmName}. Ideal conditions for harvesting and sun-drying ${cropLabel}.`,
+      notificationCode: 'weather_daily_summary',
+      severity: 0.5,
+    }
   }
 
   return {
-    title: '🌾 Weather AI: Daily Farm Briefing',
-    body: `${farmName}: ${weatherSummary.condition}, ${weatherSummary.temp.toFixed(0)}°C with ${rainPct}% rain chance. Good conditions for ${cropLabel} maintenance.`,
+    title: '🌾 Daily Farm Weather Update',
+    body: `${farmName}: ${weatherSummary.condition}, ${weatherSummary.temp.toFixed(0)}°C with ${rainPct}% rain chance. Favorable for ${cropLabel} maintenance.`,
     notificationCode: baseAlert.notificationCode,
     severity: baseAlert.severity,
   }
@@ -241,6 +273,11 @@ function buildWeatherAlerts(
     999,
   )
 
+  const windCandidate = next72Hours.find((entry) => {
+    const windKmh = Number(entry.wind?.speed || 0) * 3.6
+    return windKmh >= 35
+  })
+
   // Priority 1: Typhoon / Severe Tropical Storm Warning
   if (typhoonCandidate) {
     const windKmh = Math.round(Number(typhoonCandidate.wind?.speed || 0) * 3.6)
@@ -257,7 +294,7 @@ function buildWeatherAlerts(
     ]
   }
 
-  // Priority 2: Consolidated Rain & Harvest Advisory
+  // Priority 2: Consolidated Rain & Flood Advisory
   if (rainCandidate) {
     const popPercent = Math.round(Number(rainCandidate.pop || 0) * 100)
     const rainDesc = rainCandidate.weather?.[0]?.description || 'heavy rain'
@@ -272,16 +309,16 @@ function buildWeatherAlerts(
   }
 
   // Priority 3: Extreme Heat / Cold Advisory
-  if (maxTemp >= 36) {
+  if (maxTemp >= 34) {
     return [
       {
-        title: '☀️ Heat Advisory',
-        body: `High temperatures up to ${maxTemp.toFixed(0)}°C expected near ${farmName}. Water early and monitor ${cropLabel} for heat stress.`,
+        title: '☀️ Extreme Heat Advisory',
+        body: `High temperatures up to ${maxTemp.toFixed(0)}°C expected near ${farmName}. Irrigate early and monitor ${cropLabel} for heat stress.`,
         notificationCode: 'weather_temperature',
-        severity: 0.75,
+        severity: 0.8,
       },
     ]
-  } else if (minTemp <= 10) {
+  } else if (minTemp <= 12) {
     return [
       {
         title: '❄️ Low Temperature Advisory',
@@ -292,7 +329,20 @@ function buildWeatherAlerts(
     ]
   }
 
-  // Priority 4: Standard Daily Weather Briefing
+  // Priority 4: Strong Wind Advisory
+  if (windCandidate) {
+    const windKmh = Math.round(Number(windCandidate.wind?.speed || 0) * 3.6)
+    return [
+      {
+        title: '💨 Strong Wind Warning',
+        body: `Strong wind gusts (${windKmh} km/h) expected ${getTimeLabel(windCandidate.dt)} near ${farmName}. Check trellises and stake tall ${cropLabel}.`,
+        notificationCode: 'weather_wind',
+        severity: 0.75,
+      },
+    ]
+  }
+
+  // Priority 5: Standard Daily Weather / Optimal Sunny Harvest
   if (next24h.length > 0) {
     const mainCondition = next24h[0].weather?.[0]?.description || 'clear skies'
     const highTemp = next24h.reduce(
@@ -300,6 +350,19 @@ function buildWeatherAlerts(
       -999,
     )
     const maxPop = Math.max(...next24h.map((e) => Number(e.pop || 0)))
+    const isSunnyDry = maxPop < 0.22 && highTemp >= 27
+
+    if (isSunnyDry) {
+      return [
+        {
+          title: '🌾 Optimal Harvest & Drying Weather',
+          body: `Clear sunshine (${highTemp.toFixed(0)}°C) near ${farmName}. Favorable conditions for harvesting and sun-drying ${cropLabel}.`,
+          notificationCode: 'weather_sunny_harvest',
+          severity: 0.6,
+        },
+      ]
+    }
+
     const rainText =
       maxPop > 0.2
         ? `${Math.round(maxPop * 100)}% rain chance`
@@ -307,7 +370,7 @@ function buildWeatherAlerts(
 
     return [
       {
-        title: '🌾 Daily Weather Update',
+        title: '🌾 Daily Farm Weather Update',
         body: `Forecast for ${farmName}: ${mainCondition} with a high of ${highTemp.toFixed(0)}°C (${rainText}). Wishing you a productive farming day!`,
         notificationCode: 'weather_daily_summary',
         severity: 0.5,
@@ -433,16 +496,23 @@ Deno.serve(async (request: Request) => {
           summaryMetrics,
         )
 
-        let weatherImage = 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600&auto=format&fit=crop&q=80'
+        let weatherImage = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&auto=format&fit=crop&q=80'
         if (alert.notificationCode?.includes('storm') || alert.notificationCode?.includes('typhoon')) {
-          weatherImage = 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=600&auto=format&fit=crop&q=80'
+          weatherImage = 'https://images.unsplash.com/photo-1514632595-4944383f2737?w=600&auto=format&fit=crop&q=80'
         } else if (alert.notificationCode?.includes('rain')) {
           weatherImage = 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80'
-        } else if (alert.notificationCode?.includes('heat')) {
-          weatherImage = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&auto=format&fit=crop&q=80'
+        } else if (alert.notificationCode?.includes('heat') || alert.notificationCode?.includes('temperature')) {
+          weatherImage = 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=600&auto=format&fit=crop&q=80'
+        } else if (alert.notificationCode?.includes('wind')) {
+          weatherImage = 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=600&auto=format&fit=crop&q=80'
+        } else if (alert.notificationCode?.includes('harvest') || alert.notificationCode?.includes('sunny')) {
+          weatherImage = 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=600&auto=format&fit=crop&q=80'
         }
 
-        console.log(`[daily-weather-check] Triggering push: ${alert.notificationCode} -> ${farmer.user_id} | Title: "${alert.title}" | Body: "${alert.body}"`)
+        const cleanTitle = sanitizeWeatherCopy(alert.title)
+        const cleanBody = sanitizeWeatherCopy(alert.body)
+
+        console.log(`[daily-weather-check] Triggering push: ${alert.notificationCode} -> ${farmer.user_id} | Title: "${cleanTitle}" | Body: "${cleanBody}"`)
         
         // Use manual fetch with apikey header to ensure it passes the Supabase Gateway correctly
         const pushResponse = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
@@ -454,8 +524,8 @@ Deno.serve(async (request: Request) => {
           },
           body: JSON.stringify({
             targetUserId: farmer.user_id,
-            title: alert.title,
-            body: alert.body,
+            title: cleanTitle,
+            body: cleanBody,
             imageUrl: weatherImage,
             notificationCode: alert.notificationCode,
             linkType: 'weather',
@@ -463,7 +533,7 @@ Deno.serve(async (request: Request) => {
               category: 'weather',
               farm_name: farmName,
               specialty: farmer.specialty || '',
-              ai_generated: 'openrouter',
+              source: 'openrouter_weather',
               image_url: weatherImage,
             },
           }),

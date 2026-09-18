@@ -299,6 +299,7 @@ class CartItem {
   final String price;
   final String unit;
   final String imageUrl;
+  final String? farmLogoUrl;
   int quantity;
   bool isSelected;
 
@@ -310,6 +311,7 @@ class CartItem {
     required this.price,
     required this.unit,
     required this.imageUrl,
+    this.farmLogoUrl,
     this.quantity = 1,
     this.isSelected = true,
   });
@@ -326,6 +328,7 @@ class CartItem {
       'price': price,
       'unit': unit,
       'imageUrl': imageUrl,
+      'farmLogoUrl': farmLogoUrl,
       'quantity': quantity,
       'isSelected': isSelected,
     };
@@ -340,6 +343,7 @@ class CartItem {
       price: json['price'] as String? ?? '',
       unit: json['unit'] as String? ?? '',
       imageUrl: json['imageUrl'] as String? ?? '',
+      farmLogoUrl: json['farmLogoUrl'] as String? ?? json['farmerAvatarUrl'] as String?,
       quantity: json['quantity'] as int? ?? 1,
       isSelected: json['isSelected'] as bool? ?? true,
     );

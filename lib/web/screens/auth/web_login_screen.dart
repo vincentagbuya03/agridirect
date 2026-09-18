@@ -87,9 +87,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
   }
 
   void _handleLogin() async {
-    final email = _loginEmailController.text.trim();
+    final identifier = _loginEmailController.text.trim();
     final password = _loginPasswordController.text.trim();
-    if (email.isEmpty || password.isEmpty) {
+    if (identifier.isEmpty || password.isEmpty) {
       _showSnackBar('Please fill in all fields');
       return;
     }
@@ -99,7 +99,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     }
     setState(() => _loginLoading = true);
     final auth = AuthService();
-    final success = await auth.login(email: email, password: password);
+    final success = await auth.login(email: identifier, password: password);
     if (mounted) setState(() => _loginLoading = false);
     
     if (success && mounted) {
@@ -280,8 +280,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     final password = _registerPasswordController.text.trim();
     final confirm = _registerConfirmController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      _showSnackBar('Please fill in all fields');
+    final hasEmail = email.isNotEmpty;
+    final hasPhone = phone.isNotEmpty;
+
+    if (name.isEmpty || (!hasEmail && !hasPhone) || password.isEmpty) {
+      _showSnackBar('Please enter your name, password, and either email or phone number');
       return;
     }
     if (password != confirm) {
@@ -300,6 +303,26 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     setState(() => _registerLoading = true);
 
     try {
+      // Phone-only registration for farmers without email
+      if (!hasEmail && hasPhone) {
+        final userId = await AuthService().registerWithPhone(
+          name: name,
+          phoneNumber: phone,
+          password: password,
+        );
+
+        if (mounted) {
+          setState(() => _registerLoading = false);
+          if (userId != null) {
+            _showSnackBar('Registration successful! Welcome to AgriDirect.');
+            widget.onLoginSuccess();
+          } else {
+            _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
+          }
+        }
+        return;
+      }
+
       // Step 0: Check if email is already registered
       final emailTaken = await SupabaseDatabase.isEmailAlreadyRegistered(email);
       if (emailTaken) {
@@ -739,9 +762,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
 
         _buildModernField(
           controller: _loginEmailController,
-          label: 'Email Address',
-          hint: 'you@example.com',
-          icon: Icons.email_outlined,
+          label: 'Email or Mobile Number',
+          hint: 'you@example.com or 09XXXXXXXXX',
+          icon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 20),
@@ -856,15 +879,15 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         _buildModernField(
           controller: _registerEmailController,
           label: 'Email Address',
-          hint: 'you@example.com',
+          hint: 'you@example.com (or use phone below)',
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 18),
         _buildModernField(
           controller: _registerPhoneController,
-          label: 'Phone Number (optional)',
-          hint: '09XX XXX XXXX',
+          label: 'Mobile Number',
+          hint: '09XX XXX XXXX (or use email above)',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),

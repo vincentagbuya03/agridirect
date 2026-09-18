@@ -9,13 +9,15 @@ const allowedOrigins = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'https://agridirect-app.vercel.app',
+  'https://agridirect.site',
+  'https://www.agridirect.site',
 ]);
 
 function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader(
     'Access-Control-Allow-Origin',
-    origin && allowedOrigins.has(origin) ? origin : 'https://agridirect-app.vercel.app',
+    origin && allowedOrigins.has(origin) ? origin : 'https://www.agridirect.site',
   );
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

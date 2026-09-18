@@ -535,7 +535,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                   final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
                   final crops = (f['specialty'] ?? 'Fresh Crops').toString();
                   final fid = f['farmer_id'] ?? f['id'];
-                  final avatar = (f['image_url'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
+                  final avatar = (f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
+                  final cover = (f['cover_url'] ?? f['cover_image_url'] ?? f['farm_banner_url'])?.toString();
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -547,6 +548,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                       totalReviews: reviews,
                       cropsSummary: crops,
                       avatarUrl: avatar,
+                      coverUrl: cover,
                       onVisit: () {
                         if (fid != null && fid.toString().isNotEmpty) {
                           context.go('${AppRoutes.farmerProfileBase}/$fid');
@@ -569,7 +571,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                 final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
                 final crops = (f['specialty'] ?? 'Fresh Crops').toString();
                 final fid = f['farmer_id'] ?? f['id'];
-                final avatar = (f['image_url'] ?? f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
+                final avatar = (f['logo_url'] ?? f['avatar_url'] ?? f['profile_image_url'])?.toString();
+                final cover = (f['cover_url'] ?? f['cover_image_url'] ?? f['farm_banner_url'])?.toString();
 
                 return Expanded(
                   child: Padding(
@@ -582,6 +585,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                       totalReviews: reviews,
                       cropsSummary: crops,
                       avatarUrl: avatar,
+                      coverUrl: cover,
                       onVisit: () {
                         if (fid != null && fid.toString().isNotEmpty) {
                           context.go('${AppRoutes.farmerProfileBase}/$fid');

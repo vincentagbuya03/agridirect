@@ -37,7 +37,7 @@ class EmailService {
       return currentOrigin;
     }
 
-    return 'https://agridirect-app.vercel.app';
+    return 'https://www.agridirect.site';
   }
 
   static Future<bool> _sendEmailViaWebApi({

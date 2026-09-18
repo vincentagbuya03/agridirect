@@ -736,8 +736,7 @@ class _WebShopCardState extends State<_WebShopCard> {
       return SupabaseConfig.client.storage.from('uploads').getPublicUrl(cleanPath);
     }
 
-    final rawAvatar = (farmer['image_url'] ??
-            farmer['logo_url'] ??
+    final rawAvatar = (farmer['logo_url'] ??
             farmer['avatar_url'] ??
             farmer['users']?['avatar_url'] ??
             farmer['profile_picture'] ??

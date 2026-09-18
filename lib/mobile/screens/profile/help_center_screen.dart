@@ -6,6 +6,7 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../web/widgets/web_consumer_nav_bar.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/widgets/tour/spotlight_tour_controller.dart';
 
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
@@ -674,6 +675,99 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Guided Spotlight App Tour Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF065F46), Color(0xFF10B981)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.explore_rounded, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Interactive App Tour',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Walk through dashboard features with step-by-step spotlights.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final auth = AuthService();
+                    if (auth.isViewingAsFarmer) {
+                      await SpotlightTourController.resetTourStatus(
+                        SpotlightTourController.farmerTourKey,
+                      );
+                      if (context.mounted) {
+                        context.go(AppRoutes.farmerDashboard);
+                      }
+                    } else {
+                      await SpotlightTourController.resetTourStatus(
+                        SpotlightTourController.consumerTourKey,
+                      );
+                      if (context.mounted) {
+                        context.go(AppRoutes.home);
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF065F46),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Start',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

@@ -218,7 +218,11 @@ class AutoUpdateService {
         RegExp(r'^[vV]'),
         '',
       );
-      final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int rawBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      // Flutter split-per-abi adds 1000 (arm), 2000 (arm64), 3000 (x86_64) to Android versionCode
+      final int currentBuild = (rawBuild >= 1000 && rawBuild < 10000)
+          ? (rawBuild % 1000)
+          : rawBuild;
 
       final updateType = _determineUpdateType(
         currentVersion: currentVersion,
@@ -254,6 +258,7 @@ class AutoUpdateService {
         context: context,
         versionInfo: versionInfo,
         currentVersion: currentVersion,
+        currentBuild: currentBuild,
         isForced: updateType == UpdateType.force,
       );
     } catch (e) {
@@ -282,7 +287,10 @@ class AutoUpdateService {
         RegExp(r'^[vV]'),
         '',
       );
-      final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int rawBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int currentBuild = (rawBuild >= 1000 && rawBuild < 10000)
+          ? (rawBuild % 1000)
+          : rawBuild;
 
       if (info != null) {
         final updateType = _determineUpdateType(
@@ -458,6 +466,7 @@ class AutoUpdateService {
     required BuildContext context,
     required AppVersionInfo versionInfo,
     required String currentVersion,
+    required int currentBuild,
     required bool isForced,
   }) {
     final targetContext = appNavigatorKey.currentContext ?? context;
@@ -472,6 +481,7 @@ class AutoUpdateService {
           child: _UpdateDialog(
             versionInfo: versionInfo,
             currentVersion: currentVersion,
+            currentBuild: currentBuild,
             isForced: isForced,
           ),
         );
@@ -483,11 +493,13 @@ class AutoUpdateService {
 class _UpdateDialog extends StatefulWidget {
   final AppVersionInfo versionInfo;
   final String currentVersion;
+  final int currentBuild;
   final bool isForced;
 
   const _UpdateDialog({
     required this.versionInfo,
     required this.currentVersion,
+    required this.currentBuild,
     required this.isForced,
   });
 
@@ -511,15 +523,16 @@ class _UpdateDialogState extends State<_UpdateDialog> {
 
   Future<void> _launchBrowserDownload() async {
     final apkUrl = widget.versionInfo.apkUrl;
-    if (apkUrl.isEmpty) return;
+    final fallbackUrl = 'https://github.com/vincentagbuya03/agridirect/releases/latest';
+    final targetUrl = apkUrl.isNotEmpty ? apkUrl : fallbackUrl;
 
-    final uri = Uri.tryParse(apkUrl);
+    final uri = Uri.tryParse(targetUrl);
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
-  void _startUpdate() {
+  void _startUpdate() async {
     final apkUrl = widget.versionInfo.apkUrl;
     if (apkUrl.isEmpty) {
       setState(() {
@@ -532,15 +545,58 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     setState(() {
       _isDownloading = true;
       _hasError = false;
-      _statusMessage = 'Downloading update package...';
+      _statusMessage = 'Verifying update package availability...';
       _downloadProgress = 0.0;
     });
+
+    // Pre-flight check: verify that the target APK URL is live and does not return 404
+    // (OtaUpdate on 404 writes the 404 HTML body to the APK file and triggers the package installer,
+    // which causes Android to show "There was a problem parsing the package.")
+    try {
+      final client = http.Client();
+      final request = http.Request('HEAD', Uri.parse(apkUrl))..followRedirects = true;
+      final response = await client.send(request).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 404) {
+        if (!mounted) return;
+        setState(() {
+          _statusMessage =
+              'The update package is still propagating on release servers. Please tap Retry in a moment, or use Browser Download.';
+          _isDownloading = false;
+          _hasError = true;
+          _downloadProgress = null;
+        });
+        return;
+      }
+
+      if (response.statusCode >= 400) {
+        if (!mounted) return;
+        setState(() {
+          _statusMessage =
+              'Server returned HTTP ${response.statusCode}. Please try Browser Download.';
+          _isDownloading = false;
+          _hasError = true;
+          _downloadProgress = null;
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('AutoUpdateService: pre-flight check warning: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = 'Downloading update package...';
+    });
+
+    final versionTag = widget.versionInfo.latestVersion.replaceAll('.', '_');
+    final filename = 'agridirect_v$versionTag.apk';
 
     try {
       OtaUpdate()
           .execute(
             apkUrl,
-            destinationFilename: 'agridirect_update.apk',
+            destinationFilename: filename,
             usePackageInstaller: false,
           )
           .listen(
@@ -599,9 +655,14 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                 case OtaStatus.CANCELED:
                   setState(() {
                     final details = event.value?.trim();
-                    _statusMessage = details == null || details.isEmpty
-                        ? 'Download failed (${event.status.name})'
-                        : 'Download failed: $details';
+                    if (details != null && details.contains('404')) {
+                      _statusMessage =
+                          'Update package not found on server (404). Please try Browser Download or tap Retry in a moment.';
+                    } else {
+                      _statusMessage = details == null || details.isEmpty
+                          ? 'Download failed (${event.status.name})'
+                          : 'Download failed: $details';
+                    }
                     _isDownloading = false;
                     _hasError = true;
                     _downloadProgress = null;
@@ -685,7 +746,10 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'v$newVer (Current: v${widget.currentVersion})',
+                    (widget.currentBuild > 0 ||
+                            widget.versionInfo.latestBuildNumber > 0)
+                        ? 'v$newVer+${widget.versionInfo.latestBuildNumber} (Current: v${widget.currentVersion}+${widget.currentBuild})'
+                        : 'v$newVer (Current: v${widget.currentVersion})',
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,

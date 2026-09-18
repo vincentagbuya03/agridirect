@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
@@ -7,6 +8,7 @@ import '../../../shared/services/integration/email_service.dart';
 import '../../../shared/services/auth/otp_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/textbee_otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
 
@@ -14,6 +16,7 @@ import '../../../shared/styles/app_theme.dart';
 class OTPVerificationScreen extends StatefulWidget {
   final String userId;
   final String email;
+  final String? phoneNumber;
   final String name;
   final String password; // This holds the temp password used for login
   final VoidCallback onVerificationSuccess;
@@ -23,6 +26,7 @@ class OTPVerificationScreen extends StatefulWidget {
     super.key,
     required this.userId,
     required this.email,
+    this.phoneNumber,
     required this.name,
     required this.password,
     required this.onVerificationSuccess,
@@ -80,6 +84,22 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   String _getOTPCode() => _codeControllers.map((c) => c.text).join();
 
   void _handleOTPChange(int index, String value) {
+    if (value.length > 1) {
+      final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+      for (int i = 0; i < 6 && i < digits.length; i++) {
+        _codeControllers[i].text = digits[i];
+      }
+      final next = (digits.length < 6) ? digits.length : 5;
+      FocusScope.of(context).requestFocus(_focusNodes[next]);
+      setState(() {});
+      if (_getOTPCode().length == 6 && !_isVerifying) {
+        _verifyOTP();
+      }
+      return;
+    }
+
+    setState(() {}); // Updates Clear Code button visibility
+
     if (value.length == 1) {
       if (index < 5) {
         FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
@@ -107,24 +127,54 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       _errorMessage = null;
     });
 
-    try {
-      final result = await OTPService().verifyOTP(
-        userId: widget.userId,
-        code: otp,
-      );
+    final bool isPhone =
+        widget.phoneNumber != null && widget.phoneNumber!.trim().isNotEmpty;
 
-      if (result['success'] != true) {
-        setState(() {
-          _errorMessage = result['message'] ?? 'Invalid code';
-          _isVerifying = false;
-        });
-        return;
+    try {
+      if (isPhone) {
+        final isValid = TextBeeOtpService().verifyOtp(
+          phoneNumber: widget.phoneNumber!,
+          enteredCode: otp,
+        );
+
+        if (!isValid) {
+          setState(() {
+            _errorMessage = 'Invalid or expired SMS code. Please try again.';
+            _isVerifying = false;
+          });
+          return;
+        }
+
+        // Mark user profile as verified in database
+        try {
+          await SupabaseConfig.client
+              .from('users')
+              .update({
+                'email_verified': true,
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('user_id', widget.userId);
+        } catch (dbErr) {
+          debugPrint('Notice: updating user verification status in DB: $dbErr');
+        }
+      } else {
+        final result = await OTPService().verifyOTP(
+          userId: widget.userId,
+          code: otp,
+        );
+
+        if (result['success'] != true) {
+          setState(() {
+            _errorMessage = result['message'] ?? 'Invalid code';
+            _isVerifying = false;
+          });
+          return;
+        }
       }
 
       _timerCountdown.cancel();
 
-      // Create a temporary authenticated session for profile completion
-      // without triggering global auth redirect to dashboard yet.
+      // Create an authenticated session
       final signInResult = await SupabaseConfig.client.auth.signInWithPassword(
         email: widget.email,
         password: widget.password,
@@ -135,19 +185,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (hasSession && mounted) {
         // 🔵 CRITICAL: Update AuthService immediately so the router sees the new state
         await AuthService().initialize(event: AuthChangeEvent.signedIn);
-        
+        widget.onVerificationSuccess();
+
         if (mounted) {
           context.go(AppRoutes.loading);
         }
       } else if (mounted) {
-        // Fallback if we don't have the password (e.g. resumed session on a different device)
-        // The user is verified in the DB, so logging in will now work.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification successful! Please log in to complete your profile.'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        widget.onVerificationSuccess();
         context.go(AppRoutes.login);
       }
     } catch (e) {
@@ -164,26 +208,66 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       _isVerifying = true;
     });
 
-    try {
-      final newCode = await OTPService().generateAndStoreOTP(
-        userId: widget.userId,
-        type: 'signup',
-      );
+    final bool isPhone =
+        widget.phoneNumber != null && widget.phoneNumber!.trim().isNotEmpty;
 
-      if (newCode != null) {
-        final sent = await EmailService.sendOTPEmail(
-          email: widget.email,
-          otpCode: newCode,
+    try {
+      if (isPhone) {
+        final sent = await TextBeeOtpService().sendOtp(
+          phoneNumber: widget.phoneNumber!,
+          onSuccess: (code) {
+            debugPrint('✅ TextBee SMS OTP resent successfully');
+          },
+          onError: (err) {
+            debugPrint('❌ TextBee SMS OTP resend error: $err');
+          },
         );
 
         if (sent) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('New SMS verification code sent!'),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          }
           _clearFields();
           _startCountdownTimer();
         } else {
-          setState(() => _errorMessage = 'Failed to send email.');
+          setState(
+            () => _errorMessage = 'Failed to send SMS code. Please try again.',
+          );
         }
       } else {
-        setState(() => _errorMessage = 'Failed to generate code.');
+        final newCode = await OTPService().generateAndStoreOTP(
+          userId: widget.userId,
+          type: 'signup',
+        );
+
+        if (newCode != null) {
+          final sent = await EmailService.sendOTPEmail(
+            email: widget.email,
+            otpCode: newCode,
+          );
+
+          if (sent) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('New verification code sent to your email!'),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            }
+            _clearFields();
+            _startCountdownTimer();
+          } else {
+            setState(() => _errorMessage = 'Failed to send email.');
+          }
+        } else {
+          setState(() => _errorMessage = 'Failed to generate code.');
+        }
       }
     } catch (e) {
       setState(() => _errorMessage = 'Error: $e');
@@ -193,9 +277,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   void _clearFields() {
-    for (var controller in _codeControllers) {
-      controller.clear();
-    }
+    setState(() {
+      for (var controller in _codeControllers) {
+        controller.clear();
+      }
+    });
     FocusScope.of(context).requestFocus(_focusNodes[0]);
   }
 
@@ -213,6 +299,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isPhone =
+        widget.phoneNumber != null &&
+        widget.phoneNumber!.trim().isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -231,52 +321,77 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Column(
           children: [
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.mark_email_read_outlined,
-                color: AppColors.primary,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Verify Your Email',
-              style: AppTextStyles.headline1,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSubtle,
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isPhone
+                        ? Icons.sms_outlined
+                        : Icons.mark_email_read_outlined,
+                    color: AppColors.primary,
+                    size: 48,
+                  ),
                 ),
-                children: [
-                  const TextSpan(
-                    text: 'We have sent a 6-digit verification code to ',
-                  ),
-                  TextSpan(
-                    text: widget.email,
+                const SizedBox(height: 32),
+                Text(
+                  isPhone ? 'Verify Your Mobile Number' : 'Verify Your Email',
+                  style: AppTextStyles.headline1,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
                     style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textHeadline,
-                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSubtle,
                     ),
+                    children: [
+                      TextSpan(
+                        text: isPhone
+                            ? 'We have sent a 6-digit SMS verification code to '
+                            : 'We have sent a 6-digit verification code to ',
+                      ),
+                      TextSpan(
+                        text: isPhone ? widget.phoneNumber! : widget.email,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textHeadline,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
             const SizedBox(height: 48),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(6, (i) => _buildOTPField(i)),
             ),
-            const SizedBox(height: 32),
+            if (_codeControllers.any((c) => c.text.isNotEmpty)) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _clearFields,
+                  icon: const Icon(
+                    Icons.backspace_outlined,
+                    size: 14,
+                    color: AppColors.textSubtle,
+                  ),
+                  label: Text(
+                    'Clear Code',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSubtle,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
             if (_errorMessage != null)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -384,30 +499,54 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     return SizedBox(
       width: 48,
       height: 56,
-      child: TextField(
-        controller: _codeControllers[index],
-        focusNode: _focusNodes[index],
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        onChanged: (v) => _handleOTPChange(index, v),
-        style: AppTextStyles.headline2.copyWith(color: AppColors.primary),
-        decoration: InputDecoration(
-          counterText: '',
-          contentPadding: EdgeInsets.zero,
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[200]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[200]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+      child: Focus(
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.backspace ||
+               event.physicalKey == PhysicalKeyboardKey.backspace)) {
+            if (_codeControllers[index].text.isEmpty && index > 0) {
+              _codeControllers[index - 1].clear();
+              FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
+              setState(() {});
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: TextField(
+          controller: _codeControllers[index],
+          focusNode: _focusNodes[index],
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          maxLength: 1,
+          onTap: () {
+            _codeControllers[index].selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _codeControllers[index].text.length,
+            );
+          },
+          onChanged: (v) => _handleOTPChange(index, v),
+          style: AppTextStyles.headline2.copyWith(color: AppColors.primary),
+          decoration: InputDecoration(
+            counterText: '',
+            contentPadding: EdgeInsets.zero,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[200]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[200]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
           ),
         ),
       ),

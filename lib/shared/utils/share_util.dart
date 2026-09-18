@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// Helper utility for generating share links across platforms.
 class ShareUtil {
   /// Production web domain
-  static const String webDomain = 'https://agridirect-app.vercel.app';
+  static const String webDomain = 'https://www.agridirect.site';
 
   /// Custom URI scheme that directly launches the installed Android APK / iOS App
   static const String appScheme = 'agridirect://';

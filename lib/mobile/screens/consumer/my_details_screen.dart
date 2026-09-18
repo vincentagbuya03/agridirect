@@ -16,6 +16,7 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../shared/localization/farmer_locale_service.dart';
 import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import '../../../shared/widgets/phone_verification_dialog.dart';
+import '../../../shared/router/app_routes.dart';
 
 /// Displays and allows editing of user/farmer details.
 class MyDetailsScreen extends StatefulWidget {
@@ -63,10 +64,15 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     super.initState();
     _auth = AuthService();
     final authUser = SupabaseConfig.client.auth.currentUser;
-    final initialPhone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+    final initialPhone =
+        (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '')
+            .toString()
+            .trim();
 
     _nameController = TextEditingController();
-    _emailController = TextEditingController(text: authUser?.email ?? _auth.userEmail);
+    _emailController = TextEditingController(
+      text: authUser?.email ?? _auth.userEmail,
+    );
     _locationController = TextEditingController();
     _addressController = TextEditingController();
     _latitudeController = TextEditingController();
@@ -134,7 +140,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             final latitudeText = (rawLatitude ?? '').toString();
             final longitudeText = (rawLongitude ?? '').toString();
             var storedLocation = (farmer['location'] ?? '').toString().trim();
-            var rawImagePath = (farmer['image_url'] ?? '').toString().trim();
+            var rawImagePath = (farmer['logo_url'] ?? '').toString().trim();
             final updates = <String, dynamic>{};
 
             if (storedLocation.isEmpty) {
@@ -167,24 +173,28 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _latitudeController.text = latitudeText;
             _longitudeController.text = longitudeText;
             _imageUrlController.text = rawImagePath;
-            _freeDeliveryMinAmountController.text = (farmer['free_delivery_min_amount'] ?? '0').toString();
-            _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
-            
-            // 1. Personal Avatar / Farm Logo is strictly loaded from image_url, logo_url, or user avatar (NEVER face_photo_path)
-            final userProfile = await SupabaseDatabase.getUserProfile(userId);
-            final rawLogoPath = (farmer['image_url'] as String?)?.trim().isNotEmpty == true
-                ? (farmer['image_url'] as String).trim()
-                : (farmer['logo_url'] as String?)?.trim().isNotEmpty == true
-                    ? (farmer['logo_url'] as String).trim()
-                    : ((userProfile?['avatar_url'] as String?)?.trim().isNotEmpty == true
-                        ? (userProfile!['avatar_url'] as String).trim()
-                        : _auth.userAvatarUrl);
+            _freeDeliveryMinAmountController.text =
+                (farmer['free_delivery_min_amount'] ?? '0').toString();
+            _farmerId = farmer['farmer_id']
+                ?.toString(); // 🟢 NEW: Save farmer_id
 
-            _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
-              rawLogoPath,
-              defaultBucket: 'uploads',
-            );
-            await _precacheProfileImage(_farmerImageUrl);
+            // 1. Farm Logo is strictly loaded from logo_url (NEVER personal user avatar or face_photo_path)
+            final rawLogoPath =
+                (farmer['logo_url'] as String?)?.trim().isNotEmpty == true
+                ? (farmer['logo_url'] as String).trim()
+                : '';
+
+            if (rawLogoPath.isNotEmpty &&
+                !rawLogoPath.contains('face_photo') &&
+                !rawLogoPath.contains('valid_id')) {
+              _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
+                rawLogoPath,
+                defaultBucket: 'uploads',
+              );
+              await _precacheProfileImage(_farmerImageUrl);
+            } else {
+              _farmerImageUrl = null;
+            }
 
             // 2. Farm Cover Banner is loaded ONLY from cover_url (NEVER image_url or face_photo_path)
             final rawCoverPath = (farmer['cover_url'] as String?)?.trim() ?? '';
@@ -238,7 +248,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       }
 
       // Always load verified phone from users table or Supabase auth
-      String loadedPhone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+      String loadedPhone =
+          (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '')
+              .toString()
+              .trim();
 
       try {
         final users = await SupabaseConfig.client
@@ -352,7 +365,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       if (mounted) {
         // We store the RELATIVE PATH (bucket/filename) in the database for consistency
         final dbPath = 'uploads/$path';
-        
+
         setState(() {
           if (isFarmer) {
             _farmerImageUrl = publicUrl;
@@ -365,35 +378,49 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
         // 🟢 NEW: Immediately sync with database so user doesn't lose the update
         bool updateSuccessful = false;
         try {
-          final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
-          debugPrint('🔍 Attempting to update farmer image for user_id: $userId, farmer_id: $_farmerId');
-          
+          final userId = _auth.userId.isNotEmpty
+              ? _auth.userId
+              : SupabaseConfig.client.auth.currentUser?.id;
+          debugPrint(
+            '🔍 Attempting to update farmer image for user_id: $userId, farmer_id: $_farmerId',
+          );
+
           if (userId != null && userId.isNotEmpty) {
-            final result = await SupabaseConfig.client
-                .from('users')
-                .update({'avatar_url': dbPath})
-                .eq('user_id', userId)
-                .select('user_id');
-            
-            updateSuccessful = result.isNotEmpty;
+            try {
+              final result = await SupabaseConfig.client
+                  .from('users')
+                  .update({'avatar_url': dbPath})
+                  .eq('user_id', userId)
+                  .select('user_id');
+
+              if (result.isNotEmpty) updateSuccessful = true;
+            } catch (userErr) {
+              debugPrint('⚠️ Error updating users avatar_url: $userErr');
+            }
+
+            await _auth.updateUserAvatarUrl(publicUrl);
+
             if (isFarmer) {
               try {
-                await SupabaseConfig.client
-                    .from('farmers')
-                    .update({
-                      'image_url': dbPath,
-                      'logo_url': dbPath,
-                    })
-                    .eq('user_id', userId);
+                if (_farmerId != null && _farmerId!.isNotEmpty) {
+                  final fResult = await SupabaseConfig.client
+                      .from('farmers')
+                      .update({'logo_url': dbPath})
+                      .eq('farmer_id', _farmerId!)
+                      .select();
+                  if (fResult.isNotEmpty) updateSuccessful = true;
+                } else {
+                  final fResult = await SupabaseConfig.client
+                      .from('farmers')
+                      .update({'logo_url': dbPath})
+                      .eq('user_id', userId)
+                      .select();
+                  if (fResult.isNotEmpty) updateSuccessful = true;
+                }
               } catch (logoColErr) {
-                // If logo_url column does not exist yet, update image_url only
-                debugPrint('⚠️ logo_url column might not exist yet, updating image_url only: $logoColErr');
-                await SupabaseConfig.client
-                    .from('farmers')
-                    .update({
-                      'image_url': dbPath,
-                    })
-                    .eq('user_id', userId);
+                debugPrint(
+                  '⚠️ Error updating logo_url on farmers: $logoColErr',
+                );
               }
             }
           }
@@ -401,7 +428,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           debugPrint('❌ Database sync error: $dbErr');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Upload worked but sync failed: $dbErr'), backgroundColor: Colors.orange),
+              SnackBar(
+                content: Text('Upload worked but sync failed: $dbErr'),
+                backgroundColor: Colors.orange,
+              ),
             );
           }
           return; // Stop here on error
@@ -413,25 +443,31 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
         if (mounted) {
           if (updateSuccessful) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile image updated successfully!'),
+              SnackBar(
+                content: Text(
+                  isFarmer
+                      ? (FarmerLocaleService.instance.isFilipino
+                          ? 'Matagumpay na na-update ang logo ng bukid!'
+                          : 'Farm logo updated successfully!')
+                      : 'Profile image updated successfully!',
+                ),
                 backgroundColor: AppColors.success,
-                duration: Duration(seconds: 2),
+                duration: const Duration(seconds: 2),
               ),
             );
-            // Wait a moment for the user to see the success message, then pop with success signal
-            Future.delayed(const Duration(milliseconds: 1500), () {
-              if (mounted) Navigator.of(context).pop(true);
-            });
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('⚠️ Not saved: Record not found or permission denied (RLS).'),
+                content: Text(
+                  '⚠️ Not saved: Record not found or permission denied (RLS).',
+                ),
                 backgroundColor: Colors.redAccent,
                 duration: Duration(seconds: 4),
               ),
             );
-            debugPrint('⚠️ UI Warning: Update reported 0 rows modified. Check Supabase RLS policies.');
+            debugPrint(
+              '⚠️ UI Warning: Update reported 0 rows modified. Check Supabase RLS policies.',
+            );
           }
         }
       }
@@ -471,22 +507,19 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       final file = File(image.path);
 
       // Upload file directly to Supabase Storage 'uploads' bucket
-      await SupabaseConfig.client.storage.from('uploads').upload(
-        path,
-        file,
-      );
+      await SupabaseConfig.client.storage.from('uploads').upload(path, file);
 
       final publicUrl = SupabaseConfig.client.storage
           .from('uploads')
           .getPublicUrl(path);
 
-      final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
+      final userId = _auth.userId.isNotEmpty
+          ? _auth.userId
+          : SupabaseConfig.client.auth.currentUser?.id;
       final dbPath = 'uploads/$path';
       if (userId != null && userId.isNotEmpty) {
         try {
-          final coverUpdates = {
-            'cover_url': dbPath,
-          };
+          final coverUpdates = {'cover_url': dbPath};
           if (_farmerId != null && _farmerId!.isNotEmpty) {
             await SupabaseConfig.client
                 .from('farmers')
@@ -503,7 +536,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Kailangang i-run ang migration para sa cover_url: $colErr'),
+                content: Text(
+                  'Kailangang i-run ang migration para sa cover_url: $colErr',
+                ),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -561,17 +596,20 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           'residential_address': _addressController.text.trim(),
           'farm_latitude': _parseCoordinate(_latitudeController.text),
           'farm_longitude': _parseCoordinate(_longitudeController.text),
-          'free_delivery_min_amount': double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
+          'free_delivery_min_amount':
+              double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
         };
         if (_imageUrlController.text.trim().isNotEmpty) {
-          farmerUpdates['image_url'] = _imageUrlController.text.trim();
+          farmerUpdates['logo_url'] = _imageUrlController.text.trim();
         }
         if (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty) {
           farmerUpdates['cover_url'] = _farmerCoverUrl;
         }
 
         try {
-          var query = SupabaseConfig.client.from('farmers').update(farmerUpdates);
+          var query = SupabaseConfig.client
+              .from('farmers')
+              .update(farmerUpdates);
           if (_farmerId != null && _farmerId!.isNotEmpty) {
             await query.eq('farmer_id', _farmerId!);
           } else {
@@ -579,9 +617,13 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           }
         } catch (updateErr) {
           if (updateErr.toString().contains('cover_url')) {
-            debugPrint('⚠️ cover_url column might not exist yet during save, retrying without it: $updateErr');
+            debugPrint(
+              '⚠️ cover_url column might not exist yet during save, retrying without it: $updateErr',
+            );
             farmerUpdates.remove('cover_url');
-            var retryQuery = SupabaseConfig.client.from('farmers').update(farmerUpdates);
+            var retryQuery = SupabaseConfig.client
+                .from('farmers')
+                .update(farmerUpdates);
             if (_farmerId != null && _farmerId!.isNotEmpty) {
               await retryQuery.eq('farmer_id', _farmerId!);
             } else {
@@ -650,7 +692,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             centerTitle: false,
             titleSpacing: 0,
             title: Text(
-              locale.t(isFarmer ? 'farm_details_title' : 'personal_details_title'),
+              locale.t(
+                isFarmer ? 'farm_details_title' : 'personal_details_title',
+              ),
               style: GoogleFonts.plusJakartaSans(
                 fontWeight: FontWeight.w800,
                 fontSize: 17,
@@ -658,15 +702,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               ),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Color(0xFF0F172A),
+                size: 20,
+              ),
               onPressed: () => context.pop(),
             ),
             actions: const [
               Padding(
                 padding: EdgeInsets.only(right: 12),
-                child: Center(
-                  child: FarmerLanguageToggle(compact: true),
-                ),
+                child: Center(child: FarmerLanguageToggle(compact: true)),
               ),
             ],
           ),
@@ -676,7 +722,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 40),
+                  padding: const EdgeInsets.only(bottom: 120),
                   child: Form(
                     key: _infoKey,
                     child: Column(
@@ -735,11 +781,15 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               imageUrl: _customerImageUrl,
               icon: Icons.person_rounded,
               isUploading: _isUploadingImage,
-              onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
+              onTap: (_isUploadingImage || _isImagePickerActive)
+                  ? null
+                  : _uploadFarmerImage,
             ),
             const SizedBox(height: 14),
             Text(
-              _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Buyer Profile',
+              _nameController.text.trim().isNotEmpty
+                  ? _nameController.text.trim()
+                  : 'Buyer Profile',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -757,7 +807,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.shopping_bag_rounded, size: 14, color: Color(0xFF2563EB)),
+                  const Icon(
+                    Icons.shopping_bag_rounded,
+                    size: 14,
+                    color: Color(0xFF2563EB),
+                  ),
                   const SizedBox(width: 5),
                   Text(
                     locale.t('buyer_profile'),
@@ -788,110 +842,134 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          // 1. Edge-to-Edge Store Banner (Height: 185px)
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _isUploadingCover ? null : _uploadFarmerCover,
-                child: SizedBox(
-                  width: double.infinity,
+          // 1. Edge-to-Edge Store Banner & Avatar (Height: 236px so full avatar & camera badge are inside hit-test bounds)
+          SizedBox(
+            width: double.infinity,
+            height: 236,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                // Store Banner (Height: 185px)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
                   height: 185,
-                  child: _farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty
-                      ? Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CachedNetworkImage(
-                              imageUrl: _farmerCoverUrl!,
-                              fit: BoxFit.cover,
-                              filterQuality: FilterQuality.high,
-                              placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
-                              errorWidget: (_, _, _) => _buildCoverFallback(locale),
-                            ),
-                            // Ambient gradient scrim for high contrast
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.black.withValues(alpha: 0.35),
-                                    Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.5),
-                                  ],
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _isUploadingCover ? null : _uploadFarmerCover,
+                    child: _farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              CachedNetworkImage(
+                                imageUrl: _farmerCoverUrl!,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.high,
+                                placeholder: (_, _) =>
+                                    Container(color: const Color(0xFFF1F5F9)),
+                                errorWidget: (_, _, _) =>
+                                    _buildCoverFallback(locale),
+                              ),
+                              // Ambient gradient scrim for high contrast
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.35),
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.5),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        )
-                      : _buildCoverFallback(locale),
+                            ],
+                          )
+                        : _buildCoverFallback(locale),
+                  ),
                 ),
-              ),
 
-              // Glassmorphic 'Palitan ang Cover' Pill (Top-Right)
-              Positioned(
-                top: 14,
-                right: 14,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _isUploadingCover ? null : _uploadFarmerCover,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isUploadingCover)
-                              const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            else
-                              const Icon(Icons.photo_camera_rounded, size: 14, color: Colors.white),
-                            const SizedBox(width: 6),
-                            Text(
-                              _isUploadingCover ? locale.t('uploading_cover') : locale.t('change_cover'),
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: 0.2,
-                              ),
+                // Glassmorphic 'Palitan ang Cover' Pill (Top-Right)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _isUploadingCover ? null : _uploadFarmerCover,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              width: 1,
                             ),
-                          ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_isUploadingCover)
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              else
+                                const Icon(
+                                  Icons.photo_camera_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _isUploadingCover
+                                    ? locale.t('uploading_cover')
+                                    : locale.t('change_cover'),
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              // Overlapping Farm Avatar (Centered, 50px overlap)
-              Positioned(
-                bottom: -50,
-                child: _buildAvatarWithCameraBadge(
-                  imageUrl: _farmerImageUrl,
-                  icon: Icons.agriculture_rounded,
-                  isUploading: _isUploadingImage,
-                  onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
+                // Overlapping Farm Avatar (Centered, bottom aligned at y = 138 to 236)
+                Positioned(
+                  bottom: 0,
+                  child: _buildAvatarWithCameraBadge(
+                    imageUrl: _farmerImageUrl,
+                    icon: Icons.agriculture_rounded,
+                    isUploading: _isUploadingImage,
+                    onTap: (_isUploadingImage || _isImagePickerActive)
+                        ? null
+                        : _uploadFarmerImage,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
 
-          const SizedBox(height: 58), // Clear the overlapping avatar
-
+          const SizedBox(height: 8), // Clean spacing below avatar before farm name
           // Farm Name & Status Badges
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
@@ -916,9 +994,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    // Verified Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(20),
@@ -927,7 +1007,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF059669)),
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 14,
+                            color: Color(0xFF059669),
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             locale.t('verified_farm_profile'),
@@ -943,7 +1027,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
                     // Active Store Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(20),
@@ -976,7 +1063,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     // Location Chip (if available)
                     if (barangayOnly.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(20),
@@ -985,7 +1075,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.location_on_rounded, size: 13, color: Color(0xFF64748B)),
+                            const Icon(
+                              Icons.location_on_rounded,
+                              size: 13,
+                              color: Color(0xFF64748B),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               barangayOnly,
@@ -1032,7 +1126,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               height: 150,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 2),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -1044,7 +1141,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 2),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -1056,9 +1156,16 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 26),
+                child: const Icon(
+                  Icons.add_photo_alternate_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1095,47 +1202,68 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 98,
-          height: 98,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            border: Border.all(color: Colors.white, width: 4),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 18,
-                offset: Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipOval(
-            child: imageUrl != null && imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.high,
-                    placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
-                    errorWidget: (_, _, _) => Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: 98,
+            height: 98,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: Colors.white, width: 4),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      placeholder: (_, _) =>
+                          Container(color: const Color(0xFFF1F5F9)),
+                      errorWidget: (_, _, _) => Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(12),
+                        child: Image.asset(
+                          'assets/icon/logo_v3.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => Icon(
+                            icon,
+                            size: 42,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(12),
+                      child: Image.asset(
+                        'assets/icon/logo_v3.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
+                      ),
                     ),
-                  )
-                : Container(
-                    color: const Color(0xFFF1F5F9),
-                    child: Icon(icon, size: 42, color: const Color(0xFF94A3B8)),
-                  ),
+            ),
           ),
         ),
         Positioned(
           bottom: 0,
           right: 0,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: onTap,
             child: Container(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
@@ -1159,11 +1287,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       ),
                     )
-                  : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
+                  : const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 17,
+                    ),
             ),
           ),
         ),
@@ -1199,7 +1333,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   color: const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.storefront_rounded, size: 20, color: Color(0xFF047857)),
+                child: const Icon(
+                  Icons.storefront_rounded,
+                  size: 20,
+                  color: Color(0xFF047857),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1207,7 +1345,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      locale.t(isFarmer ? 'farm_info_title' : 'personal_info_title'),
+                      locale.t(
+                        isFarmer ? 'farm_info_title' : 'personal_info_title',
+                      ),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -1232,81 +1372,116 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           _buildTextField(
             controller: _nameController,
             label: locale.t(isFarmer ? 'farm_name_label' : 'full_name_label'),
-            icon: isFarmer ? Icons.storefront_rounded : Icons.person_outline_rounded,
+            icon: isFarmer
+                ? Icons.storefront_rounded
+                : Icons.person_outline_rounded,
             enabled: _isEditing,
           ),
           const SizedBox(height: 14),
 
           // Security read-only Email field
+          // Email (Protected or Linkable)
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.alternate_email_rounded, size: 18, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        locale.t('email_label'),
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _emailController.text.trim().isNotEmpty
-                            ? _emailController.text.trim()
-                            : 'No email registered',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E293B),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.lock_rounded, size: 12, color: Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Text(
-                        locale.t('protected_field'),
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
               ],
+            ),
+            child: Builder(
+              builder: (context) {
+                final emailText = _emailController.text.trim();
+                final isPhoneAccount = emailText.toLowerCase().endsWith('@phone.agridirect.ph');
+                final hasRealEmail = emailText.isNotEmpty && !isPhoneAccount;
+
+                return Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (isPhoneAccount ? const Color(0xFFF59E0B) : const Color(0xFF059669)).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isPhoneAccount ? Icons.phone_android_rounded : Icons.email_outlined,
+                        size: 18,
+                        color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isPhoneAccount ? 'Personal Email' : locale.t('email_label'),
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasRealEmail ? emailText : 'No personal email linked',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: hasRealEmail ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () async {
+                        final result = await context.push(AppRoutes.updateEmail);
+                        if (result == true && mounted) {
+                          _loadDetails();
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: (isPhoneAccount ? const Color(0xFF059669) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isPhoneAccount ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isPhoneAccount ? Icons.add_link_rounded : Icons.edit_outlined,
+                              size: 13,
+                              color: isPhoneAccount ? Colors.white : const Color(0xFF059669),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isPhoneAccount ? 'Add Email' : 'Change',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: isPhoneAccount ? Colors.white : const Color(0xFF059669),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 14),
@@ -1335,7 +1510,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final authUser = SupabaseConfig.client.auth.currentUser;
     var phone = _phoneController.text.trim();
     if (phone.isEmpty) {
-      phone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+      phone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '')
+          .toString()
+          .trim();
     }
     final hasPhone = phone.isNotEmpty;
 
@@ -1378,19 +1555,27 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: hasPhone ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                  color: hasPhone
+                      ? const Color(0xFFDCFCE7)
+                      : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: hasPhone ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+                    color: hasPhone
+                        ? const Color(0xFF86EFAC)
+                        : const Color(0xFFFDE68A),
                     width: 1,
                   ),
                 ),
                 child: Text(
-                  hasPhone ? locale.t('phone_verified_badge') : locale.t('phone_unverified_badge'),
+                  hasPhone
+                      ? locale.t('phone_verified_badge')
+                      : locale.t('phone_unverified_badge'),
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: hasPhone ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                    color: hasPhone
+                        ? const Color(0xFF15803D)
+                        : const Color(0xFFB45309),
                   ),
                 ),
               ),
@@ -1408,7 +1593,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: hasPhone ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                    color: hasPhone
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFF94A3B8),
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -1427,14 +1614,22 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   backgroundColor: const Color(0xFFECFDF5),
                   foregroundColor: const Color(0xFF047857),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Color(0xFFA7F3D0), width: 1.2),
+                    side: const BorderSide(
+                      color: Color(0xFFA7F3D0),
+                      width: 1.2,
+                    ),
                   ),
                 ),
                 child: Text(
-                  hasPhone ? locale.t('phone_update_btn') : locale.t('phone_verify_btn'),
+                  hasPhone
+                      ? locale.t('phone_update_btn')
+                      : locale.t('phone_verify_btn'),
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -1478,7 +1673,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   color: const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.local_shipping_rounded, size: 20, color: Color(0xFF047857)),
+                child: const Icon(
+                  Icons.local_shipping_rounded,
+                  size: 20,
+                  color: Color(0xFF047857),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1525,7 +1724,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               color: hasPin ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: hasPin ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0),
+                color: hasPin
+                    ? const Color(0xFFA7F3D0)
+                    : const Color(0xFFE2E8F0),
                 width: 1.2,
               ),
             ),
@@ -1537,13 +1738,19 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     Container(
                       padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
-                        color: hasPin ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                        color: hasPin
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        hasPin ? Icons.place_rounded : Icons.location_off_rounded,
+                        hasPin
+                            ? Icons.place_rounded
+                            : Icons.location_off_rounded,
                         size: 22,
-                        color: hasPin ? const Color(0xFF047857) : const Color(0xFF64748B),
+                        color: hasPin
+                            ? const Color(0xFF047857)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1563,15 +1770,19 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                           Text(
                             hasPin
                                 ? (_locationController.text.trim().isNotEmpty
-                                    ? _locationController.text.trim()
-                                    : locale.t('pinned_ready'))
+                                      ? _locationController.text.trim()
+                                      : locale.t('pinned_ready'))
                                 : locale.t('pinned_empty'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: hasPin ? const Color(0xFF047857) : const Color(0xFF64748B),
-                              fontWeight: hasPin ? FontWeight.w600 : FontWeight.w500,
+                              color: hasPin
+                                  ? const Color(0xFF047857)
+                                  : const Color(0xFF64748B),
+                              fontWeight: hasPin
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                             ),
                           ),
                         ],
@@ -1590,14 +1801,20 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       backgroundColor: Colors.white,
                       disabledForegroundColor: const Color(0xFF94A3B8),
                       side: BorderSide(
-                        color: _isEditing ? const Color(0xFF059669) : const Color(0xFFCBD5E1),
+                        color: _isEditing
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFCBD5E1),
                         width: 1.2,
                       ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     icon: const Icon(Icons.map_rounded, size: 16),
                     label: Text(
-                      hasPin ? locale.t('update_pin_btn') : locale.t('pin_on_map_btn'),
+                      hasPin
+                          ? locale.t('update_pin_btn')
+                          : locale.t('pin_on_map_btn'),
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1618,13 +1835,13 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             isRequired: false,
             helperText: locale.t('free_delivery_hint'),
             validator: (value) {
-               final text = value?.trim() ?? '';
-               if (text.isEmpty) return null;
-               final parsed = double.tryParse(text);
-               if (parsed == null || parsed < 0) {
-                 return 'Please enter a valid positive number';
-               }
-               return null;
+              final text = value?.trim() ?? '';
+              if (text.isEmpty) return null;
+              final parsed = double.tryParse(text);
+              if (parsed == null || parsed < 0) {
+                return 'Please enter a valid positive number';
+              }
+              return null;
             },
           ),
         ],
@@ -1643,7 +1860,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.95),
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+        border: const Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A000000),
@@ -1673,7 +1892,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               ),
               child: ElevatedButton.icon(
                 onPressed: () => setState(() => _isEditing = true),
-                icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                icon: const Icon(
+                  Icons.edit_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 label: Text(
                   locale.t('edit_details_btn'),
                   style: GoogleFonts.plusJakartaSans(
@@ -1686,7 +1909,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             )
@@ -1702,16 +1927,21 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         setState(() => _isEditing = false);
                       },
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        side: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
                         backgroundColor: Colors.white,
                       ),
                       child: Text(
                         locale.t('cancel_btn'),
                         style: GoogleFonts.plusJakartaSans(
-                           fontWeight: FontWeight.w700,
-                           fontSize: 14,
-                           color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: const Color(0xFF64748B),
                         ),
                       ),
                     ),
@@ -1742,13 +1972,18 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       child: _isSaving
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Text(
                               locale.t('save_details_btn'),
@@ -1803,42 +2038,77 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             isDense: true,
             filled: true,
             fillColor: enabled ? Colors.white : const Color(0xFFF8FAFC),
-            prefixIcon: Icon(icon, size: 20, color: enabled ? const Color(0xFF059669) : const Color(0xFF94A3B8)),
-            prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            prefixIcon: Icon(
+              icon,
+              size: 20,
+              color: enabled
+                  ? const Color(0xFF059669)
+                  : const Color(0xFF94A3B8),
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 44,
+              minHeight: 44,
+            ),
             helperText: helperText,
-            helperStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            helperStyle: GoogleFonts.inter(
+              fontSize: 11,
+              color: const Color(0xFF64748B),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF059669), width: 1.8),
+              borderSide: const BorderSide(
+                color: Color(0xFF059669),
+                width: 1.8,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.8,
+              ),
             ),
           ),
-          validator: validator ?? (value) {
-            if (isRequired && (value == null || value.trim().isEmpty)) {
-              return 'This field cannot be empty';
-            }
-            return null;
-          },
+          validator:
+              validator ??
+              (value) {
+                if (isRequired && (value == null || value.trim().isEmpty)) {
+                  return 'This field cannot be empty';
+                }
+                return null;
+              },
         ),
       ],
     );

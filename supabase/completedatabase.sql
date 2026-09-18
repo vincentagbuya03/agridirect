@@ -16,7 +16,6 @@ CREATE TABLE public.users (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
-CREATE UNIQUE INDEX idx_users_unique_active_phone ON public.users (phone) WHERE phone IS NOT NULL AND trim(phone) != '';
 CREATE TABLE public.roles (
   name text NOT NULL UNIQUE,
   role_id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -39,14 +38,14 @@ CREATE TABLE public.farmers (
   specialty text,
   location text,
   badge text,
-  logo_url text,
-  cover_url text,
-  image_url text,
   farmer_id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   is_verified boolean DEFAULT false,
   is_active boolean DEFAULT true,
+  verification_method text DEFAULT 'manual_admin'::text,
+  ai_confidence_score double precision,
+  ai_verification_notes text,
   free_delivery_min_amount numeric DEFAULT 0 CHECK (free_delivery_min_amount >= 0::numeric),
   id_type text,
   sex text,
@@ -55,6 +54,8 @@ CREATE TABLE public.farmers (
   valid_id_back_path text,
   residential_address text,
   farming_history text,
+  logo_url text,
+  cover_url text,
   birth_date date,
   years_of_experience integer DEFAULT 0,
   face_photo_path text,
@@ -385,6 +386,10 @@ CREATE TABLE public.notification_types (
   CONSTRAINT notification_types_pkey PRIMARY KEY (notification_type_id)
 );
 CREATE TABLE public.farmer_registrations (
+  verification_method text DEFAULT 'manual_admin'::text,
+  ai_confidence_score double precision,
+  ai_verification_notes text,
+  reviewed_at timestamp with time zone,
   reviewed_by uuid,
   review_notes text,
   farmer_id uuid NOT NULL UNIQUE,
@@ -595,4 +600,18 @@ CREATE TABLE public.user_vouchers (
   CONSTRAINT user_vouchers_pkey PRIMARY KEY (id),
   CONSTRAINT fk_user_vouchers_user FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT fk_user_vouchers_voucher FOREIGN KEY (voucher_id) REFERENCES public.vouchers(voucher_id)
+);
+CREATE TABLE public.app_versions (
+  platform text NOT NULL UNIQUE,
+  latest_version text NOT NULL,
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  latest_build_number integer NOT NULL DEFAULT 1,
+  min_supported_version text NOT NULL DEFAULT '1.0.0'::text,
+  min_supported_build_number integer NOT NULL DEFAULT 1,
+  apk_url text NOT NULL DEFAULT ''::text,
+  release_notes ARRAY NOT NULL DEFAULT '{}'::text[],
+  is_critical boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT app_versions_pkey PRIMARY KEY (id)
 );

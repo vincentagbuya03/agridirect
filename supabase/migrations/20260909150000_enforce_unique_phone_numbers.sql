@@ -107,7 +107,11 @@ BEGIN
     FROM public.users u
     WHERE (
       u.phone = v_normalized 
-      OR u.phone = ('0' || substring(v_normalized from 4)) -- check 09 format fallback
+      OR u.phone = substring(v_normalized from 2) -- '639XXXXXXXXX'
+      OR u.phone = ('0' || substring(v_normalized from 4)) -- '09XXXXXXXXX'
+      OR u.phone = substring(v_normalized from 4) -- '9XXXXXXXXX'
+      OR regexp_replace(COALESCE(u.phone, ''), '[^\d]', '', 'g') = regexp_replace(v_normalized, '[^\d]', '', 'g')
+      OR u.email = (substring(v_normalized from 2) || '@phone.agridirect.ph')
     )
     AND (p_exclude_user_id IS NULL OR u.user_id != p_exclude_user_id)
   ) INTO v_exists;

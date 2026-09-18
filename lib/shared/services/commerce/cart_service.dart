@@ -175,6 +175,7 @@ class CartService extends ChangeNotifier {
             price: product.price,
             unit: product.unit,
             imageUrl: product.imageUrl,
+            farmLogoUrl: product.farmerAvatarUrl ?? product.farmerImageUrl,
             quantity: (dbItem['quantity'] as num).toInt(),
           );
         }
@@ -292,6 +293,7 @@ class CartService extends ChangeNotifier {
         price: product.price,
         unit: product.unit,
         imageUrl: product.imageUrl,
+        farmLogoUrl: product.farmerAvatarUrl ?? product.farmerImageUrl,
         quantity: newQty,
       );
       _items.add(newItem);

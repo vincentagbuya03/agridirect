@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   const { id, type } = req.query;
 
-  const APP_URL = 'https://agridirect-app.vercel.app';
+  const APP_URL = 'https://www.agridirect.site';
   const DEFAULT_IMAGE = `${APP_URL}/icons/Icon-512.png`;
 
   const DEFAULT_TITLE = 'AgriDirect - Farm Direct E-commerce';

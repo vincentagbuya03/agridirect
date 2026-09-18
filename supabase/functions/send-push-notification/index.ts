@@ -577,12 +577,18 @@ Deno.serve(async (request: Request) => {
                   notification: {
                     title,
                     body,
-                    ...(imageUrl ? { image: imageUrl } : {}),
+                    ...(imageUrl && payload.linkType !== "conversation" && notificationCode !== "new_message" ? { image: imageUrl } : {}),
                   },
                 }),
                 data: {
                   ...messageData,
-                  ...(imageUrl ? { image_url: imageUrl } : {}),
+                  ...(imageUrl ? { image_url: imageUrl, sender_avatar: imageUrl } : {}),
+                  ...(payload.linkType === "conversation" ? {
+                    conversation_id: payload.linkId ?? "",
+                    sender_name: payload.data?.sender_name ?? title ?? "",
+                    sender_avatar: imageUrl ?? payload.data?.sender_avatar ?? "",
+                    notification_code: notificationCode,
+                  } : {}),
                   // For calls, also include these top-level data fields so the
                   // background handler can read them from RemoteMessage.data
                   ...(payload.linkType === "call" && {
@@ -599,10 +605,14 @@ Deno.serve(async (request: Request) => {
                   priority: "high",
                   ...(payload.linkType !== "call" && {
                     notification: {
-                      channel_id: "agridirect_channel",
+                      channel_id: (payload.linkType === "conversation" || notificationCode === "new_message")
+                        ? "agridirect_messages_channel"
+                        : "agridirect_channel",
                       sound: "default",
-                      tag: (payload.linkType === "weather" || notificationCode.startsWith("weather_")) ? "agridirect_weather" : undefined,
-                      ...(imageUrl ? { image: imageUrl } : {}),
+                      tag: (payload.linkType === "weather" || notificationCode.startsWith("weather_"))
+                        ? "agridirect_weather"
+                        : ((payload.linkType === "conversation" && payload.linkId) ? `conv_${payload.linkId}` : undefined),
+                      ...(imageUrl && payload.linkType !== "conversation" && notificationCode !== "new_message" ? { image: imageUrl } : {}),
                     },
                   }),
                 },

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'admin_ui.dart';
 
@@ -11,11 +12,6 @@ class AdminUsersTab extends StatefulWidget {
   final AdminService adminService;
   const AdminUsersTab({super.key, required this.adminService});
 
-  @override
-  State<AdminUsersTab> createState() => _AdminUsersTabState();
-}
-
-class _AdminUsersTabState extends State<AdminUsersTab> {
   static String? resolveAvatarUrl(dynamic rawUrl) {
     if (rawUrl == null) return null;
     final url = rawUrl.toString().trim();
@@ -24,29 +20,37 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
       return url;
     }
     try {
-      String cleanPath = url;
-      String bucket = 'customer-profiles';
+      String cleanPath = url.replaceFirst(RegExp(r'^/+'), '');
+      String bucket = 'uploads';
+
       if (cleanPath.startsWith('uploads/')) {
         cleanPath = cleanPath.replaceFirst('uploads/', '');
+        bucket = 'uploads';
+      } else if (cleanPath.startsWith('registrations/')) {
+        cleanPath = cleanPath.replaceFirst('registrations/', '');
+        bucket = 'registrations';
+      } else if (cleanPath.startsWith('face_scans/') || cleanPath.startsWith('valid_ids/')) {
+        bucket = 'registrations';
       }
-      if (cleanPath.startsWith('customer-profiles/')) {
-        cleanPath = cleanPath.replaceFirst('customer-profiles/', '');
-      } else if (cleanPath.startsWith('avatars/')) {
-        bucket = 'avatars';
-        cleanPath = cleanPath.replaceFirst('avatars/', '');
-      }
+
       return SupabaseConfig.client.storage.from(bucket).getPublicUrl(cleanPath);
     } catch (_) {
       return null;
     }
   }
 
+  @override
+  State<AdminUsersTab> createState() => _AdminUsersTabState();
+}
+
+class _AdminUsersTabState extends State<AdminUsersTab> {
+  static String? resolveAvatarUrl(dynamic rawUrl) => AdminUsersTab.resolveAvatarUrl(rawUrl);
+
   late Future<List<Map<String, dynamic>>> _usersFuture;
 
   String _searchQuery = '';
   String _filterSegment = 'all'; // all, vip, active, new, dormant, suspended
   String _sortBy = 'spend'; // spend, orders, newest, oldest, name
-  bool _piiMasked = false; // default false for admin operations
   late VoidCallback _dataRefreshListener;
 
   final TextEditingController _searchController = TextEditingController();
@@ -137,46 +141,6 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               title: 'Buyer & Consumer Management',
               subtitle: 'Monitor registered shoppers, purchasing volume, lifetime value, and order history.',
               actions: [
-                // Privacy Mode Toggle Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _piiMasked ? AdminUi.brandSoft : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _piiMasked ? AdminUi.brand.withValues(alpha: 0.3) : const Color(0xFFD3DFD7),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _piiMasked ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        size: 14,
-                        color: _piiMasked ? AdminUi.brand : AdminUi.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Privacy Mode',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _piiMasked ? AdminUi.brand : AdminUi.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Transform.scale(
-                        scale: 0.75,
-                        child: Switch(
-                          value: _piiMasked,
-                          onChanged: (v) => setState(() => _piiMasked = v),
-                          activeThumbColor: AdminUi.brand,
-                          activeTrackColor: AdminUi.brandSecondary.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
@@ -808,19 +772,21 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   Widget _buildMobileUserCard(Map<String, dynamic> user) {
-    final name = (user['name'] ?? 'Registered Buyer').toString();
+    final rawName = (user['name'] ?? 'Registered Buyer').toString();
     final rawEmail = (user['email'] ?? 'No email').toString();
     final rawPhone = (user['phone'] ?? 'No phone').toString();
     final rawUserId = (user['user_id'] ?? '').toString();
     final shortId = rawUserId.length >= 8 ? rawUserId.substring(0, 8) : rawUserId;
 
-    final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-    final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+    final name = _maskName(rawName);
+    final email = _maskString(rawEmail);
+    final phone = _maskPhone(rawPhone);
 
     final ordersCount = (user['orders_count'] as num? ?? 0).toInt();
     final totalSpent = ((user['total_spent'] as num?)?.toDouble() ?? 0.0);
     final isActive = user['is_active'] != false;
     final isVip = totalSpent >= 1000 || ordersCount >= 2;
+    final isSystemVerified = user['is_system_verified'] == true || user['email_verified'] == true || user['is_verified'] == true;
 
     final rawDate = user['created_at']?.toString();
     String formattedJoined = 'Recently';
@@ -858,16 +824,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                   Builder(
                     builder: (context) {
                       final avatarUrl = resolveAvatarUrl(user['avatar_url']);
-                      return CircleAvatar(
+                      final gmailAvatarUrl = user['gmail_avatar_url'] as String?;
+                      return SafeCircleAvatar(
                         radius: 20,
-                        backgroundColor: AdminUi.brandSoft,
-                        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl == null
+                        imageUrl: avatarUrl,
+                        fallbackGmailUrl: gmailAvatarUrl,
+                        child: name.isNotEmpty
                             ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                name[0].toUpperCase(),
                                 style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
                               )
-                            : null,
+                            : const Icon(Icons.person_rounded, size: 20, color: AdminUi.brand),
                       );
                     },
                   ),
@@ -944,6 +911,31 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                                     color: AdminUi.brand,
                                     fontWeight: FontWeight.w800,
                                   ),
+                                ),
+                              ),
+                            if (isSystemVerified)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                                  borderRadius: AdminUi.radiusSm,
+                                  border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF0284C7)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'VERIFIED',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 9,
+                                        color: const Color(0xFF0284C7),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             InkWell(
@@ -1097,14 +1089,15 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   Widget _buildRow(Map<String, dynamic> user) {
-    final name = (user['name'] ?? 'Registered Buyer').toString();
+    final rawName = (user['name'] ?? 'Registered Buyer').toString();
     final rawEmail = (user['email'] ?? 'No email').toString();
     final rawPhone = (user['phone'] ?? 'No phone').toString();
     final rawUserId = (user['user_id'] ?? '').toString();
     final shortId = rawUserId.length >= 8 ? rawUserId.substring(0, 8) : rawUserId;
 
-    final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-    final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+    final name = _maskName(rawName);
+    final email = _maskString(rawEmail);
+    final phone = _maskPhone(rawPhone);
 
     final ordersCount = (user['orders_count'] as num? ?? 0).toInt();
     final totalSpent = ((user['total_spent'] as num?)?.toDouble() ?? 0.0);
@@ -1142,16 +1135,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                     Builder(
                       builder: (context) {
                         final avatarUrl = resolveAvatarUrl(user['avatar_url']);
-                        return CircleAvatar(
+                        final gmailAvatarUrl = user['gmail_avatar_url'] as String?;
+                        return SafeCircleAvatar(
                           radius: 20,
-                          backgroundColor: AdminUi.brandSoft,
-                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl == null
+                          imageUrl: avatarUrl,
+                          fallbackGmailUrl: gmailAvatarUrl,
+                          child: name.isNotEmpty
                               ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                  name[0].toUpperCase(),
                                   style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
                                 )
-                              : null,
+                              : const Icon(Icons.person_rounded, size: 20, color: AdminUi.brand),
                         );
                       },
                     ),
@@ -1435,11 +1429,12 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               final totalSpend = ((data['total_spent'] as num?)?.toDouble() ?? 0.0);
               final isVip = totalSpend >= 1000 || orders.length >= 2;
 
-              final name = profile['name'] ?? 'Buyer';
-              final rawEmail = profile['email'] ?? 'No email';
-              final rawPhone = profile['phone'] ?? 'No phone';
-              final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-              final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+              final rawName = (profile['name'] ?? 'Buyer').toString();
+              final rawEmail = (profile['email'] ?? 'No email').toString();
+              final rawPhone = (profile['phone'] ?? 'No phone').toString();
+              final name = _maskName(rawName);
+              final email = _maskString(rawEmail);
+              final phone = _maskPhone(rawPhone);
 
               return Padding(
                 padding: EdgeInsets.all(isMobile ? 18 : 28),
@@ -1454,16 +1449,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                         Builder(
                           builder: (context) {
                             final avatarUrl = resolveAvatarUrl(profile['avatar_url']);
-                            return CircleAvatar(
+                            final gmailAvatarUrl = profile['gmail_avatar_url'] as String?;
+                            return SafeCircleAvatar(
                               radius: isMobile ? 22 : 28,
-                              backgroundColor: AdminUi.brandSoft,
-                              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                              child: avatarUrl == null
+                              imageUrl: avatarUrl,
+                              fallbackGmailUrl: gmailAvatarUrl,
+                              child: name.isNotEmpty
                                   ? Text(
-                                      name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                      name[0].toUpperCase(),
                                       style: AdminUi.title(size: isMobile ? 18 : 22, color: AdminUi.brand),
                                     )
-                                  : null,
+                                  : Icon(Icons.person_rounded, size: isMobile ? 22 : 28, color: AdminUi.brand),
                             );
                           },
                         ),
@@ -1498,6 +1494,32 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                                       ),
                                     ),
                                   ),
+                                  if (profile['is_system_verified'] == true || profile['email_verified'] == true || profile['is_verified'] == true) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                                        borderRadius: AdminUi.radiusSm,
+                                        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF0284C7)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'VERIFIED BY SYSTEM',
+                                            style: AdminUi.label(
+                                              size: 9,
+                                              color: const Color(0xFF0284C7),
+                                              weight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 3),
@@ -1829,6 +1851,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
         ),
       ],
     );
+  }
+
+  String _maskName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed == 'Registered Buyer' || trimmed == 'Buyer') return name;
+    final parts = trimmed.split(RegExp(r'\s+'));
+    return parts.map((part) {
+      if (part.length <= 1) return part;
+      if (part.length == 2) return '${part[0]}*';
+      return '${part[0]}${'*' * (part.length - 1)}';
+    }).join(' ');
   }
 
   String _maskString(String str) {

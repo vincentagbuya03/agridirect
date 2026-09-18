@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../widgets/farmer/web_farmer_header.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import 'web_weather_radar_screen.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 
 class WebSalesDashboard extends StatefulWidget {
@@ -262,60 +263,65 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    if (_showWeatherPage) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF070E1B),
-        body: _buildWeatherRadarPage(),
-      );
-    }
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        if (_showWeatherPage) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF070E1B),
+            body: _buildWeatherRadarPage(),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: _surface,
-      body: Stack(
-        children: [
-          // Background Design Elements
-          Positioned.fill(
-            child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.04, color: _primary),
-            ),
-          ),
-          const Positioned.fill(
-            child: FloatingParticles(
-              count: 12,
-              maxSize: 1.5,
-              color: Color(0xFF10B981),
-              height: 1200,
-            ),
-          ),
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [_primary.withValues(alpha: 0.05), Colors.transparent],
+        return Scaffold(
+          backgroundColor: _surface,
+          body: Stack(
+            children: [
+              // Background Design Elements
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: DotPatternPainter(opacity: 0.04, color: _primary),
                 ),
               ),
-            ),
-          ),
-          Column(
-            children: [
-              WebFarmerHeader(
-                currentIndex: widget.currentIndex,
-                onNavigate: (index, [route]) => widget.onNavigate(index),
+              const Positioned.fill(
+                child: FloatingParticles(
+                  count: 12,
+                  maxSize: 1.5,
+                  color: Color(0xFF10B981),
+                  height: 1200,
+                ),
               ),
-              Expanded(
-                child: _isLoading 
-                  ? _buildDashboardSkeleton()
-                  : _buildMainScrollableArea(),
+              Positioned(
+                top: -100,
+                right: -100,
+                child: Container(
+                  width: 400,
+                  height: 400,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [_primary.withValues(alpha: 0.05), Colors.transparent],
+                    ),
+                  ),
+                ),
+              ),
+              Column(
+                children: [
+                  WebFarmerHeader(
+                    currentIndex: widget.currentIndex,
+                    onNavigate: (index, [route]) => widget.onNavigate(index),
+                  ),
+                  Expanded(
+                    child: _isLoading 
+                      ? _buildDashboardSkeleton()
+                      : _buildMainScrollableArea(),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -491,7 +497,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  'Storefront Active · ${_farmLocationName ?? 'Local Farm'}',
+                  '${FarmerLocaleService.instance.s('Storefront Active', 'Aktibong Tindahan')} · ${_farmLocationName ?? FarmerLocaleService.instance.s('Local Farm', 'Lokal na Bukid')}',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -506,7 +512,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         ),
         const SizedBox(height: 8),
         Text(
-          'Welcome back, $_farmerName! 🌾',
+          '${FarmerLocaleService.instance.s('Welcome back', 'Maligayang pagbabalik')}, $_farmerName! 🌾',
           style: GoogleFonts.plusJakartaSans(
             fontSize: isMobile ? 24 : (isTablet ? 28 : 34),
             fontWeight: FontWeight.w900,
@@ -516,7 +522,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         ),
         const SizedBox(height: 6),
         Text(
-          "Manage your farm's performance, products, and order fulfillments in real-time.",
+          FarmerLocaleService.instance.s(
+            "Manage your farm's performance, products, and order fulfillments in real-time.",
+            "Pamahalaan ang takbo ng bukid, mga paninda, at pagtupad ng order sa real-time.",
+          ),
           style: GoogleFonts.inter(
             fontSize: isMobile ? 13 : 15,
             color: _muted,
@@ -595,7 +604,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Feels $feelsLike°C',
+                            '${FarmerLocaleService.instance.s('Feels', 'Pakiramdam')} $feelsLike°C',
                             style: GoogleFonts.inter(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -625,7 +634,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                         Row(
                           children: [
                             Text(
-                              'Radar',
+                              FarmerLocaleService.instance.s('Radar', 'Ulat Panahon'),
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: const Color(0xFF3B82F6),
@@ -652,7 +661,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         ElevatedButton.icon(
           onPressed: () => widget.onNavigate(1),
           icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('Add Product'),
+          label: Text(FarmerLocaleService.instance.s('Add Product', 'Magdagdag ng Produkto')),
           style: ElevatedButton.styleFrom(
             backgroundColor: _primary,
             foregroundColor: Colors.white,
@@ -668,7 +677,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         OutlinedButton.icon(
           onPressed: _openVoucherManager,
           icon: const Icon(Icons.confirmation_number_outlined, size: 16),
-          label: const Text('Manage Vouchers'),
+          label: Text(FarmerLocaleService.instance.s('Manage Vouchers', 'Pamahalaan ang Voucher')),
           style: OutlinedButton.styleFrom(
             foregroundColor: _dark,
             backgroundColor: Colors.white,
@@ -851,7 +860,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Voucher Manager',
+                        FarmerLocaleService.instance.s('Voucher Manager', 'Tagapamahala ng Voucher'),
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
@@ -860,7 +869,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Manage store vouchers & customer discount codes',
+                        FarmerLocaleService.instance.s(
+                          'Manage store vouchers & customer discount codes',
+                          'Pamahalaan ang mga voucher at discount code ng tindahan',
+                        ),
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: _muted,
@@ -901,7 +913,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                 Icon(Icons.style_outlined, size: 14, color: activeTab == 0 ? _primary : _muted),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'Vouchers List (${vouchers.length})',
+                                  '${FarmerLocaleService.instance.s('Vouchers List', 'Listahan ng Voucher')} (${vouchers.length})',
                                   style: GoogleFonts.inter(
                                     fontSize: 12.5,
                                     fontWeight: activeTab == 0 ? FontWeight.w800 : FontWeight.w600,
@@ -935,7 +947,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                 Icon(Icons.add_circle_outline_rounded, size: 14, color: activeTab == 1 ? _primary : _muted),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'Create New',
+                                  FarmerLocaleService.instance.s('Create New', 'Gumawa ng Bago'),
                                   style: GoogleFonts.inter(
                                     fontSize: 12.5,
                                     fontWeight: activeTab == 1 ? FontWeight.w800 : FontWeight.w600,
@@ -977,7 +989,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'No store vouchers created yet',
+                                      FarmerLocaleService.instance.s('No store vouchers created yet', 'Wala pang nagagawang voucher'),
                                       style: GoogleFonts.plusJakartaSans(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 16,
@@ -986,7 +998,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Click "Create New" to add promotional codes for your shop.',
+                                      FarmerLocaleService.instance.s(
+                                        'Click "Create New" to add promotional codes for your shop.',
+                                        'Pindutin ang "Gumawa ng Bago" upang magdagdag ng promo code sa iyong tindahan.',
+                                      ),
                                       style: GoogleFonts.inter(
                                         color: _muted,
                                         fontSize: 13,
@@ -1013,7 +1028,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                   final String? dateStr = voucher['valid_until']?.toString() ?? voucher['end_date']?.toString();
                                   final String endStr = dateStr != null
                                       ? DateFormat('yMMMd').format(DateTime.tryParse(dateStr) ?? DateTime.now().add(const Duration(days: 30)))
-                                      : 'No Expiry';
+                                      : FarmerLocaleService.instance.s('No Expiry', 'Walang Expiration');
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 14),
@@ -1103,8 +1118,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                       ),
                                                       child: Text(
                                                         minSpend > 0
-                                                            ? 'Min. Spend ₱${minSpend.toStringAsFixed(0)}'
-                                                            : 'No Min. Spend',
+                                                            ? '${FarmerLocaleService.instance.s('Min. Spend', 'Min. Gastos')} ₱${minSpend.toStringAsFixed(0)}'
+                                                            : FarmerLocaleService.instance.s('No Min. Spend', 'Walang Min. Gastos'),
                                                         style: GoogleFonts.inter(
                                                           fontSize: 11,
                                                           fontWeight: FontWeight.w700,
@@ -1120,7 +1135,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                     const Icon(Icons.event_available_rounded, size: 13, color: Colors.grey),
                                                     const SizedBox(width: 6),
                                                     Text(
-                                                      'Valid until $endStr',
+                                                      '${FarmerLocaleService.instance.s('Valid until', 'May bisa hanggang')} $endStr',
                                                       style: GoogleFonts.inter(fontSize: 11.5, color: _muted),
                                                     ),
                                                   ],
@@ -1131,7 +1146,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                     const Icon(Icons.people_outline_rounded, size: 13, color: Colors.grey),
                                                     const SizedBox(width: 6),
                                                     Text(
-                                                      'Claimed $used / $limit times',
+                                                      '${FarmerLocaleService.instance.s('Claimed', 'Nagamit')} $used / $limit ${FarmerLocaleService.instance.s('times', 'beses')}',
                                                       style: GoogleFonts.inter(fontSize: 11.5, color: _muted),
                                                     ),
                                                   ],
@@ -1144,7 +1159,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                           padding: const EdgeInsets.only(right: 14),
                                           child: IconButton(
                                             icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                                            tooltip: 'Delete Voucher',
+                                            tooltip: FarmerLocaleService.instance.s('Delete Voucher', 'Tanggalin ang Voucher'),
                                             style: IconButton.styleFrom(
                                               backgroundColor: Colors.red.withValues(alpha: 0.06),
                                               padding: const EdgeInsets.all(8),
@@ -1184,7 +1199,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Configure discount value and rules. Vouchers are automatically displayed on your store profile page and product details pages.',
+                                        FarmerLocaleService.instance.s(
+                                          'Configure discount value and rules. Vouchers are automatically displayed on your store profile page and product details pages.',
+                                          'I-set ang halaga ng diskwento at patakaran. Awtomatikong ipapakita ang mga voucher sa profile ng iyong tindahan at pahina ng mga produkto.',
+                                        ),
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
@@ -1205,13 +1223,13 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       textCapitalization: TextCapitalization.characters,
                                       style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: 'Voucher Promo Code',
+                                        labelText: FarmerLocaleService.instance.s('Voucher Promo Code', 'Promo Code ng Voucher'),
                                         hintText: 'e.g. HARVEST50',
                                         prefixIcon: const Icon(Icons.label_outline_rounded, size: 18),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
-                                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                      validator: (v) => (v == null || v.trim().isEmpty) ? FarmerLocaleService.instance.s('Required', 'Kailangan') : null,
                                     ),
                                   ),
                                   const SizedBox(width: 14),
@@ -1219,14 +1237,20 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     child: DropdownButtonFormField<String>(
                                       initialValue: discountType,
                                       decoration: InputDecoration(
-                                        labelText: 'Discount Type',
+                                        labelText: FarmerLocaleService.instance.s('Discount Type', 'Uri ng Diskwento'),
                                         prefixIcon: const Icon(Icons.style_outlined, size: 18),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
-                                      items: const [
-                                        DropdownMenuItem(value: 'flat', child: Text('Flat Discount (₱)')),
-                                        DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)')),
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: 'flat',
+                                          child: Text(FarmerLocaleService.instance.s('Flat Discount (₱)', 'Direktang Bawas (₱)')),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'percentage',
+                                          child: Text(FarmerLocaleService.instance.s('Percentage (%)', 'Porsyento (%)')),
+                                        ),
                                       ],
                                       onChanged: (val) {
                                         if (val != null) {
@@ -1246,7 +1270,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       keyboardType: TextInputType.number,
                                       style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: discountType == 'flat' ? 'Discount Value (₱)' : 'Discount Value (%)',
+                                        labelText: discountType == 'flat'
+                                            ? FarmerLocaleService.instance.s('Discount Value (₱)', 'Halaga ng Diskwento (₱)')
+                                            : FarmerLocaleService.instance.s('Discount Value (%)', 'Porsyento ng Diskwento (%)'),
                                         hintText: discountType == 'flat' ? '50' : '10',
                                         prefixIcon: Icon(
                                           discountType == 'flat' ? Icons.payments_outlined : Icons.percent_rounded,
@@ -1255,7 +1281,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
-                                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
+                                      validator: (v) => (v == null || double.tryParse(v) == null) ? FarmerLocaleService.instance.s('Required number', 'Kailangang numero') : null,
                                     ),
                                   ),
                                   const SizedBox(width: 14),
@@ -1265,13 +1291,13 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       keyboardType: TextInputType.number,
                                       style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: 'Min. Spend (₱)',
+                                        labelText: FarmerLocaleService.instance.s('Min. Spend (₱)', 'Min. Gastos (₱)'),
                                         hintText: '100',
                                         prefixIcon: const Icon(Icons.shopping_bag_outlined, size: 18),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
-                                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
+                                      validator: (v) => (v == null || double.tryParse(v) == null) ? FarmerLocaleService.instance.s('Required number', 'Kailangang numero') : null,
                                     ),
                                   ),
                                 ],
@@ -1285,8 +1311,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       keyboardType: TextInputType.number,
                                       style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: 'Max Discount Limit (₱)',
-                                        hintText: 'Optional',
+                                        labelText: FarmerLocaleService.instance.s('Max Discount Limit (₱)', 'Max na Diskwento (₱)'),
+                                        hintText: FarmerLocaleService.instance.s('Optional', 'Opsyonal'),
                                         prefixIcon: const Icon(Icons.money_off_rounded, size: 18),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -1300,13 +1326,13 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       keyboardType: TextInputType.number,
                                       style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: 'Total Quantity Limit',
+                                        labelText: FarmerLocaleService.instance.s('Total Quantity Limit', 'Kabuuang Limitasyon ng Dami'),
                                         hintText: '100',
                                         prefixIcon: const Icon(Icons.onetwothree_rounded, size: 18),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
-                                      validator: (v) => (v == null || int.tryParse(v) == null) ? 'Required integer' : null,
+                                      validator: (v) => (v == null || int.tryParse(v) == null) ? FarmerLocaleService.instance.s('Required integer', 'Kailangang buong numero') : null,
                                     ),
                                   ),
                                 ],
@@ -1352,7 +1378,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Expiration Date',
+                                              FarmerLocaleService.instance.s('Expiration Date', 'Araw ng Pagpaso'),
                                               style: GoogleFonts.inter(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
@@ -1384,7 +1410,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               actions: [
                 TextButton(
                   onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
-                  child: Text('Close', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _muted)),
+                  child: Text(
+                    FarmerLocaleService.instance.s('Close', 'Isara'),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _muted),
+                  ),
                 ),
                 if (activeTab == 1)
                   ElevatedButton(
@@ -1397,7 +1426,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     child: Text(
-                      isSaving ? 'Creating...' : 'Create Voucher',
+                      isSaving 
+                          ? FarmerLocaleService.instance.s('Creating...', 'Ginagawa...')
+                          : FarmerLocaleService.instance.s('Create Voucher', 'Gumawa ng Voucher'),
                       style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
                     ),
                   ),
@@ -1422,43 +1453,47 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
     final metrics = [
       (
-        'Pending Orders',
+        FarmerLocaleService.instance.s('Pending Orders', 'Nakabinbing Order'),
         '$_pendingOrders',
-        _pendingOrders > 0 ? '$_pendingOrders require fulfillment' : 'All orders fulfilled',
+        _pendingOrders > 0
+            ? '$_pendingOrders ${FarmerLocaleService.instance.s('require fulfillment', 'kailangang tuparin')}'
+            : FarmerLocaleService.instance.s('All orders fulfilled', 'Lahat ng order ay natupad'),
         Icons.shopping_bag_outlined,
         const Color(0xFF3B82F6),
         () => widget.onNavigate(2),
-        _pendingOrders > 0 ? 'Needs Action' : 'Clear',
+        _pendingOrders > 0
+            ? FarmerLocaleService.instance.s('Needs Action', 'Kailangan ng Aksyon')
+            : FarmerLocaleService.instance.s('Clear', 'Ayos Lahat'),
         _pendingOrders > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
       ),
       (
-        'Active Listings',
+        FarmerLocaleService.instance.s('Active Listings', 'Aktibong Paninda'),
         '$_activeListings',
-        'Storefront live products',
+        FarmerLocaleService.instance.s('Storefront live products', 'Nakatanghal sa tindahan'),
         Icons.inventory_2_outlined,
         _primary,
         () => widget.onNavigate(1),
-        'Live',
+        FarmerLocaleService.instance.s('Live', 'Aktibo'),
         _primary,
       ),
       (
-        'Total Revenue',
+        FarmerLocaleService.instance.s('Total Revenue', 'Kabuuang Kita'),
         _currencyFormat.format(_weeklyRevenue),
-        '7-day sales: ${_currencyFormat.format(_salesData.fold(0.0, (a, b) => a + b))}',
+        '${FarmerLocaleService.instance.s('7-day sales', 'Benta sa 7 araw')}: ${_currencyFormat.format(_salesData.fold(0.0, (a, b) => a + b))}',
         Icons.trending_up_rounded,
         const Color(0xFF8B5CF6),
         null,
-        'Earnings',
+        FarmerLocaleService.instance.s('Earnings', 'Kinita'),
         const Color(0xFF8B5CF6),
       ),
       (
-        'Farmer Rating',
+        FarmerLocaleService.instance.s('Farmer Rating', 'Marka ng Magsasaka'),
         '$_farmerRating ★',
-        '$_farmerReviews · Verified Seller',
+        '$_farmerReviews · ${FarmerLocaleService.instance.s('Verified Seller', 'Beripikadong Nagtitinda')}',
         Icons.star_rounded,
         const Color(0xFFF59E0B),
         null,
-        'Top Rated',
+        FarmerLocaleService.instance.s('Top Rated', 'Mataas ang Marka'),
         const Color(0xFFF59E0B),
       ),
     ];
@@ -1833,7 +1868,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Sales Performance',
+                      FarmerLocaleService.instance.s('Sales Performance', 'Takbo ng Benta'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: isMobile ? 18 : 20,
                         fontWeight: FontWeight.w900,
@@ -1843,7 +1878,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '7-Day Total: ${_currencyFormat.format(total7Days)}',
+                      '${FarmerLocaleService.instance.s('7-Day Total', 'Kabuuan sa 7 Araw')}: ${_currencyFormat.format(total7Days)}',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: _primary,
@@ -1865,7 +1900,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     const Icon(Icons.show_chart_rounded, size: 16, color: _primary),
                     const SizedBox(width: 6),
                     Text(
-                      'Last 7 Days',
+                      FarmerLocaleService.instance.s('Last 7 Days', 'Huling 7 Araw'),
                       style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _primary),
                     ),
                   ],
@@ -1915,7 +1950,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Inventory Split',
+                FarmerLocaleService.instance.s('Inventory Split', 'Hati ng Imbentaryo'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 18 : 20,
                   fontWeight: FontWeight.w900,
@@ -1924,7 +1959,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, size: 18, color: _muted),
-                tooltip: 'Refresh',
+                tooltip: FarmerLocaleService.instance.s('Refresh', 'I-refresh'),
                 onPressed: _loadDashboardData,
               ),
             ],
@@ -1942,17 +1977,20 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     '$_activeListings',
                     style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: _dark),
                   ),
-                  Text('Total Items', style: GoogleFonts.inter(fontSize: 11, color: _muted, fontWeight: FontWeight.w600)),
+                  Text(
+                    FarmerLocaleService.instance.s('Total Items', 'Kabuuang Paninda'),
+                    style: GoogleFonts.inter(fontSize: 11, color: _muted, fontWeight: FontWeight.w600),
+                  ),
                 ],
               ),
             ),
           ),
           const Spacer(),
-          _buildLegendRow('In Stock', _primary, _inventoryLegend1),
+          _buildLegendRow(FarmerLocaleService.instance.s('In Stock', 'May Stock'), _primary, _inventoryLegend1),
           const SizedBox(height: 10),
-          _buildLegendRow('Low Stock (<5kg)', _secondary, _inventoryLegend2),
+          _buildLegendRow(FarmerLocaleService.instance.s('Low Stock (<5kg)', 'Kakaunting Stock (<5kg)'), _secondary, _inventoryLegend2),
           const SizedBox(height: 10),
-          _buildLegendRow('Out of Stock', _accent, _inventoryLegend3),
+          _buildLegendRow(FarmerLocaleService.instance.s('Out of Stock', 'Ubos Na'), _accent, _inventoryLegend3),
         ],
       ),
     );
@@ -2035,7 +2073,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Stock Alerts',
+                    FarmerLocaleService.instance.s('Stock Alerts', 'Alerto sa Stock'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -2046,7 +2084,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
               TextButton(
                 onPressed: () => widget.onNavigate(1),
-                child: Text('Manage Stock', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13)),
+                child: Text(
+                  FarmerLocaleService.instance.s('Manage Stock', 'Pamahalaan ang Stock'),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13),
+                ),
               ),
             ],
           ),
@@ -2060,7 +2101,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 36),
                     const SizedBox(height: 8),
                     Text(
-                      'All products fully stocked!',
+                      FarmerLocaleService.instance.s('All products fully stocked!', 'Lahat ng produkto ay may sapat na stock!'),
                       style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                   ],
@@ -2104,7 +2145,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        isOutOfStock ? 'OUT OF STOCK' : '$qty left',
+                        isOutOfStock 
+                            ? FarmerLocaleService.instance.s('OUT OF STOCK', 'UBOS NA') 
+                            : '$qty ${FarmerLocaleService.instance.s('left', 'natitira')}',
                         style: GoogleFonts.inter(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
@@ -2145,7 +2188,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Orders',
+                FarmerLocaleService.instance.s('Recent Orders', 'Kamakailang Order'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 18 : 20,
                   fontWeight: FontWeight.w900,
@@ -2154,7 +2197,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
               TextButton(
                 onPressed: () => widget.onNavigate(2),
-                child: Text('View All Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13)),
+                child: Text(
+                  FarmerLocaleService.instance.s('View All Orders', 'Tingnan Lahat'),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13),
+                ),
               ),
             ],
           ),
@@ -2167,7 +2213,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   children: [
                     const Icon(Icons.inbox_outlined, size: 36, color: _muted),
                     const SizedBox(height: 8),
-                    Text('No customer orders yet.', style: GoogleFonts.inter(color: _muted, fontSize: 14)),
+                    Text(
+                      FarmerLocaleService.instance.s('No customer orders yet.', 'Wala pang order mula sa mamimili.'),
+                      style: GoogleFonts.inter(color: _muted, fontSize: 14),
+                    ),
                   ],
                 ),
               ),
@@ -2212,12 +2261,12 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Order from ${o['customerName'] ?? 'Customer'}',
+                '${FarmerLocaleService.instance.s('Order from', 'Order mula kay')} ${o['customerName'] ?? FarmerLocaleService.instance.s('Customer', 'Mamimili')}',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _dark, fontSize: 14),
               ),
               const SizedBox(height: 3),
               Text(
-                o['items'] ?? 'Processing order items...',
+                o['items'] ?? FarmerLocaleService.instance.s('Processing order items...', 'Pinoproseso ang mga produkto...'),
                 style: GoogleFonts.inter(color: _muted, fontSize: 12.5),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -2235,7 +2284,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             ),
             const SizedBox(height: 3),
             Text(
-              o['timeAgo'] ?? 'Recently',
+              o['timeAgo'] ?? FarmerLocaleService.instance.s('Recently', 'Kamakailan'),
               style: GoogleFonts.inter(color: _muted, fontSize: 11.5, fontWeight: FontWeight.w500),
             ),
           ],

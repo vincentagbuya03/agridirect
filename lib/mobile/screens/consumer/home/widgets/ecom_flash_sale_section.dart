@@ -212,7 +212,7 @@ class _EcomFlashSaleSectionState extends State<EcomFlashSaleSection> {
 
           // ── HORIZONTAL PRODUCT CARDS ──
           SizedBox(
-            height: 195,
+            height: 212,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -313,63 +313,71 @@ class _EcomFlashSaleSectionState extends State<EcomFlashSaleSection> {
                         ),
 
                         // Pricing and Flame Claim Bar
-                        Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '₱${product.price.replaceAll('₱', '').trim()}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFFFA541C),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 4,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '₱${product.price.replaceAll('₱', '').trim()}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFFA541C),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
+                                const SizedBox(height: 3),
 
-                              // Flame stock progress bar
-                              Container(
-                                height: 12,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFE8D6),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Stack(
-                                  alignment: Alignment.centerLeft,
-                                  children: [
-                                    FractionallySizedBox(
-                                      widthFactor: claimProgress,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFFFA541C),
-                                              Color(0xFFFF7A45),
-                                            ],
+                                // Flame stock progress bar
+                                Container(
+                                  height: 13,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFE8D6),
+                                    borderRadius: BorderRadius.circular(6.5),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.centerLeft,
+                                    children: [
+                                      FractionallySizedBox(
+                                        widthFactor: claimProgress,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFFFA541C),
+                                                Color(0xFFFF7A45),
+                                              ],
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(6.5),
                                           ),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
                                         ),
                                       ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        '🔥 ${(claimProgress * 100).toInt()}% claimed',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 7.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: claimProgress > 0.5
-                                              ? Colors.white
-                                              : const Color(0xFFD4380D),
+                                      Center(
+                                        child: Text(
+                                          '🔥 ${(claimProgress * 100).toInt()}% claimed',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w800,
+                                            color: claimProgress > 0.5
+                                                ? Colors.white
+                                                : const Color(0xFFD4380D),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],

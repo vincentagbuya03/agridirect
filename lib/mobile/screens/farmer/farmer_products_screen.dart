@@ -22,6 +22,7 @@ import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/offline/offline_queue_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 import '../../widgets/offline_browse_widget.dart';
 import '../../widgets/offline_sync_widget.dart';
 
@@ -202,82 +203,94 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _ordersStream,
-        builder: (context, orderSnapshot) {
-          final orders = orderSnapshot.data ?? [];
-          double totalSales = 0.0;
-          for (final order in orders) {
-            if (order['status'] == 'DELIVERED') {
-              totalSales += (order['rawTotal'] as num?)?.toDouble() ?? 0.0;
-            }
-          }
+    final locale = FarmerLocaleService.instance;
 
-          return StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _productsStream,
-            builder: (context, productSnapshot) {
-              final onlineProducts = productSnapshot.data ?? [];
-              final pendingProducts = _getFilteredPendingProducts();
-              final activeItemsCount =
-                  onlineProducts.length + pendingProducts.length;
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _ordersStream,
+            builder: (context, orderSnapshot) {
+              final orders = orderSnapshot.data ?? [];
+              double totalSales = 0.0;
+              for (final order in orders) {
+                if (order['status'] == 'DELIVERED') {
+                  totalSales += (order['rawTotal'] as num?)?.toDouble() ?? 0.0;
+                }
+              }
 
-              return Column(
-                children: [
-                  _buildCompactHeader(totalSales, activeItemsCount),
-                  _buildStatusBanner(),
-                  _buildSearchAndFilters(),
-                  Expanded(
-                    child: ValueListenableBuilder(
-                      valueListenable: Hive.box<OfflineProductQueue>(
-                        OfflineQueueService.boxName,
-                      ).listenable(),
-                      builder: (context, queueBox, _) {
-                        return ValueListenableBuilder(
-                          valueListenable: Hive.box<CachedProduct>(
-                            'cached_products',
+              return StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _productsStream,
+                builder: (context, productSnapshot) {
+                  final onlineProducts = productSnapshot.data ?? [];
+                  final pendingProducts = _getFilteredPendingProducts();
+                  final activeItemsCount =
+                      onlineProducts.length + pendingProducts.length;
+
+                  return Column(
+                    children: [
+                      _buildCompactHeader(totalSales, activeItemsCount, locale),
+                      _buildStatusBanner(locale),
+                      _buildSearchAndFilters(locale),
+                      Expanded(
+                        child: ValueListenableBuilder(
+                          valueListenable: Hive.box<OfflineProductQueue>(
+                            OfflineQueueService.boxName,
                           ).listenable(),
-                          builder: (context, cacheBox, _) {
-                            return _buildProductsList(
-                              onlineProducts,
-                              productSnapshot.connectionState ==
-                                  ConnectionState.waiting,
+                          builder: (context, queueBox, _) {
+                            return ValueListenableBuilder(
+                              valueListenable: Hive.box<CachedProduct>(
+                                'cached_products',
+                              ).listenable(),
+                              builder: (context, cacheBox, _) {
+                                return _buildProductsList(
+                                  onlineProducts,
+                                  productSnapshot.connectionState ==
+                                      ConnectionState.waiting,
+                                  locale,
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await context.push(AppRoutes.addProduct);
-          _initializeStreams();
-        },
-        backgroundColor: const Color(0xFF059669),
-        elevation: 4,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          'LIST PRODUCT',
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-            fontSize: 13,
           ),
-        ),
-      ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () async {
+              await context.push(AppRoutes.addProduct);
+              _initializeStreams();
+            },
+            backgroundColor: const Color(0xFF059669),
+            elevation: 4,
+            icon: const Icon(Icons.add_rounded, color: Colors.white),
+            label: Text(
+              locale.t('list_product_btn'),
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
   // ─── Compact Slim Header (Replaces the 25% screen space header) ───
-  Widget _buildCompactHeader(double totalSales, int activeItemsCount) {
+  Widget _buildCompactHeader(
+    double totalSales,
+    int activeItemsCount,
+    FarmerLocaleService locale,
+  ) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -298,7 +311,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'MY INVENTORY',
+                      locale.t('my_inventory'),
                       style: GoogleFonts.inter(
                         color: const Color(0xFF059669),
                         fontSize: 10,
@@ -311,7 +324,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Product Catalog',
+                        locale.t('product_catalog'),
                         style: GoogleFonts.poppins(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -374,7 +387,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      '$activeItemsCount Items',
+                      '$activeItemsCount ${locale.t('items_count')}',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -392,7 +405,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   }
 
   // ─── Search & Quick Filter Chips ───
-  Widget _buildSearchAndFilters() {
+  Widget _buildSearchAndFilters(FarmerLocaleService locale) {
     final activeFilterCount =
         (_selectedTypeFilter != 'All' ? 1 : 0) +
         (_selectedStockFilter != 'All' ? 1 : 0);
@@ -419,7 +432,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                       color: const Color(0xFF0F172A),
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Search products or crop name...',
+                      hintText: locale.t('search_products_hint'),
                       hintStyle: GoogleFonts.inter(
                         color: const Color(0xFF94A3B8),
                         fontSize: 13,
@@ -447,7 +460,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: _showFilterBottomSheet,
+                onTap: () => _showFilterBottomSheet(locale),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 42,
@@ -500,7 +513,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             child: Row(
               children: [
                 _buildQuickFilterChip(
-                  label: 'All Produce',
+                  label: locale.t('filter_all_produce'),
                   isSelected:
                       _selectedTypeFilter == 'All' &&
                       _selectedStockFilter == 'All',
@@ -513,7 +526,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 ),
                 const SizedBox(width: 6),
                 _buildQuickFilterChip(
-                  label: '🌱 Pre-orders',
+                  label: locale.t('filter_preorders'),
                   isSelected: _selectedTypeFilter == 'Pre-order',
                   onTap: () {
                     setState(() {
@@ -526,7 +539,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 ),
                 const SizedBox(width: 6),
                 _buildQuickFilterChip(
-                  label: '📦 Standard Stock',
+                  label: locale.t('filter_standard_stock'),
                   isSelected: _selectedTypeFilter == 'Standard',
                   onTap: () {
                     setState(() {
@@ -539,7 +552,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 ),
                 const SizedBox(width: 6),
                 _buildQuickFilterChip(
-                  label: '✅ In Stock',
+                  label: locale.t('filter_in_stock'),
                   isSelected: _selectedStockFilter == 'In Stock',
                   onTap: () {
                     setState(() {
@@ -552,7 +565,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 ),
                 const SizedBox(width: 6),
                 _buildQuickFilterChip(
-                  label: '⚠️ Low Stock',
+                  label: locale.t('filter_low_stock'),
                   isSelected: _selectedStockFilter == 'Low Stock',
                   onTap: () {
                     setState(() {
@@ -560,6 +573,19 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                           _selectedStockFilter == 'Low Stock'
                               ? 'All'
                               : 'Low Stock';
+                    });
+                  },
+                ),
+                const SizedBox(width: 6),
+                _buildQuickFilterChip(
+                  label: locale.t('filter_out_of_stock'),
+                  isSelected: _selectedStockFilter == 'Out of Stock',
+                  onTap: () {
+                    setState(() {
+                      _selectedStockFilter =
+                          _selectedStockFilter == 'Out of Stock'
+                              ? 'All'
+                              : 'Out of Stock';
                     });
                   },
                 ),
@@ -606,7 +632,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     );
   }
 
-  void _showFilterBottomSheet() {
+  void _showFilterBottomSheet(FarmerLocaleService locale) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -637,7 +663,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Filter Catalog',
+                        locale.t('filter_catalog_title'),
                         style: GoogleFonts.poppins(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -653,7 +679,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                           setState(() {});
                         },
                         child: Text(
-                          'Reset',
+                          locale.t('reset_filters'),
                           style: GoogleFonts.inter(
                             color: const Color(0xFF059669),
                             fontWeight: FontWeight.w700,
@@ -664,7 +690,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Listing Type',
+                    locale.t('listing_type_label'),
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -673,12 +699,18 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    children: ['All', 'Standard', 'Pre-order'].map((type) {
+                    children: [
+                      {'key': 'All', 'label': locale.s('All', 'Lahat')},
+                      {'key': 'Standard', 'label': locale.s('Standard', 'Karaniwan')},
+                      {'key': 'Pre-order', 'label': locale.s('Pre-order', 'Paunang Order')},
+                    ].map((item) {
+                      final type = item['key']!;
+                      final label = item['label']!;
                       final isSelected = _selectedTypeFilter == type;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(type),
+                          label: Text(label),
                           selected: isSelected,
                           selectedColor: const Color(0xFFECFDF5),
                           labelStyle: GoogleFonts.inter(
@@ -700,7 +732,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Stock Status',
+                    locale.t('stock_status_label'),
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -709,12 +741,19 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    children: ['All', 'In Stock', 'Low Stock', 'Out of Stock'].map((stock) {
+                    children: [
+                      {'key': 'All', 'label': locale.s('All', 'Lahat')},
+                      {'key': 'In Stock', 'label': locale.s('In Stock', 'May Stock')},
+                      {'key': 'Low Stock', 'label': locale.s('Low Stock', 'Kakaunti')},
+                      {'key': 'Out of Stock', 'label': locale.s('Out of Stock', 'Ubos Na')},
+                    ].map((item) {
+                      final stock = item['key']!;
+                      final label = item['label']!;
                       final isSelected = _selectedStockFilter == stock;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(stock),
+                          label: Text(label),
                           selected: isSelected,
                           selectedColor: const Color(0xFFECFDF5),
                           labelStyle: GoogleFonts.inter(
@@ -748,7 +787,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                         elevation: 0,
                       ),
                       child: Text(
-                        'Apply Filters',
+                        locale.t('apply_filters'),
                         style: GoogleFonts.inter(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -766,7 +805,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     );
   }
 
-  Widget _buildStatusBanner() {
+  Widget _buildStatusBanner(FarmerLocaleService locale) {
     if (_effectiveOnline &&
         _offlineProductService.pendingProductsCount.value == 0) {
       return const SizedBox.shrink();
@@ -790,8 +829,11 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           Expanded(
             child: Text(
               _effectiveOnline
-                  ? '${_offlineProductService.pendingProductsCount.value} products waiting to sync'
-                  : 'You are currently offline',
+                  ? locale.s(
+                      '${_offlineProductService.pendingProductsCount.value} products waiting to sync',
+                      '${_offlineProductService.pendingProductsCount.value} paninda naghihintay na ma-sync',
+                    )
+                  : locale.s('You are currently offline', 'Kasalukuyan kang offline'),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -819,6 +861,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   Widget _buildProductsList(
     List<Map<String, dynamic>> onlineProducts,
     bool isLoading,
+    FarmerLocaleService locale,
   ) {
     final query = _searchController.text.trim().toLowerCase();
 
@@ -894,10 +937,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           if (offlineProducts.isEmpty)
             _buildEmptyState(
               icon: Icons.offline_bolt_rounded,
-              title: 'No Cached Products',
+              title: locale.s('No Cached Products', 'Walang Naka-save na Paninda'),
               subtitle: query.isNotEmpty
-                  ? 'No products match "$query"'
-                  : 'Load products while online to view them offline.',
+                  ? locale.s('No products match "$query"', 'Walang panindang tumutugma sa "$query"')
+                  : locale.s('Load products while online to view them offline.', 'Mag-load ng paninda habang online upang makita offline.'),
               action: () {},
             )
           else
@@ -1001,11 +1044,16 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     if (listItems.isEmpty) {
       return _buildEmptyState(
         icon: Icons.inventory_2_outlined,
-        title: query.isNotEmpty ? 'No Results Found' : 'Empty Inventory',
+        title: query.isNotEmpty
+            ? locale.t('no_results_title')
+            : locale.t('empty_inventory_title'),
         subtitle: query.isNotEmpty
-            ? 'No products match your search "$query".'
-            : 'Start listing your agricultural products to reach buyers.',
-        buttonLabel: query.isNotEmpty ? null : 'Add Your First Product',
+            ? locale.s(
+                'No products match your search "$query".',
+                'Walang panindang tumutugma sa iyong hinahanap na "$query".',
+              )
+            : locale.t('empty_inventory_sub'),
+        buttonLabel: query.isNotEmpty ? null : locale.t('add_first_product'),
         action: query.isNotEmpty
             ? null
             : () async {
@@ -1076,6 +1124,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
 
   // ─── Compact & Modern Product Card ───
   Widget _buildProductCard(Map<String, dynamic> product) {
+    final locale = FarmerLocaleService.instance;
     final isPreorder = product['is_preorder'] == true;
     final available = product['available'] ?? 0;
     final availableNum = (available is num)
@@ -1083,44 +1132,50 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         : (double.tryParse(available.toString()) ?? 0.0);
     final rawStatus = product['status']?.toString().toUpperCase();
 
-    final String status;
+    final String statusKey;
     if (rawStatus != null &&
         rawStatus != 'IN STOCK' &&
         rawStatus != 'LIVE (OFFLINE)' &&
         rawStatus.isNotEmpty) {
-      status = rawStatus;
+      statusKey = rawStatus;
     } else if (availableNum <= 0) {
-      status = 'SOLD OUT';
+      statusKey = 'SOLD OUT';
     } else if (availableNum <= 10 && !isPreorder) {
-      status = 'LOW STOCK';
+      statusKey = 'LOW STOCK';
     } else if (isPreorder) {
-      status = 'PRE-ORDER';
+      statusKey = 'PRE-ORDER';
     } else {
-      status = 'IN STOCK';
+      statusKey = 'IN STOCK';
     }
 
     Color statusColor;
     Color statusBg;
-    switch (status) {
+    String statusDisplay;
+    switch (statusKey) {
       case 'SOLD OUT':
         statusColor = const Color(0xFFEF4444);
         statusBg = const Color(0xFFFEF2F2);
+        statusDisplay = locale.t('status_sold_out');
         break;
       case 'LOW STOCK':
         statusColor = const Color(0xFFD97706);
         statusBg = const Color(0xFFFFFBEB);
+        statusDisplay = locale.t('status_low_stock');
         break;
       case 'PENDING SYNC':
         statusColor = const Color(0xFFF97316);
         statusBg = const Color(0xFFFFF7ED);
+        statusDisplay = locale.t('status_pending_sync');
         break;
       case 'PRE-ORDER':
         statusColor = const Color(0xFF0284C7);
         statusBg = const Color(0xFFF0F9FF);
+        statusDisplay = locale.t('status_preorder');
         break;
       default:
         statusColor = const Color(0xFF059669);
         statusBg = const Color(0xFFECFDF5);
+        statusDisplay = locale.t('status_in_stock');
     }
 
     final isOffline = product['is_offline'] == true;
@@ -1134,8 +1189,22 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     final price = product['price']?.toString() ?? '0';
     final unit = product['unit']?.toString() ?? 'kg';
     final desc = product['description']?.toString() ?? '';
-    final harvest = product['harvest']?.toString() ??
-        (isPreorder ? 'Pre-order' : 'Ready Now');
+    final rawHarvest = product['harvest']?.toString();
+    final String harvestDisplay;
+    if (rawHarvest != null && rawHarvest.isNotEmpty) {
+      if (rawHarvest == 'Ready Now') {
+        harvestDisplay = locale.t('ready_now');
+      } else if (rawHarvest == 'Pre-order') {
+        harvestDisplay = locale.t('status_preorder');
+      } else if (rawHarvest.startsWith('In ')) {
+        final days = rawHarvest.replaceAll('In ', '').replaceAll(' days', '').replaceAll(' day', '');
+        harvestDisplay = locale.s('In $days days', 'Sa $days araw');
+      } else {
+        harvestDisplay = rawHarvest;
+      }
+    } else {
+      harvestDisplay = isPreorder ? locale.t('status_preorder') : locale.t('ready_now');
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1274,7 +1343,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                                   ),
                                 ),
                                 child: Text(
-                                  status,
+                                  statusDisplay,
                                   style: GoogleFonts.inter(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w800,
@@ -1318,7 +1387,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                                 isPreorder
                                     ? Icons.grass_rounded
                                     : Icons.calendar_today_rounded,
-                                harvest,
+                                harvestDisplay,
                               ),
                             ],
                           ),
@@ -1329,7 +1398,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 ),
 
                 // Low Stock Warning Banner
-                if (status == 'LOW STOCK') ...[
+                if (statusKey == 'LOW STOCK') ...[
                   const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
@@ -1345,7 +1414,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '⚠️ Low Stock: Only $available $unit left. Tap to restock.',
+                            locale.s(
+                              '⚠️ Low Stock: Only $available $unit left. Tap to restock.',
+                              '⚠️ Kakaunting Stock: $available $unit na lang. Pindutin para magdagdag.',
+                            ),
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
@@ -1394,7 +1466,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                '${milestones.length} Growth Updates Posted',
+                                locale.s(
+                                  '${milestones.length} Growth Updates Posted',
+                                  '${milestones.length} Update sa Pagtubo',
+                                ),
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
@@ -1446,7 +1521,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Pre-order Item',
+                              locale.s('Pre-order Item', 'Paunang Order'),
                               style: GoogleFonts.inter(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
@@ -1488,7 +1563,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Post Update',
+                                    locale.t('post_update_btn'),
                                     style: GoogleFonts.inter(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
@@ -1532,7 +1607,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Manage',
+                                  locale.t('manage_btn'),
                                   style: GoogleFonts.inter(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w700,

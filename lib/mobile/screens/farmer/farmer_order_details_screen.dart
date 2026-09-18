@@ -16,6 +16,8 @@ import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../widgets/farmer/farmer_language_toggle.dart';
 
 class FarmerOrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -52,34 +54,71 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   List<Map<String, dynamic>> get _steps {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
     final isPreorder = widget.order.isPreorder == true;
+    final loc = FarmerLocaleService.instance;
     return isPreorder
         ? [
-            {'title': 'Pre-ordered', 'desc': 'Reservation received', 'icon': Icons.bookmark_added_rounded},
-            {'title': 'Confirmed', 'desc': 'Pre-order accepted', 'icon': Icons.check_circle_rounded},
-            {'title': 'Growing', 'desc': 'Awaiting harvest', 'icon': Icons.agriculture_rounded},
             {
-              'title': isCop ? 'Ready for Pickup' : 'Shipped',
-              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'title': loc.s('Pre-ordered', 'Paunang Order'),
+              'desc': loc.s('Reservation received', 'Natanggap ang reserbasyon'),
+              'icon': Icons.bookmark_added_rounded,
+            },
+            {
+              'title': loc.s('Confirmed', 'Kumpirmado'),
+              'desc': loc.s('Pre-order accepted', 'Tinanggap ang paunang order'),
+              'icon': Icons.check_circle_rounded,
+            },
+            {
+              'title': loc.s('Growing', 'Pinalalaki / Tanim'),
+              'desc': loc.s('Awaiting harvest', 'Hinihintay ang pag-ani'),
+              'icon': Icons.agriculture_rounded,
+            },
+            {
+              'title': isCop
+                  ? loc.s('Ready for Pickup', 'Handa nang Kunin')
+                  : loc.s('Shipped', 'Ipinadala'),
+              'desc': isCop
+                  ? loc.s('Ready at farm', 'Handa sa sakahan')
+                  : loc.s('On the way', 'Papunta na'),
               'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded,
             },
             {
-              'title': isCop ? 'Picked Up' : 'Delivered',
-              'desc': 'Completed',
+              'title': isCop
+                  ? loc.s('Picked Up', 'Nakuha Na')
+                  : loc.s('Delivered', 'Naihatid Na'),
+              'desc': loc.s('Completed', 'Tapos na'),
               'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded,
             },
           ]
         : [
-            {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
-            {'title': 'Confirmed', 'desc': 'Order accepted', 'icon': Icons.check_circle_rounded},
-            {'title': 'Preparing', 'desc': 'Harvesting & packing', 'icon': Icons.inventory_2_rounded},
             {
-              'title': isCop ? 'Ready for Pickup' : 'Shipped',
-              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'title': loc.s('Placed', 'Nagawa'),
+              'desc': loc.s('Order received', 'Natanggap ang order'),
+              'icon': Icons.assignment_turned_in_rounded,
+            },
+            {
+              'title': loc.s('Confirmed', 'Kumpirmado'),
+              'desc': loc.s('Order accepted', 'Tinanggap ang order'),
+              'icon': Icons.check_circle_rounded,
+            },
+            {
+              'title': loc.s('Preparing', 'Inihahanda'),
+              'desc': loc.s('Harvesting & packing', 'Inaani at ibinabalot'),
+              'icon': Icons.inventory_2_rounded,
+            },
+            {
+              'title': isCop
+                  ? loc.s('Ready for Pickup', 'Handa nang Kunin')
+                  : loc.s('Shipped', 'Ipinadala'),
+              'desc': isCop
+                  ? loc.s('Ready at farm', 'Handa sa sakahan')
+                  : loc.s('On the way', 'Papunta na'),
               'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded,
             },
             {
-              'title': isCop ? 'Picked Up' : 'Delivered',
-              'desc': 'Completed',
+              'title': isCop
+                  ? loc.s('Picked Up', 'Nakuha Na')
+                  : loc.s('Delivered', 'Naihatid Na'),
+              'desc': loc.s('Completed', 'Tapos na'),
               'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded,
             },
           ];
@@ -112,7 +151,8 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   Future<void> _loadDetails() async {
     setState(() => _isLoading = true);
     try {
-      final items = await _orderService.getOrderItems(widget.order.orderId);
+      final itemsFuture = _orderService.getOrderItems(widget.order.orderId);
+
       String? deliveryAddressId = widget.order.deliveryAddressId;
       if (deliveryAddressId == null || deliveryAddressId.isEmpty) {
         try {
@@ -120,84 +160,31 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
               .from('orders')
               .select('delivery_address_id')
               .eq('order_id', widget.order.orderId)
-              .maybeSingle();
+              .maybeSingle()
+              .timeout(const Duration(seconds: 4));
           if (orderData != null) {
             deliveryAddressId = orderData['delivery_address_id']?.toString();
           }
         } catch (_) {}
       }
 
-      Map<String, dynamic>? address;
-      if (deliveryAddressId != null && deliveryAddressId.isNotEmpty) {
-        address = await _orderService.getDeliveryAddress(deliveryAddressId);
+      final addressFuture = (deliveryAddressId != null && deliveryAddressId.isNotEmpty)
+          ? _orderService.getDeliveryAddress(deliveryAddressId)
+          : Future<Map<String, dynamic>?>.value(null);
 
-        if (address != null && (address['latitude'] == null || address['longitude'] == null)) {
-          try {
-            final street = address['street']?.toString() ?? '';
-            final barangay = address['barangay']?.toString() ?? '';
-            final city = address['city']?.toString() ?? '';
-            final province = address['province']?.toString() ?? '';
+      final farmerProfileFuture = widget.order.farmerId.isNotEmpty
+          ? FarmerService().getFarmerProfileByFarmerId(widget.order.farmerId)
+          : Future<FarmerProfile?>.value(null);
 
-            String cleanBrgy(String val) =>
-                val.replaceAll(RegExp(r'\b(brgy|brgy\.|barangay)\b', caseSensitive: false), '').trim();
-            String cleanStreet(String val) =>
-                val.replaceAll(RegExp(r'#\d+'), '').replaceAll(RegExp(r'\d+'), '').trim();
+      final results = await Future.wait([
+        itemsFuture.timeout(const Duration(seconds: 5), onTimeout: () => []),
+        addressFuture.timeout(const Duration(seconds: 5), onTimeout: () => null),
+        farmerProfileFuture.timeout(const Duration(seconds: 5), onTimeout: () => null),
+      ]);
 
-            final listQueries = <String>[];
-            final parts1 = <String>[street, barangay, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts1.isNotEmpty) listQueries.add(parts1.join(', '));
-
-            final cStreet = cleanStreet(street);
-            final cBrgy = cleanBrgy(barangay);
-            final parts2 = <String>[cStreet, cBrgy, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts2.isNotEmpty) listQueries.add(parts2.join(', '));
-
-            final parts3 = <String>[cBrgy, city, province].where((s) => s.isNotEmpty).toList();
-            if (parts3.isNotEmpty) listQueries.add(parts3.join(', '));
-
-            final parts4 = <String>[city, province].where((s) => s.isNotEmpty).toList();
-            if (parts4.isNotEmpty) listQueries.add(parts4.join(', '));
-
-            LatLng? foundCoords;
-            for (final q in listQueries) {
-              if (q.trim().isEmpty) continue;
-              final encodedAddr = Uri.encodeComponent(q);
-              final searchUri = Uri.parse(
-                'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
-              );
-              final res = await http.get(
-                searchUri,
-                headers: const {
-                  'User-Agent': 'AgriDirect/1.0 (support: noreplyagridirect@gmail.com)',
-                },
-              );
-              if (res.statusCode == 200) {
-                final list = jsonDecode(res.body) as List;
-                if (list.isNotEmpty) {
-                  final first = list.first as Map<String, dynamic>;
-                  final latVal = double.tryParse(first['lat']?.toString() ?? '');
-                  final lonVal = double.tryParse(first['lon']?.toString() ?? '');
-                  if (latVal != null && lonVal != null) {
-                    foundCoords = LatLng(latVal, lonVal);
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (foundCoords != null) {
-              address = Map<String, dynamic>.from(address);
-              address['latitude'] = foundCoords.latitude;
-              address['longitude'] = foundCoords.longitude;
-            }
-          } catch (_) {}
-        }
-      }
-
-      FarmerProfile? farmerProfile;
-      if (widget.order.farmerId.isNotEmpty) {
-        farmerProfile = await FarmerService().getFarmerProfileByFarmerId(widget.order.farmerId);
-      }
+      final items = results[0] as List<OrderItem>;
+      final address = results[1] as Map<String, dynamic>?;
+      final farmerProfile = results[2] as FarmerProfile?;
 
       if (mounted) {
         setState(() {
@@ -207,52 +194,131 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           _isLoading = false;
         });
       }
+
+      // Background geocoding without blocking the screen
+      if (address != null && (address['latitude'] == null || address['longitude'] == null)) {
+        _geocodeAddressInBackground(address);
+      }
     } catch (e) {
       debugPrint('Error loading order details: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _geocodeAddressInBackground(Map<String, dynamic> address) async {
+    try {
+      final street = address['street']?.toString() ?? '';
+      final barangay = address['barangay']?.toString() ?? '';
+      final city = address['city']?.toString() ?? '';
+      final province = address['province']?.toString() ?? '';
+
+      String cleanBrgy(String val) =>
+          val.replaceAll(RegExp(r'\b(brgy|brgy\.|barangay)\b', caseSensitive: false), '').trim();
+      String cleanStreet(String val) =>
+          val.replaceAll(RegExp(r'#\d+'), '').replaceAll(RegExp(r'\d+'), '').trim();
+
+      final listQueries = <String>[];
+      final parts1 = <String>[street, barangay, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts1.isNotEmpty) listQueries.add(parts1.join(', '));
+
+      final cStreet = cleanStreet(street);
+      final cBrgy = cleanBrgy(barangay);
+      final parts2 = <String>[cStreet, cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts2.isNotEmpty) listQueries.add(parts2.join(', '));
+
+      final parts3 = <String>[cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+      if (parts3.isNotEmpty) listQueries.add(parts3.join(', '));
+
+      final parts4 = <String>[city, province].where((s) => s.isNotEmpty).toList();
+      if (parts4.isNotEmpty) listQueries.add(parts4.join(', '));
+
+      LatLng? foundCoords;
+      for (final q in listQueries.take(2)) {
+        if (q.trim().isEmpty) continue;
+        final encodedAddr = Uri.encodeComponent(q);
+        final searchUri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
+        );
+        try {
+          final res = await http.get(
+            searchUri,
+            headers: const {
+              'User-Agent': 'AgriDirect/1.0 (support: noreplyagridirect@gmail.com)',
+            },
+          ).timeout(const Duration(seconds: 2));
+
+          if (res.statusCode == 200) {
+            final list = jsonDecode(res.body) as List;
+            if (list.isNotEmpty) {
+              final first = list.first as Map<String, dynamic>;
+              final latVal = double.tryParse(first['lat']?.toString() ?? '');
+              final lonVal = double.tryParse(first['lon']?.toString() ?? '');
+              if (latVal != null && lonVal != null) {
+                foundCoords = LatLng(latVal, lonVal);
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (foundCoords != null && mounted) {
+        setState(() {
+          final updated = Map<String, dynamic>.from(_address ?? address);
+          updated['latitude'] = foundCoords!.latitude;
+          updated['longitude'] = foundCoords.longitude;
+          _address = updated;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isDesktop = sw >= 960;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final sw = MediaQuery.of(context).size.width;
+        final isDesktop = sw >= 960;
 
-    return Scaffold(
-      backgroundColor: _surface,
-      appBar: _buildAppBar(isDesktop),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: _primary),
-            )
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 36 : 16,
-                20,
-                isDesktop ? 36 : 16,
-                isDesktop ? 48 : 100,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeaderBanner(isDesktop),
-                      const SizedBox(height: 24),
-                      if (isDesktop) _buildDesktop2ColumnLayout() else _buildMobileStackedLayout(),
-                    ],
+        return Scaffold(
+          backgroundColor: _surface,
+          appBar: _buildAppBar(isDesktop),
+          body: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: _primary),
+                )
+              : SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    isDesktop ? 36 : 16,
+                    20,
+                    isDesktop ? 36 : 16,
+                    isDesktop ? 48 : 100,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1280),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeaderBanner(isDesktop),
+                          const SizedBox(height: 24),
+                          if (isDesktop) _buildDesktop2ColumnLayout() else _buildMobileStackedLayout(),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-      bottomNavigationBar: (!isDesktop && !_isLoading) ? _buildMobileBottomBar() : null,
+          bottomNavigationBar: (!isDesktop && !_isLoading) ? _buildMobileBottomBar() : null,
+        );
+      },
     );
   }
 
   // ─── App Bar ───────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar(bool isDesktop) {
+    final loc = FarmerLocaleService.instance;
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -260,41 +326,60 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
         icon: const Icon(Icons.arrow_back_rounded, color: _dark),
-        tooltip: 'Back to Orders',
+        tooltip: loc.s('Back to Orders', 'Bumalik sa mga Order'),
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isDesktop) ...[
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Text(
-                  'Orders',
-                  style: GoogleFonts.inter(fontSize: 14, color: _muted, fontWeight: FontWeight.w600),
+      title: isDesktop
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Text(
+                      loc.s('Orders', 'Mga Order'),
+                      style: GoogleFonts.inter(fontSize: 14, color: _muted, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '${loc.s('Order', 'Order')} #${widget.order.orderNumber}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              '${loc.s('Order', 'Order')} #${widget.order.orderNumber}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: _dark,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            'Order #${widget.order.orderNumber}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: isDesktop ? 16 : 15,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-        ],
-      ),
       actions: [
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: FarmerLanguageToggle(compact: true),
+          ),
+        ),
         IconButton(
           onPressed: _loadDetails,
           icon: const Icon(Icons.refresh_rounded, color: _muted, size: 20),
-          tooltip: 'Refresh Details',
+          tooltip: loc.s('Refresh Details', 'I-refresh ang Detalye'),
         ),
         const SizedBox(width: 8),
       ],
@@ -304,6 +389,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   // ─── Header Banner ─────────────────────────────────────────────────────────
   Widget _buildHeaderBanner(bool isDesktop) {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
+    final loc = FarmerLocaleService.instance;
 
     return Container(
       padding: EdgeInsets.all(isDesktop ? 24 : 18),
@@ -339,7 +425,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                   children: [
                     Flexible(
                       child: Text(
-                        'Order #${widget.order.orderNumber}',
+                        '${loc.s('Order', 'Order')} #${widget.order.orderNumber}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: isDesktop ? 20 : 16,
                           fontWeight: FontWeight.w900,
@@ -356,9 +442,9 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: widget.order.orderNumber));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Order Number copied!'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(loc.s('Order Number copied!', 'Nakopya ang Numero ng Order!')),
+                              duration: const Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -375,7 +461,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      'Placed on ${_formatDateTime(widget.order.createdAt)}',
+                      '${loc.s('Placed on', 'Nagawa noong')} ${_formatDateTime(widget.order.createdAt)}',
                       style: GoogleFonts.inter(fontSize: 12.5, color: _muted, fontWeight: FontWeight.w500),
                     ),
                     Container(
@@ -385,7 +471,9 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        isCop ? '🏪 Farm Pickup (COP)' : '🚚 Standard Delivery',
+                        isCop
+                            ? loc.s('🏪 Farm Pickup (COP)', '🏪 Kunin sa Sakahan (COP)')
+                            : loc.s('🚚 Standard Delivery', '🚚 Karaniwang Pagpapadala'),
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -468,6 +556,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 1. Fulfillment Pipeline Stepper Card ──────────────────────────────────
   Widget _buildFulfillmentPipelineCard() {
+    final loc = FarmerLocaleService.instance;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -489,7 +578,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Fulfillment Timeline',
+                loc.s('Fulfillment Timeline', 'Takdang Panahon ng Pagtupad'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -658,6 +747,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 2. Harvest Items Invoice Table Card ───────────────────────────────────
   Widget _buildHarvestItemsCard() {
+    final loc = FarmerLocaleService.instance;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -679,7 +769,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Order Items (${_items.length})',
+                '${loc.s('Order Items', 'Mga Paninda sa Order')} (${_items.length})',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -687,7 +777,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 ),
               ),
               Text(
-                'Itemized Breakdown',
+                loc.s('Itemized Breakdown', 'Detalyadong Listahan'),
                 style: GoogleFonts.inter(fontSize: 12, color: _muted),
               ),
             ],
@@ -699,7 +789,10 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: Text('No items found in this order.', style: GoogleFonts.inter(color: _muted)),
+                child: Text(
+                  loc.s('No items found in this order.', 'Walang nakitang paninda sa order na ito.'),
+                  style: GoogleFonts.inter(color: _muted),
+                ),
               ),
             )
           else
@@ -734,7 +827,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.productName ?? 'Produce Item',
+                            item.productName ?? loc.s('Produce Item', 'Paninda'),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -768,23 +861,28 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 3. Action Console Card (Sidebar / Top Stack) ──────────────────────────
   Widget _buildActionConsoleCard() {
+    final loc = FarmerLocaleService.instance;
     final isFinished = _currentStatus == 'DELIVERED' || _currentStatus == 'CANCELLED';
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
 
-    String nextActionLabel = 'Confirm Order';
+    String nextActionLabel = loc.s('Confirm Order', 'Kumpirmahin ang Order');
     String nextStatus = 'CONFIRMED';
     IconData actionIcon = Icons.check_circle_outline_rounded;
 
     if (_currentStatus == 'CONFIRMED') {
-      nextActionLabel = 'Start Preparing Harvest';
+      nextActionLabel = loc.s('Start Preparing Harvest', 'Simulan ang Paghahanda / Pag-ani');
       nextStatus = 'PROCESSING';
       actionIcon = Icons.inventory_2_outlined;
     } else if (_currentStatus == 'PROCESSING') {
-      nextActionLabel = isCop ? 'Mark Ready for Pickup' : 'Ship via Courier';
+      nextActionLabel = isCop
+          ? loc.s('Mark Ready for Pickup', 'Ihanda para sa Pagkuha')
+          : loc.s('Ship via Courier', 'Ipadala gamit ang Courier');
       nextStatus = 'SHIPPED';
       actionIcon = isCop ? Icons.storefront_rounded : Icons.local_shipping_outlined;
     } else if (_currentStatus == 'SHIPPED') {
-      nextActionLabel = isCop ? 'Complete Buyer Pickup' : 'Mark Delivered';
+      nextActionLabel = isCop
+          ? loc.s('Complete Buyer Pickup', 'Kumpletuhin ang Pagkuha')
+          : loc.s('Mark Delivered', 'Markahang Naihatid Na');
       nextStatus = 'DELIVERED';
       actionIcon = Icons.done_all_rounded;
     }
@@ -807,7 +905,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Order Fulfillment Action',
+            loc.s('Order Fulfillment Action', 'Aksyon sa Pagtupad ng Order'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -817,8 +915,8 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           const SizedBox(height: 6),
           Text(
             isFinished
-                ? 'This order has been completed and finalized.'
-                : 'Advance the fulfillment pipeline to keep the buyer updated.',
+                ? loc.s('This order has been completed and finalized.', 'Ang order na ito ay tapos na at pinal na.')
+                : loc.s('Advance the fulfillment pipeline to keep the buyer updated.', 'I-abante ang katayuan upang maabisuhan ang mamimili.'),
             style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
           ),
           const SizedBox(height: 16),
@@ -836,7 +934,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                       )
                     : Icon(actionIcon, size: 18),
                 label: Text(
-                  _isUpdating ? 'Updating...' : nextActionLabel,
+                  _isUpdating ? loc.s('Updating...', 'Ina-update...') : nextActionLabel,
                   style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -854,7 +952,10 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
               child: OutlinedButton.icon(
                 onPressed: _isUpdating ? null : _showStatusUpdateSheet,
                 icon: const Icon(Icons.edit_note_rounded, size: 18, color: _dark),
-                label: Text('Change to Other Status...', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: _dark)),
+                label: Text(
+                  loc.s('Change to Other Status...', 'Palitan sa Ibang Katayuan...'),
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: _dark),
+                ),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: _border),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -874,7 +975,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                   const Icon(Icons.verified_rounded, size: 20, color: _primary),
                   const SizedBox(width: 8),
                   Text(
-                    'Order Finalized',
+                    loc.s('Order Finalized', 'Pinal na ang Order'),
                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _primaryDark),
                   ),
                 ],
@@ -888,6 +989,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 4. Customer Card ──────────────────────────────────────────────────────
   Widget _buildCustomerCard() {
+    final loc = FarmerLocaleService.instance;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -906,7 +1008,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Buyer Information',
+            loc.s('Buyer Information', 'Impormasyon ng Mamimili'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -958,7 +1060,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Verified AgriDirect Buyer',
+                      loc.s('Verified AgriDirect Buyer', 'Beripikadong Mamimili ng AgriDirect'),
                       style: GoogleFonts.inter(fontSize: 12, color: _muted),
                     ),
                   ],
@@ -977,7 +1079,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 );
               },
               icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
-              label: const Text('Message Buyer Directly'),
+              label: Text(loc.s('Message Buyer Directly', 'I-mensahe Diretso ang Mamimili')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F172A),
                 foregroundColor: Colors.white,
@@ -995,6 +1097,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 5. Price Breakdown Card ───────────────────────────────────────────────
   Widget _buildPriceBreakdownCard() {
+    final loc = FarmerLocaleService.instance;
     final subtotal = widget.order.subtotal ?? widget.order.total ?? 0;
     final fee = widget.order.deliveryFee ?? 0;
     final total = widget.order.total ?? subtotal;
@@ -1017,7 +1120,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Payment Summary',
+            loc.s('Payment Summary', 'Buod ng Bayad'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -1025,11 +1128,14 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _summaryRow('Subtotal', '₱${subtotal.toStringAsFixed(2)}'),
+          _summaryRow(loc.s('Subtotal', 'Halaga ng Paninda'), '₱${subtotal.toStringAsFixed(2)}'),
           const SizedBox(height: 10),
-          _summaryRow('Delivery Fee', fee > 0 ? '₱${fee.toStringAsFixed(2)}' : 'Free / Included'),
+          _summaryRow(
+            loc.s('Delivery Fee', 'Bayad sa Pagpapadala'),
+            fee > 0 ? '₱${fee.toStringAsFixed(2)}' : loc.s('Free / Included', 'Libre / Kasama Na'),
+          ),
           const SizedBox(height: 10),
-          _summaryRow('Payment Method', widget.order.paymentMethod?.toUpperCase() ?? 'COD'),
+          _summaryRow(loc.s('Payment Method', 'Paraan ng Pagbayad'), widget.order.paymentMethod?.toUpperCase() ?? 'COD'),
           const SizedBox(height: 14),
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 14),
@@ -1037,7 +1143,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Payable',
+                loc.s('Total Payable', 'Kabuuang Babayaran'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -1071,6 +1177,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── 6. Delivery Location Card ─────────────────────────────────────────────
   Widget _buildDeliveryLocationCard() {
+    final loc = FarmerLocaleService.instance;
     if (_address == null) {
       final method = widget.order.paymentMethod?.toUpperCase() ?? '';
       final isPickup = method == 'COP';
@@ -1089,7 +1196,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isPickup ? 'Farm Pickup Location' : 'Delivery Address',
+              isPickup ? loc.s('Farm Pickup Location', 'Lokasyon ng Sakahan para sa Pagkuha') : loc.s('Delivery Address', 'Direksyon ng Pagpapadala'),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -1109,8 +1216,8 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             ] else ...[
               Text(
                 isPickup
-                    ? 'Customer will pick up from your farm address.'
-                    : 'Standard customer delivery address on record.',
+                    ? loc.s('Customer will pick up from your farm address.', 'Kukunin ng mamimili mula sa lokasyon ng iyong sakahan.')
+                    : loc.s('Standard customer delivery address on record.', 'Nakatala na karaniwang direksyon ng mamimili.'),
                 style: GoogleFonts.inter(fontSize: 13, color: _muted),
               ),
             ],
@@ -1150,7 +1257,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Delivery Location',
+                loc.s('Delivery Location', 'Lokasyon ng Pagpapadala'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -1167,19 +1274,24 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                     }
                   },
                   icon: const Icon(Icons.directions_rounded, size: 16, color: _primary),
-                  label: Text('Directions', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: _primary)),
+                  label: Text(
+                    loc.s('Directions', 'Direksyon'),
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: _primary),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            addressText.isNotEmpty ? addressText : 'Customer address details provided upon dispatch',
+            addressText.isNotEmpty
+                ? addressText
+                : loc.s('Customer address details provided upon dispatch', 'Ibibigay ang mga detalye ng tirahan sa pagpapadala'),
             style: GoogleFonts.inter(fontSize: 13.5, color: _dark, fontWeight: FontWeight.w500),
           ),
           if (_address!['recipient_name'] != null || _address!['recipient_phone'] != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Recipient: ${_address!['recipient_name'] ?? ''} · ${_address!['recipient_phone'] ?? ''}',
+              '${loc.s('Recipient:', 'Tatanggap:')} ${_address!['recipient_name'] ?? ''} · ${_address!['recipient_phone'] ?? ''}',
               style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
             ),
           ],
@@ -1239,6 +1351,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ─── Mobile Sticky Bottom Bar ──────────────────────────────────────────────
   Widget _buildMobileBottomBar() {
+    final loc = FarmerLocaleService.instance;
     final isFinished = _currentStatus == 'DELIVERED' || _currentStatus == 'CANCELLED';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -1265,7 +1378,11 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 )
               : const Icon(Icons.edit_note_rounded, size: 18),
           label: Text(
-            _isUpdating ? 'Updating...' : (isFinished ? 'Order Finalized' : 'Update Order Status'),
+            _isUpdating
+                ? loc.s('Updating...', 'Ina-update...')
+                : (isFinished
+                    ? loc.s('Order Finalized', 'Pinal na ang Order')
+                    : loc.s('Update Order Status', 'I-update ang Katayuan')),
             style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           style: ElevatedButton.styleFrom(
@@ -1282,6 +1399,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   // ─── Status Actions & Confirmation ─────────────────────────────────────────
   Future<void> _advanceStatus(String nextStatus, String actionTitle) async {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
+    final loc = FarmerLocaleService.instance;
     setState(() => _isUpdating = true);
 
     try {
@@ -1289,19 +1407,19 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       if (mounted) {
         setState(() => _currentStatus = nextStatus);
 
-        String successMsg = 'Order status updated successfully.';
+        String successMsg = loc.s('Order status updated successfully.', 'Matagumpay na nai-update ang katayuan ng order.');
         if (nextStatus == 'SHIPPED') {
           successMsg = isCop
-              ? 'Order is ready for farm pickup! Buyer notified.'
-              : 'Order marked as shipped and in-transit!';
+              ? loc.s('Order is ready for farm pickup! Buyer notified.', 'Handa na ang order para sa pagkuha! Naabisuhan ang mamimili.')
+              : loc.s('Order marked as shipped and in-transit!', 'Markahang ipinadala na ang order!');
         } else if (nextStatus == 'DELIVERED') {
           successMsg = isCop
-              ? 'Pickup completed! Order finalized.'
-              : 'Order delivered successfully!';
+              ? loc.s('Pickup completed! Order finalized.', 'Nakumpleto ang pagkuha! Pinal na ang order.')
+              : loc.s('Order delivered successfully!', 'Matagumpay na naihatid ang order!');
         } else if (nextStatus == 'CONFIRMED') {
-          successMsg = 'Order accepted! Ready to harvest & pack.';
+          successMsg = loc.s('Order accepted! Ready to harvest & pack.', 'Tinanggap ang order! Handa nang anihin at ibalot.');
         } else if (nextStatus == 'PROCESSING') {
-          successMsg = 'Order is now processing!';
+          successMsg = loc.s('Order is now processing!', 'Kasalukuyan nang inihahanda ang order!');
         }
 
         late OverlayEntry overlayEntry;
@@ -1338,22 +1456,42 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   void _showStatusUpdateSheet() {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
+    final loc = FarmerLocaleService.instance;
     final allStatuses = [
-      {'label': 'CONFIRMED', 'title': 'CONFIRMED', 'icon': Icons.check_circle_outline, 'color': Colors.blue},
-      {'label': 'PROCESSING', 'title': 'PROCESSING', 'icon': Icons.loop_rounded, 'color': Colors.indigo},
+      {
+        'label': 'CONFIRMED',
+        'title': loc.s('CONFIRMED', 'KUMPIRMADO'),
+        'icon': Icons.check_circle_outline,
+        'color': Colors.blue,
+      },
+      {
+        'label': 'PROCESSING',
+        'title': loc.s('PROCESSING', 'INIIHANDA / INAANI'),
+        'icon': Icons.loop_rounded,
+        'color': Colors.indigo,
+      },
       {
         'label': 'SHIPPED',
-        'title': isCop ? 'READY FOR PICKUP' : 'SHIPPED',
+        'title': isCop
+            ? loc.s('READY FOR PICKUP', 'HANDA NANG KUNIN')
+            : loc.s('SHIPPED', 'IPINADALA NA'),
         'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_outlined,
         'color': Colors.deepPurple,
       },
       {
         'label': 'DELIVERED',
-        'title': isCop ? 'COMPLETED PICKUP' : 'DELIVERED',
+        'title': isCop
+            ? loc.s('COMPLETED PICKUP', 'NAKUHA NA')
+            : loc.s('DELIVERED', 'NAIHATID NA'),
         'icon': isCop ? Icons.done_all_rounded : Icons.done_all_rounded,
         'color': _primary,
       },
-      {'label': 'CANCELLED', 'title': 'CANCELLED', 'icon': Icons.cancel_outlined, 'color': Colors.red},
+      {
+        'label': 'CANCELLED',
+        'title': loc.s('CANCELLED', 'NAKANSELA'),
+        'icon': Icons.cancel_outlined,
+        'color': Colors.red,
+      },
     ];
 
     List<Map<String, dynamic>> allowedStatuses = [];
@@ -1387,19 +1525,22 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Update Order Status',
+              loc.s('Update Order Status', 'I-update ang Katayuan ng Order'),
               style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: _dark),
             ),
             const SizedBox(height: 6),
             Text(
-              'Select the next status step for Order #${widget.order.orderNumber}',
+              '${loc.s('Select the next status step for Order', 'Pumili ng susunod na katayuan para sa Order')} #${widget.order.orderNumber}',
               style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
             ),
             const SizedBox(height: 20),
             if (allowedStatuses.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Text('No further status updates available.', style: GoogleFonts.inter(color: _muted)),
+                child: Text(
+                  loc.s('No further status updates available.', 'Wala nang karagdagang update na available.'),
+                  style: GoogleFonts.inter(color: _muted),
+                ),
               )
             else
               ...allowedStatuses.map(
@@ -1425,6 +1566,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   // ─── Status Badge ──────────────────────────────────────────────────────────
   Widget _buildStatusBadge(String status, dynamic paymentMethod) {
     final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
+    final loc = FarmerLocaleService.instance;
     Color bg = const Color(0xFFFFFBEB);
     Color fg = const Color(0xFFD97706);
     IconData icon = Icons.hourglass_top_rounded;
@@ -1434,27 +1576,29 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       bg = const Color(0xFFECFDF5);
       fg = _primary;
       icon = Icons.check_circle_rounded;
-      label = isCop ? 'PICKED UP' : 'DELIVERED';
+      label = isCop ? loc.s('PICKED UP', 'NAKUHA NA') : loc.s('DELIVERED', 'NAIHATID NA');
     } else if (status == 'SHIPPED') {
       bg = const Color(0xFFEFF6FF);
       fg = const Color(0xFF2563EB);
       icon = isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded;
-      label = isCop ? 'READY FOR PICKUP' : 'SHIPPED';
+      label = isCop ? loc.s('READY FOR PICKUP', 'HANDA NANG KUNIN') : loc.s('SHIPPED', 'IPINADALA NA');
     } else if (status == 'PROCESSING') {
       bg = const Color(0xFFF5F3FF);
       fg = const Color(0xFF7C3AED);
       icon = Icons.inventory_2_rounded;
-      label = 'PROCESSING';
+      label = loc.s('PROCESSING', 'INIIHANDA');
     } else if (status == 'CONFIRMED') {
       bg = const Color(0xFFECFEFF);
       fg = const Color(0xFF0891B2);
       icon = Icons.thumb_up_alt_rounded;
-      label = 'CONFIRMED';
+      label = loc.s('CONFIRMED', 'KUMPIRMADO');
     } else if (status == 'CANCELLED') {
       bg = const Color(0xFFFEF2F2);
       fg = const Color(0xFFDC2626);
       icon = Icons.cancel_rounded;
-      label = 'CANCELLED';
+      label = loc.s('CANCELLED', 'NAKANSELA');
+    } else if (status == 'PENDING') {
+      label = loc.s('PENDING', 'HINIHINTAY');
     }
 
     return Container(
@@ -1597,7 +1741,7 @@ class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay> with Singl
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Status Updated',
+                      FarmerLocaleService.instance.s('Status Updated', 'Nai-update ang Katayuan'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,

@@ -8,6 +8,7 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/utils/js_helper.dart';
+import '../../../shared/widgets/image_widgets.dart';
 
 import 'admin_ui.dart';
 import 'admin_users_tab.dart';
@@ -1826,6 +1827,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   Widget _registrationItem(Map<String, dynamic> reg) {
     final name = reg['name'] ?? reg['full_name'] ?? 'Farmer Applicant';
     final farm = '${reg['farm_name'] ?? "New Farm"} • ${reg['specialty'] ?? "Organic Produce"}';
+    final logoUrl = AdminUsersTab.resolveAvatarUrl(reg['logo_url'] ?? reg['image_url'] ?? reg['farm_logo']);
+    final isSystemVerified = reg['verification_method'] == 'ai_auto_verified' || reg['is_system_verified'] == true;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1845,9 +1848,9 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
+                        SafeCircleAvatar(
                           radius: 16,
-                          backgroundColor: AdminUi.brandSoft,
+                          imageUrl: logoUrl,
                           child: const Icon(Icons.person_rounded, color: AdminUi.brand, size: 16),
                         ),
                         const SizedBox(width: 10),
@@ -1855,9 +1858,42 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                name,
-                                style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      name,
+                                      style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isSystemVerified) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.bolt_rounded, size: 10, color: Color(0xFF0284C7)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            'SYSTEM VERIFIED',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 9,
+                                              color: const Color(0xFF0284C7),
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               Text(
                                 farm,
@@ -1914,9 +1950,9 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 )
               : Row(
                   children: [
-                    CircleAvatar(
+                    SafeCircleAvatar(
                       radius: 16,
-                      backgroundColor: AdminUi.brandSoft,
+                      imageUrl: logoUrl,
                       child: const Icon(Icons.person_rounded, color: AdminUi.brand, size: 16),
                     ),
                     const SizedBox(width: 12),
@@ -1924,9 +1960,42 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isSystemVerified) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.bolt_rounded, size: 10, color: Color(0xFF0284C7)),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        'SYSTEM VERIFIED',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9,
+                                          color: const Color(0xFF0284C7),
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           Text(
                             farm,

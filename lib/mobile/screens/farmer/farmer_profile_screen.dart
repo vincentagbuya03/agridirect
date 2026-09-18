@@ -11,6 +11,8 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/localization/farmer_locale_service.dart';
 import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Mobile Profile screen specifically for Farmers.
 class FarmerProfileScreen extends StatefulWidget {
@@ -41,6 +43,76 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   static const Color _dark = Color(0xFF0F172A);
 
   Map<String, dynamic> _dashboardStats = {};
+  bool _isUploadingCover = false;
+
+  Future<void> _pickAndUploadCoverPhoto() async {
+    if (_isUploadingCover) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingCover = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.name.split('.').last;
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = 'covers/$fileName';
+
+      await SupabaseConfig.client.storage
+          .from('uploads')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: 'image/${ext == "png" ? "png" : "jpeg"}',
+              upsert: true,
+            ),
+          );
+
+      final publicUrl = SupabaseConfig.client.storage
+          .from('uploads')
+          .getPublicUrl(path);
+
+      final userId = (SupabaseConfig.currentUser?.id ?? AuthService().userId).trim();
+      if (userId.isNotEmpty) {
+        try {
+          await SupabaseConfig.client
+              .from('farmers')
+              .update({'cover_url': publicUrl})
+              .eq('user_id', userId);
+        } catch (colErr) {
+          debugPrint('⚠️ Error updating cover_url in farmer_profile_screen: $colErr');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _farmerCoverUrl = publicUrl;
+        _isUploadingCover = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Farm cover photo updated successfully!'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error uploading cover photo: $e');
+      if (!mounted) return;
+      setState(() => _isUploadingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload cover photo: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -127,22 +199,19 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           _farmerCoverUrl = safeCoverUrl.isNotEmpty ? safeCoverUrl : null;
         });
 
-        // 2. Farm Logo / Avatar: strictly from image_url, logo_url, or user avatar (NEVER face_photo_path)
-        final userProfile = await SupabaseDatabase.getUserProfile(userId);
-        final rawLogoUrl = (farmers[0]['image_url'] as String?)?.trim().isNotEmpty == true
-            ? (farmers[0]['image_url'] as String).trim()
-            : ((farmers[0]['logo_url'] as String?)?.trim().isNotEmpty == true
-                ? (farmers[0]['logo_url'] as String).trim()
-                : ((userProfile?['avatar_url'] as String?)?.trim().isNotEmpty == true
-                    ? (userProfile!['avatar_url'] as String).trim()
-                    : auth.userAvatarUrl));
-        final safeUrl = await SupabaseDatabase.getSafeUrl(
-          rawLogoUrl,
-          defaultBucket: 'uploads',
-        );
+        // 2. Farm Logo: strictly from logo_url (NEVER personal user avatar or face_photo_path)
+        final rawLogoUrl = (farmers[0]['logo_url'] as String?)?.trim().isNotEmpty == true
+            ? (farmers[0]['logo_url'] as String).trim()
+            : '';
+        final safeUrl = rawLogoUrl.isNotEmpty
+            ? await SupabaseDatabase.getSafeUrl(
+                rawLogoUrl,
+                defaultBucket: 'uploads',
+              )
+            : '';
         if (mounted) {
           setState(() {
-            _farmerImageUrl = safeUrl.isNotEmpty ? safeUrl : (auth.userAvatarUrl.isNotEmpty ? auth.userAvatarUrl : null);
+            _farmerImageUrl = safeUrl.isNotEmpty ? safeUrl : null;
           });
         }
       }
@@ -222,7 +291,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
 
     return Stack(
       children: [
-        // Background Cover Photo or Emerald Gradient
+        // Background Cover Photo or Empty Slate (Farmers without cover do NOT see default banner)
         Positioned.fill(
           child: (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty)
               ? CachedNetworkImage(
@@ -233,7 +302,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                       ),
                     ),
                   ),
@@ -243,7 +312,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF059669), Color(0xFF10B981)],
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF064E3B)],
                     ),
                   ),
                 ),
@@ -317,9 +386,11 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                       const FarmerLanguageToggle(compact: true),
                       const SizedBox(width: 4),
                       IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         icon: const Icon(
                           Icons.settings_outlined,
-                          size: 24,
+                          size: 22,
                           color: Colors.white,
                         ),
                         onPressed: () => context.push(AppRoutes.appSettings),
@@ -332,45 +403,90 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Farm logo avatar
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+                  // Farm logo avatar with tap to edit
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () async {
+                      await context.push(AppRoutes.myDetails);
+                      _loadFarmerData();
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: (_farmerImageUrl != null &&
+                                    _farmerImageUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    key: ValueKey(_farmerImageUrl),
+                                    imageUrl: _farmerImageUrl!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, _) =>
+                                        Container(color: Colors.white24),
+                                    errorWidget: (_, _, _) => Container(
+                                      color: Colors.white,
+                                      alignment: Alignment.center,
+                                      child: const Icon(
+                                        Icons.storefront_rounded,
+                                        size: 32,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: Colors.white,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.storefront_rounded,
+                                      size: 32,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                    child: ClipOval(
-                      child:
-                          (_farmerImageUrl != null &&
-                              _farmerImageUrl!.isNotEmpty)
-                          ? CachedNetworkImage(
-                              key: ValueKey(_farmerImageUrl),
-                              imageUrl: _farmerImageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) =>
-                                  Container(color: Colors.white24),
-                              errorWidget: (_, _, _) => const Icon(
-                                Icons.agriculture,
-                                size: 32,
-                                color: Colors.white54,
-                              ),
-                            )
-                          : Container(
-                              color: Colors.white24,
-                              child: const Icon(
-                                Icons.agriculture,
-                                size: 32,
-                                color: Colors.white54,
-                              ),
-                            ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -389,29 +505,70 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () async {
-                            await context.push(AppRoutes.myDetails);
-                            _loadFarmerData();
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Edit Farm Details',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  fontWeight: FontWeight.w500,
-                                ),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                await context.push(AppRoutes.myDetails);
+                                _loadFarmerData();
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Edit Farm Details',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 16,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
+                                ],
                               ),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 16,
-                                color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                            GestureDetector(
+                              onTap: _pickAndUploadCoverPhoto,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isUploadingCover)
+                                    const SizedBox(
+                                      width: 11,
+                                      height: 11,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.photo_camera_outlined,
+                                      size: 13,
+                                      color: Colors.white,
+                                    ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty)
+                                        ? (locale.isFilipino ? 'Palitan ang Cover' : 'Change Cover')
+                                        : (locale.isFilipino ? 'Magdagdag ng Cover' : 'Add Cover'),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

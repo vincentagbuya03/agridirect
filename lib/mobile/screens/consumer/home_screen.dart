@@ -26,6 +26,9 @@ import 'home/widgets/ecom_hero_banner.dart';
 import 'home/widgets/ecom_quick_channels.dart';
 import 'home/widgets/ecom_flash_sale_section.dart';
 import 'home/widgets/ecom_product_card.dart';
+import '../../widgets/address_management_sheets.dart';
+import '../../../shared/widgets/tour/spotlight_tour_controller.dart';
+import '../../../shared/widgets/tour/consumer_tour_steps.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,6 +54,13 @@ class _HomeScreenState extends State<HomeScreen>
   late Future<List<ProductItem>> _flashSaleProductsFuture;
   Position? _userPosition;
 
+  // Guided Tour Target Keys
+  final GlobalKey _searchBarKey = GlobalKey();
+  final GlobalKey _quickChannelsKey = GlobalKey();
+  final GlobalKey _featuredFarmersKey = GlobalKey();
+  final GlobalKey _heroBannerKey = GlobalKey();
+  final GlobalKey _cartActionKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +73,28 @@ class _HomeScreenState extends State<HomeScreen>
     _flashSaleProductsFuture = SupabaseDataService().getFlashSaleProducts();
     _loadDefaultAddress();
     _loadUserPosition();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndLaunchConsumerTour();
+    });
+  }
+
+  Future<void> _checkAndLaunchConsumerTour({bool force = false}) async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    final steps = getConsumerTourSteps(
+      searchAndAddressKey: _searchBarKey,
+      quickChannelsKey: _quickChannelsKey,
+      featuredFarmersKey: _featuredFarmersKey,
+      flashDealsKey: _heroBannerKey,
+      cartOrAssistantKey: _cartActionKey,
+    );
+    await SpotlightTourController.startTour(
+      context,
+      steps: steps,
+      prefKey: SpotlightTourController.consumerTourKey,
+      force: force,
+    );
   }
 
   Future<void> _loadUserPosition() async {
@@ -119,6 +151,8 @@ class _HomeScreenState extends State<HomeScreen>
               displayCity: _displayCity,
               onLocationTap: () => _showAddressPicker(context),
               unreadMessagesStream: _unreadCountStream,
+              searchBarKey: _searchBarKey,
+              cartActionKey: _cartActionKey,
             ),
             if (AuthService().isSeller)
               SliverToBoxAdapter(
@@ -133,8 +167,18 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 6)),
-            const SliverToBoxAdapter(child: EcomHeroBanner()),
-            const SliverToBoxAdapter(child: EcomQuickChannels()),
+            SliverToBoxAdapter(
+              child: KeyedSubtree(
+                key: _heroBannerKey,
+                child: const EcomHeroBanner(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: KeyedSubtree(
+                key: _quickChannelsKey,
+                child: const EcomQuickChannels(),
+              ),
+            ),
             SliverToBoxAdapter(
               child: FutureBuilder<List<ProductItem>>(
                 future: _flashSaleProductsFuture,
@@ -145,48 +189,51 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  _buildSectionHeader(
-                    'Featured Farmers',
-                    'Map View',
-                    () => context.push(AppRoutes.farmersMap),
-                  ),
-                  _buildFeaturedFarmersList(context),
-                  const SizedBox(height: 16),
-                ],
+              child: KeyedSubtree(
+                key: _featuredFarmersKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    _buildSectionHeader(
+                      'Featured Farmers',
+                      'Map View',
+                      () => context.push(AppRoutes.farmersMap),
+                    ),
+                    _buildFeaturedFarmersList(context),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(2),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'DAILY DISCOVERIES',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: const Color(0xFF0F172A),
+                      const SizedBox(width: 8),
+                      Text(
+                        'DAILY DISCOVERIES',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textHeadline,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () {
-                        SupabaseDataService.navigationTabNotifier.value = 1;
-                      },
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          SupabaseDataService.navigationTabNotifier.value = 1;
+                        },
                       child: Text(
                         'See All',
                         style: GoogleFonts.inter(
@@ -893,9 +940,27 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        context.push(AppRoutes.myDetails);
+                        final newAddr =
+                            await showModalBottomSheet<UserAddress>(
+                          context: context,
+                          isScrollControlled: true,
+                          useRootNavigator: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => const AddressEditorSheet(),
+                        );
+                        if (newAddr != null) {
+                          await UserService().setDefaultAddress(newAddr.addressId);
+                          if (mounted) {
+                            setState(() {
+                              _defaultAddress = newAddr;
+                              _addressLoaded = true;
+                            });
+                          }
+                        } else {
+                          _loadDefaultAddress();
+                        }
                       },
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Add Address'),
@@ -1033,9 +1098,12 @@ class _HomeScreenState extends State<HomeScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    context.push(AppRoutes.addressBook);
+                    await context.push(AppRoutes.addressBook);
+                    if (mounted) {
+                      _loadDefaultAddress();
+                    }
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Manage Addresses'),

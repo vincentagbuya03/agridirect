@@ -7,8 +7,10 @@ import '../../../shared/services/auth/otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/widgets/distinctive_phone_input.dart';
 import 'otp_verification_screen.dart';
 import 'registration_completion_screen.dart';
+import '../../../shared/services/auth/textbee_otp_service.dart';
 
 /// Mobile Registration screen with premium design.
 class RegistrationScreen extends StatefulWidget {
@@ -21,15 +23,31 @@ class RegistrationScreen extends StatefulWidget {
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
+  int _selectedTab = 0; // 0 = Email (Buyer), 1 = Phone Number (Farmer)
+
+  // Email registration state
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isGoogleLoading = false;
 
+  // Phone registration state (Ideal for farmers without email)
+  final _phoneNameController = TextEditingController();
+  final _phonePasswordController = TextEditingController();
+  final _phoneConfirmPasswordController = TextEditingController();
+  String _phoneE164 = '';
+  bool _isPhoneValid = false;
+  bool _obscurePhonePassword = true;
+  bool _obscurePhoneConfirmPassword = true;
+  bool _isPhoneLoading = false;
+
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneNameController.dispose();
+    _phonePasswordController.dispose();
+    _phoneConfirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -156,6 +174,121 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  void _handlePhoneRegister() async {
+    final name = _phoneNameController.text.trim();
+    final password = _phonePasswordController.text.trim();
+    final confirmPassword = _phoneConfirmPasswordController.text.trim();
+
+    if (name.isEmpty) {
+      _showErrorModal('Missing Name', 'Please enter your full name.');
+      return;
+    }
+
+    if (!_isPhoneValid || _phoneE164.isEmpty) {
+      _showErrorModal(
+        'Invalid Mobile Number',
+        'Please enter a valid, active Philippine mobile number (e.g., 0917 123 4567).',
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      _showErrorModal(
+        'Missing Password',
+        'Please create a password or 6-digit PIN.',
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      _showErrorModal(
+        'Password Too Short',
+        'Password must be at least 6 characters or numbers.',
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showErrorModal(
+        'Password Mismatch',
+        'Passwords do not match. Please re-enter.',
+      );
+      return;
+    }
+
+    setState(() => _isPhoneLoading = true);
+
+    try {
+      final userId = await AuthService().registerWithPhone(
+        name: name,
+        phoneNumber: _phoneE164,
+        password: password,
+        autoSignIn: false,
+      );
+
+      if (mounted) {
+        if (userId == null) {
+          setState(() => _isPhoneLoading = false);
+          _showErrorModal(
+            'Registration Failed',
+            AuthService().errorMessage ??
+                'Unable to create account. Please try again.',
+          );
+          return;
+        }
+
+        final digits = _phoneE164.replaceAll('+', '');
+        final syntheticEmail = '$digits@phone.agridirect.ph';
+
+        // Dispatch SMS verification code via TextBee
+        final otpSent = await TextBeeOtpService().sendOtp(
+          phoneNumber: _phoneE164,
+          onSuccess: (code) {
+            debugPrint('✅ TextBee SMS OTP sent for new registration: $_phoneE164');
+          },
+          onError: (err) {
+            debugPrint('⚠️ TextBee SMS OTP dispatch error: $err');
+          },
+        );
+
+        if (!otpSent) {
+          if (mounted) {
+            setState(() => _isPhoneLoading = false);
+            _showErrorModal(
+              'SMS Verification Notice',
+              'Failed to dispatch SMS code to $_phoneE164. Please check your signal or network connection and try again.',
+            );
+          }
+          return;
+        }
+
+        if (mounted) {
+          setState(() => _isPhoneLoading = false);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPVerificationScreen(
+                userId: userId,
+                email: syntheticEmail,
+                phoneNumber: _phoneE164,
+                name: name,
+                password: password,
+                onVerificationSuccess: () {
+                  widget.onRegistrationSuccess();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPhoneLoading = false);
+        _showErrorModal('Error', 'An unexpected error occurred: $e');
+      }
+    }
+  }
+
   Future<bool> _resumeIfAlreadyRegistered({
     required String email,
     required String fallbackName,
@@ -270,22 +403,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
+  void _navigateBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.login);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.login);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  onPressed: _navigateBack,
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               const SizedBox(height: 32),
               Text('Create Account', style: AppTextStyles.headline1),
               const SizedBox(height: 8),
@@ -295,132 +443,356 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   color: AppColors.textSubtle,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
 
-              // Fields Section
-              _buildInputLabel('Full Name'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _nameController,
-                hintText: 'Enter your full name',
-                prefixIcon: Icons.person_outline_rounded,
-              ),
-              const SizedBox(height: 20),
-
-              _buildInputLabel('Email Address'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _emailController,
-                hintText: 'name@example.com',
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 40),
-
-              // Register Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleRegister,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: AppShimmerLoader(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          'Create Account',
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+              // Tab Selector: Email vs Phone Number
+              Container(
+                height: 48,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.grey[200])),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('OR', style: AppTextStyles.labelSmall),
-                  ),
-                  Expanded(child: Divider(color: Colors.grey[200])),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Google Button Only
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton(
-                  onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey[200]!),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    backgroundColor: Colors.white,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_isGoogleLoading)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: AppShimmerLoader(strokeWidth: 2),
-                        )
-                      else ...[
-                        Container(
-                          width: 20,
-                          height: 20,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedTab = 0),
+                        child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: _selectedTab == 0 ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey[300]!),
+                            boxShadow: _selectedTab == 0
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            'G',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF4285F4),
-                              fontSize: 12,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.email_outlined,
+                                size: 16,
+                                color: _selectedTab == 0 ? AppColors.primary : AppColors.textSubtle,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Email',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: _selectedTab == 0 ? FontWeight.bold : FontWeight.w500,
+                                  color: _selectedTab == 0 ? AppColors.primary : AppColors.textSubtle,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Text(
-                            'Continue with Google',
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyMedium.copyWith(
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedTab = 1),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 1 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _selectedTab == 1
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.phone_android_rounded,
+                                size: 16,
+                                color: _selectedTab == 1 ? AppColors.primary : AppColors.textSubtle,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Phone Number',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: _selectedTab == 1 ? FontWeight.bold : FontWeight.w500,
+                                  color: _selectedTab == 1 ? AppColors.primary : AppColors.textSubtle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              if (_selectedTab == 0) ...[
+                // Email Registration Fields
+                _buildInputLabel('Full Name'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _nameController,
+                  hintText: 'Enter your full name',
+                  prefixIcon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 20),
+
+                _buildInputLabel('Email Address'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _emailController,
+                  hintText: 'name@example.com',
+                  prefixIcon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+
+                const SizedBox(height: 32),
+
+                // Register Button (Email)
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleRegister,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: AppShimmerLoader(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Create Account',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: Colors.white,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textHeadline,
                             ),
                           ),
-                        ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[200])),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('OR', style: AppTextStyles.labelSmall),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[200])),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Google Button Only
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey[200]!),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      backgroundColor: Colors.white,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isGoogleLoading)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: AppShimmerLoader(strokeWidth: 2),
+                          )
+                        else ...[
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'G',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF4285F4),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              'Continue with Google',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textHeadline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Phone / Farmer Registration Fields
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.phone_android_rounded, color: AppColors.primary, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Sign up quickly using your mobile phone number. No email or Gmail account required!',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+
+                _buildInputLabel('Full Name'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _phoneNameController,
+                  hintText: 'e.g. Juan dela Cruz',
+                  prefixIcon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 18),
+
+                _buildInputLabel('Philippine Mobile Number'),
+                const SizedBox(height: 8),
+                DistinctivePhoneInput(
+                  label: 'Mobile Number',
+                  helperText: 'Enter your 11-digit number (e.g., 0917 123 4567)',
+                  onChanged: (formattedE164, isValidAndUnique) {
+                    setState(() {
+                      _phoneE164 = formattedE164;
+                      _isPhoneValid = isValidAndUnique;
+                    });
+                  },
+                ),
+                const SizedBox(height: 18),
+
+                _buildInputLabel('Password / 6-Digit PIN'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _phonePasswordController,
+                  hintText: 'Create a password or 6-digit PIN',
+                  prefixIcon: Icons.lock_outline_rounded,
+                  obscureText: _obscurePhonePassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePhonePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 19,
+                      color: AppColors.textSubtle,
+                    ),
+                    onPressed: () => setState(
+                      () => _obscurePhonePassword = !_obscurePhonePassword,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                _buildInputLabel('Confirm Password / PIN'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _phoneConfirmPasswordController,
+                  hintText: 'Re-enter your password or PIN',
+                  prefixIcon: Icons.lock_outline_rounded,
+                  obscureText: _obscurePhoneConfirmPassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePhoneConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 19,
+                      color: AppColors.textSubtle,
+                    ),
+                    onPressed: () => setState(
+                      () => _obscurePhoneConfirmPassword =
+                          !_obscurePhoneConfirmPassword,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Register Button (Phone)
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isPhoneLoading ? null : _handlePhoneRegister,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isPhoneLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: AppShimmerLoader(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Create Account',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 48),
               Row(
@@ -431,7 +803,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: _navigateBack,
                     child: Text(
                       'Sign In',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -447,8 +819,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInputLabel(String text) {
     return Text(
