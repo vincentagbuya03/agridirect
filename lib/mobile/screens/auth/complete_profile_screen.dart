@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/textbee_otp_service.dart';
 import '../../../shared/widgets/distinctive_phone_input.dart';
 import '../../../shared/localization/farmer_locale_service.dart';
 import '../../../shared/styles/farmer_theme.dart';
 import '../../../shared/widgets/farmer/farmer_button.dart';
 import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
+import '../../../shared/widgets/phone_otp_verification_dialog.dart';
 
 /// Screen shown to new users to complete their profile with a 2-step flow:
 /// Step 1: Distinctive Phone Input (with duplicate check)
@@ -30,6 +32,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   int _currentStep = 0;
   String _verifiedPhone = '';
   bool _isPhoneVerified = false;
+  bool _isPhoneOtpVerified = false;
+  String _otpVerifiedPhoneNumber = '';
+  bool _isSendingOtp = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
@@ -43,7 +48,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     super.dispose();
   }
 
-  void _goToPasswordStep() {
+  Future<void> _goToPasswordStep() async {
     final rawInput = (_verifiedPhone.isNotEmpty ? _verifiedPhone : _phoneController.text).trim();
     final cleanDigits = rawInput.replaceAll(RegExp(r'[^\d]'), '');
     final nationalDigits = cleanDigits.startsWith('63')
@@ -83,12 +88,67 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       return;
     }
 
-    setState(() => _currentStep = 1);
-    _pageController.animateToPage(
-      1,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubic,
+    // If already verified via SMS OTP for this exact phone number, advance
+    if (_isPhoneOtpVerified && _otpVerifiedPhoneNumber == _verifiedPhone) {
+      setState(() => _currentStep = 1);
+      _pageController.animateToPage(
+        1,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+      );
+      return;
+    }
+
+    // Dispatch SMS OTP verification
+    setState(() => _isSendingOtp = true);
+
+    final sent = await TextBeeOtpService().sendOtp(
+      phoneNumber: _verifiedPhone,
+      onSuccess: (code) {
+        debugPrint(
+          '✅ TextBee SMS OTP dispatched for mobile complete profile: $_verifiedPhone',
+        );
+      },
+      onError: (err) {
+        debugPrint('⚠️ TextBee SMS OTP error: $err');
+      },
     );
+
+    if (!mounted) return;
+    setState(() => _isSendingOtp = false);
+
+    if (!sent) {
+      _showErrorModal(
+        'SMS Service Notice',
+        'Failed to dispatch SMS verification code to $_verifiedPhone. Please check your signal and try again.',
+      );
+      return;
+    }
+
+    // Show Phone OTP Verification Dialog
+    final verified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PhoneOtpVerificationDialog(
+        phoneNumber: _verifiedPhone,
+        title: 'Verify Phone Number',
+        subtitle:
+            'Enter the 6-digit SMS code sent to your phone to verify your number before setting your password.',
+      ),
+    );
+
+    if (verified == true && mounted) {
+      setState(() {
+        _isPhoneOtpVerified = true;
+        _otpVerifiedPhoneNumber = _verifiedPhone;
+        _currentStep = 1;
+      });
+      _pageController.animateToPage(
+        1,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   void _goToPhoneStep() {
@@ -376,6 +436,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 setState(() {
                   _verifiedPhone = formattedE164;
                   _isPhoneVerified = isValidAndUnique;
+                  if (_verifiedPhone != _otpVerifiedPhoneNumber) {
+                    _isPhoneOtpVerified = false;
+                  }
                 });
               }
             },
@@ -383,12 +446,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
           const SizedBox(height: 24),
 
-          // Save & Continue Button (56px FarmerButton)
+          // Save & Continue / Verify with SMS OTP Button (56px FarmerButton)
           FarmerButton(
-            label: locale.isFilipino
-                ? 'I-save at Magpatuloy'
-                : 'Save & Continue',
-            icon: Icons.arrow_forward_rounded,
+            label: _isPhoneOtpVerified
+                ? (locale.isFilipino ? 'I-save at Magpatuloy' : 'Save & Continue')
+                : (locale.isFilipino
+                    ? 'I-verify gamit ang SMS OTP'
+                    : 'Verify with SMS OTP'),
+            icon: _isPhoneOtpVerified
+                ? Icons.arrow_forward_rounded
+                : Icons.sms_rounded,
+            isLoading: _isSendingOtp,
             height: 56,
             onPressed: _goToPasswordStep,
           ),

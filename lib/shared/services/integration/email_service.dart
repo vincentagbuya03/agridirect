@@ -31,13 +31,16 @@ class EmailService {
     final configured = dotenv.env['WEB_EMAIL_API_BASE']?.trim() ?? '';
     if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
 
-    final currentOrigin = Uri.base.origin;
     final host = Uri.base.host.toLowerCase();
-    if (host != 'localhost' && host != '127.0.0.1' && host != '::1') {
-      return currentOrigin;
+    if (host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host == 'agridirect.site' ||
+        host == 'www.agridirect.site') {
+      return 'https://www.agridirect.site';
     }
 
-    return 'https://www.agridirect.site';
+    return Uri.base.origin;
   }
 
   static Future<bool> _sendEmailViaWebApi({
@@ -106,9 +109,11 @@ class EmailService {
     required String code,
   }) async {
     if (kIsWeb) {
-      // PasswordResetService already calls its own endpoint directly,
-      // but this fallback keeps Web email API dispatch robust.
-      return _sendEmailViaWebApi(email: email, type: 'otp', otpCode: code);
+      return _sendEmailViaWebApi(
+        email: email,
+        type: 'password_reset',
+        otpCode: code,
+      );
     }
 
     try {

@@ -48,6 +48,7 @@ import '../../web/screens/auth/web_farmer_registration_screen.dart';
 import '../../web/screens/auth/web_auth_callback_screen.dart';
 import '../../web/screens/auth/web_password_reset_screen.dart';
 import '../../web/screens/auth/web_password_reset_with_code_screen.dart';
+import '../../web/screens/auth/web_complete_profile_screen.dart';
 import '../../web/screens/consumer/web_cart_screen.dart';
 import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
@@ -1003,11 +1004,21 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // â”€â”€ Google Complete Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Google / Profile Completion ──────────────────────────────────────────
       GoRoute(
         path: AppRoutes.completeProfile,
-        builder: (context, state) =>
-            CompleteProfileScreen(onComplete: () => context.go(AppRoutes.home)),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (kIsWeb || constraints.maxWidth > 800) {
+              return WebCompleteProfileScreen(
+                onComplete: () => context.go(AppRoutes.home),
+              );
+            }
+            return CompleteProfileScreen(
+              onComplete: () => context.go(AppRoutes.home),
+            );
+          },
+        ),
       ),
 
       // â”€â”€ Farmer Registration (mobile) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

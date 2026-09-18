@@ -11,14 +11,25 @@ const allowedOrigins = new Set([
   'https://www.agridirect.site',
 ]);
 
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+  if (origin.endsWith('agridirect.site')) return true;
+  if (/^https:\/\/([a-z0-9-]+)\.vercel\.app$/.test(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader(
     'Access-Control-Allow-Origin',
-    origin && allowedOrigins.has(origin) ? origin : 'https://www.agridirect.site',
+    origin && isOriginAllowed(origin) ? origin : '*',
   );
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, Accept, X-Requested-With, Origin',
+  );
 }
 
 function normalizeEmail(value) {
@@ -199,11 +210,16 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
-    if (type !== 'otp' && type !== 'alert' && type !== 'resolution') {
+    if (
+      type !== 'otp' &&
+      type !== 'password_reset' &&
+      type !== 'alert' &&
+      type !== 'resolution'
+    ) {
       return res.status(400).json({ error: 'Invalid email type requested.' });
     }
 
-    if (type === 'otp' && (!otpCode || otpCode.length < 4)) {
+    if ((type === 'otp' || type === 'password_reset') && (!otpCode || otpCode.length < 4)) {
       return res.status(400).json({ error: 'A valid OTP code is required.' });
     }
 
@@ -224,9 +240,18 @@ module.exports = async function handler(req, res) {
     let toEmail = email;
     let replyTo = undefined;
 
-    if (type === 'otp') {
-      subject = 'AgriDirect: Account Verification Code';
-      html = buildHtmlTemplate(otpCode, 'verify your account');
+    const isReset =
+      type === 'password_reset' ||
+      (subjectLine && subjectLine.toLowerCase().includes('reset'));
+
+    if (type === 'otp' || type === 'password_reset') {
+      subject = isReset
+          ? 'AgriDirect: Password Reset Request'
+          : 'AgriDirect: Account Verification Code';
+      html = buildHtmlTemplate(
+        otpCode,
+        isReset ? 'reset your password' : 'verify your account',
+      );
     } else if (type === 'alert') {
       subject = 'AgriDirect: Your Password Was Changed';
       html = buildPasswordChangedTemplate();

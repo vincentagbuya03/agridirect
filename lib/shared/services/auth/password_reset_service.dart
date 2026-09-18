@@ -1,8 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 import 'otp_service.dart';
 import 'textbee_otp_service.dart';
 import 'auth_service.dart';
@@ -128,62 +124,6 @@ class PasswordResetService {
     await _client.auth.resetPasswordForEmail(normalizedEmail);
   }
 
-  static String get _webEmailApiBase {
-    final configured = dotenv.env['WEB_EMAIL_API_BASE']?.trim() ?? '';
-    if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
-
-    final currentOrigin = Uri.base.origin;
-    final host = Uri.base.host.toLowerCase();
-    final isLocalhost = host == 'localhost' || host == '127.0.0.1';
-    if (isLocalhost) {
-      return 'http://localhost:3000';
-    }
-
-    return currentOrigin;
-  }
-
-  static Future<void> _sendResetCodeViaWebApi(String normalizedEmail) async {
-    final baseUrl = _webEmailApiBase;
-    final endpoint = Uri.parse('$baseUrl/api/auth/send-email');
-
-    try {
-      final response = await http
-          .post(
-            endpoint,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'email': normalizedEmail,
-              'type': 'password_reset',
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return;
-      }
-
-      String message = 'Failed to send password reset code via web service.';
-      try {
-        final body = jsonDecode(response.body);
-        if (body is Map && body['error'] is String) {
-          message = body['error'] as String;
-        }
-      } catch (_) {}
-
-      throw message;
-    } catch (e) {
-      debugPrint('[PasswordResetService] Error sending reset code via web API: $e');
-      final message = e.toString().toLowerCase();
-      if (message.contains('failed to fetch') ||
-          message.contains('xmlhttprequest') ||
-          message.contains('clientexception')) {
-        throw 'Password reset email service is not reachable. Please deploy the web email API or check its environment variables.';
-      }
-
-      throw 'Unable to send password reset email right now. Please try again later or contact support.';
-    }
-  }
-
   /// Send a 6-digit password reset code to user's email or mobile number
   static Future<PasswordResetDeliveryMode> sendResetCode(String identifier) async {
     try {
@@ -232,28 +172,34 @@ class PasswordResetService {
       final normalizedEmail = _normalizeEmail(clean);
       final userId = await _findUserIdByIdentifier(normalizedEmail);
 
-      if (kIsWeb) {
-        await _sendResetCodeViaWebApi(normalizedEmail);
-        return PasswordResetDeliveryMode.code;
-      }
-
-      // If users/profile row is missing, still allow Supabase recovery email.
+      // If user row is missing in public table, seamlessly dispatch Supabase recovery email.
       if (userId == null) {
+        debugPrint(
+          '[PasswordResetService] No user profile in public table for $normalizedEmail, sending Supabase recovery email',
+        );
         await _sendRecoveryEmailWithFallback(normalizedEmail: normalizedEmail);
         return PasswordResetDeliveryMode.recoveryLink;
       }
 
+      // If user profile exists, generate/retrieve 6-digit OTP code in database.
       final code = await _getOrCreatePasswordResetCode(userId);
 
-      // 3. Send via Gmail SMTP
-      final sent = await EmailService.sendPasswordResetCode(
-        email: normalizedEmail,
-        code: code,
-      );
+      // Attempt to send 6-digit code via EmailService (Web API on Web, Gmail SMTP on Mobile)
+      bool sent = false;
+      try {
+        sent = await EmailService.sendPasswordResetCode(
+          email: normalizedEmail,
+          code: code,
+        );
+      } catch (e) {
+        debugPrint('[PasswordResetService] Custom code email dispatch error: $e');
+        sent = false;
+      }
 
+      // If custom code dispatch failed or is unreachable, seamlessly fallback to Supabase recovery email
       if (!sent) {
         debugPrint(
-          '[PasswordResetService] Password reset code email failed, falling back to recovery link for $normalizedEmail',
+          '[PasswordResetService] Custom code dispatch failed or unreachable, falling back to Supabase recovery email for $normalizedEmail',
         );
         await _sendRecoveryEmailWithFallback(normalizedEmail: normalizedEmail);
         return PasswordResetDeliveryMode.recoveryLink;

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/textbee_otp_service.dart';
 import '../../../shared/services/integration/email_service.dart';
 import '../../../shared/services/auth/otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
@@ -305,21 +306,63 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     try {
       // Phone-only registration for farmers without email
       if (!hasEmail && hasPhone) {
+        final formattedPhone = TextBeeOtpService.formatE164(phone);
         final userId = await AuthService().registerWithPhone(
           name: name,
-          phoneNumber: phone,
+          phoneNumber: formattedPhone,
           password: password,
+          autoSignIn: false,
         );
 
-        if (mounted) {
+        if (!mounted) return;
+
+        if (userId == null) {
           setState(() => _registerLoading = false);
-          if (userId != null) {
-            _showSnackBar('Registration successful! Welcome to AgriDirect.');
-            widget.onLoginSuccess();
-          } else {
-            _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
-          }
+          _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
+          return;
         }
+
+        final digits = formattedPhone.replaceAll('+', '');
+        final syntheticEmail = '$digits@phone.agridirect.ph';
+
+        final otpSent = await TextBeeOtpService().sendOtp(
+          phoneNumber: formattedPhone,
+          onSuccess: (code) {
+            debugPrint(
+              '✅ TextBee SMS OTP dispatched for web login register: $formattedPhone',
+            );
+          },
+          onError: (err) {
+            debugPrint('⚠️ TextBee SMS OTP error: $err');
+          },
+        );
+
+        if (!mounted) return;
+        setState(() => _registerLoading = false);
+
+        if (!otpSent) {
+          _showSnackBar(
+            'Failed to send SMS verification code. Please check your network and try again.',
+          );
+          return;
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WebOTPVerificationScreen(
+              userId: userId,
+              email: syntheticEmail,
+              phoneNumber: formattedPhone,
+              name: name,
+              password: password,
+              onVerificationSuccess: () {
+                _showSnackBar('Verified! Welcome to AgriDirect.');
+                widget.onLoginSuccess();
+              },
+            ),
+          ),
+        );
         return;
       }
 

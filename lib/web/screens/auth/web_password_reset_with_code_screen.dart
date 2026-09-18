@@ -28,6 +28,7 @@ class _WebPasswordResetWithCodeScreenState
   bool _codeSent = false;
   bool _codeVerified = false;
   bool _resetSuccess = false;
+  bool _recoveryLinkSent = false;
   String? _feedbackMessage;
   bool _feedbackIsError = false;
 
@@ -83,16 +84,8 @@ class _WebPasswordResetWithCodeScreenState
       } else {
         setState(() {
           _isLoading = false;
-          _resetSuccess = true;
+          _recoveryLinkSent = true;
         });
-        _setFeedback(
-          'We sent a secure reset link to your email. Check your inbox to continue.',
-          isError: false,
-        );
-
-        await Future.delayed(const Duration(seconds: 2));
-        if (!mounted) return;
-        context.go(AppRoutes.login);
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -234,7 +227,9 @@ class _WebPasswordResetWithCodeScreenState
                         ),
                       ],
                     ),
-                    child: _resetSuccess
+                    child: _recoveryLinkSent
+                        ? _buildRecoveryLinkSentView()
+                        : _resetSuccess
                         ? _buildSuccessView()
                         : _codeVerified
                         ? _buildCreatePasswordForm()
@@ -429,6 +424,112 @@ class _WebPasswordResetWithCodeScreenState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecoveryLinkSentView() {
+    final identifier = _emailController.text.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.mark_email_read_rounded,
+            color: _primary,
+            size: 44,
+          ),
+        ),
+        const SizedBox(height: 28),
+        Text(
+          'Check Your Email',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: GoogleFonts.inter(
+              fontSize: 14.5,
+              color: _mutedDark,
+              height: 1.5,
+            ),
+            children: [
+              const TextSpan(
+                text: 'We sent a secure password reset link to:\n',
+              ),
+              TextSpan(
+                text: identifier,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: _primary,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Click the reset link in your email to choose a new password. If you don\'t see the email, please check your spam folder.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF166534),
+                    height: 1.45,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () => context.go(AppRoutes.login),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Back to Login',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
           ),
         ),
       ],
