@@ -226,6 +226,24 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             .from('uploads')
             .getPublicUrl(path);
 
+        final userId = AuthService().userId;
+        if (userId.isNotEmpty) {
+          try {
+            await SupabaseConfig.client
+                .from('users')
+                .update({'avatar_url': publicUrl})
+                .eq('user_id', userId);
+            if (AuthService().isViewingAsFarmer) {
+              await SupabaseConfig.client
+                  .from('farmers')
+                  .update({'logo_url': publicUrl})
+                  .eq('user_id', userId);
+            }
+          } catch (dbErr) {
+            debugPrint('⚠️ Error syncing uploaded avatar to db: $dbErr');
+          }
+        }
+
         setState(() {
           _avatarUrl = publicUrl;
         });
@@ -330,6 +348,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         };
         if (_coverImageUrl != null && _coverImageUrl!.isNotEmpty) {
           farmerUpdates['cover_url'] = _coverImageUrl;
+        }
+        if (_avatarUrl.isNotEmpty) {
+          farmerUpdates['logo_url'] = _avatarUrl;
         }
         await SupabaseConfig.client
             .from('farmers')
@@ -465,50 +486,58 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             children: [
               Row(
                 children: [
-                  ClipOval(
-                    child: SafeNetworkImage(
-                      imageUrl: profileImageUrl,
-                      defaultBucket: 'uploads',
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                      placeholder: Container(color: Colors.grey[200]),
-                      errorWidget: const Icon(
-                        Icons.person,
-                        size: 22,
-                        color: _muted,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _selectedTab = 0),
+                    child: ClipOval(
+                      child: SafeNetworkImage(
+                        imageUrl: profileImageUrl,
+                        defaultBucket: 'uploads',
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        placeholder: Container(color: Colors.grey[200]),
+                        errorWidget: const Icon(
+                          Icons.person,
+                          size: 22,
+                          color: _muted,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName.isNotEmpty ? displayName : 'User',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _dark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Row(
-                          children: [
-                            const Icon(Icons.edit, size: 11, color: _muted),
-                            const SizedBox(width: 3),
-                            Text(
-                              'Edit Profile',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: _muted,
-                              ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _selectedTab = 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName.isNotEmpty ? displayName : 'User',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
                             ),
-                          ],
-                        ),
-                      ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.edit, size: 11, color: _muted),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Edit Profile',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: _muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   // Mode switch button
@@ -1559,46 +1588,50 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isFarmer ? Colors.amber.shade700 : primary,
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isFarmer ? Colors.amber : primary).withValues(
-                      alpha: 0.15,
-                    ),
-                    blurRadius: 16,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _isUploadingAvatar ? null : _pickAndUploadInlineAvatar,
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isFarmer ? Colors.amber.shade700 : primary,
+                    width: 3,
                   ),
-                ],
-              ),
-              child: ClipOval(
-                child: _isUploadingAvatar
-                    ? Container(
-                        color: Colors.grey[200],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: isFarmer ? Colors.amber.shade800 : primary,
-                            strokeWidth: 3,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isFarmer ? Colors.amber : primary).withValues(
+                        alpha: 0.15,
+                      ),
+                      blurRadius: 16,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: _isUploadingAvatar
+                      ? Container(
+                          color: Colors.grey[200],
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: isFarmer ? Colors.amber.shade800 : primary,
+                              strokeWidth: 3,
+                            ),
+                          ),
+                        )
+                      : SafeNetworkImage(
+                          imageUrl: _avatarUrl,
+                          defaultBucket: 'uploads',
+                          fit: BoxFit.cover,
+                          placeholder: Container(color: Colors.grey[200]),
+                          errorWidget: Icon(
+                            isFarmer ? Icons.storefront : Icons.person,
+                            size: 40,
+                            color: _muted,
                           ),
                         ),
-                      )
-                    : SafeNetworkImage(
-                        imageUrl: _avatarUrl,
-                        defaultBucket: 'uploads',
-                        fit: BoxFit.cover,
-                        placeholder: Container(color: Colors.grey[200]),
-                        errorWidget: Icon(
-                          isFarmer ? Icons.storefront : Icons.person,
-                          size: 40,
-                          color: _muted,
-                        ),
-                      ),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -1632,41 +1665,45 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                width: 160,
-                height: 90,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.shade700, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: _isUploadingCover
-                      ? Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.amber,
-                              strokeWidth: 3,
-                            ),
-                          ),
-                        )
-                      : SafeNetworkImage(
-                          imageUrl: _coverImageUrl,
-                          defaultBucket: 'uploads',
-                          fit: BoxFit.cover,
-                          placeholder: Container(color: Colors.grey[200]),
-                          errorWidget: Container(
-                            color: const Color(0xFF003822),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _isUploadingCover ? null : _pickAndUploadInlineCover,
+                child: Container(
+                  width: 160,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade700, width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _isUploadingCover
+                        ? Container(
+                            color: Colors.grey[200],
                             child: const Center(
-                              child: Icon(
-                                Icons.landscape_rounded,
-                                color: Colors.white38,
-                                size: 28,
+                              child: CircularProgressIndicator(
+                                color: Colors.amber,
+                                strokeWidth: 3,
+                              ),
+                            ),
+                          )
+                        : SafeNetworkImage(
+                            imageUrl: _coverImageUrl,
+                            defaultBucket: 'uploads',
+                            fit: BoxFit.cover,
+                            placeholder: Container(color: Colors.grey[200]),
+                            errorWidget: Container(
+                              color: const Color(0xFF003822),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.landscape_rounded,
+                                  color: Colors.white38,
+                                  size: 28,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1720,40 +1757,64 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           controller: _phoneController,
           icon: Icons.phone_outlined,
         ),
-        _buildInlineEditRow(
-          label: 'Registered Email',
-          controller: _emailController,
-          icon: Icons.mail_outline,
-          readOnly: true,
-          badge: 'Farmer Verified',
-        ),
+        Builder(builder: (context) {
+          final isPhoneOnly = _emailController.text.toLowerCase().endsWith('@phone.agridirect.ph');
+          return _buildInlineEditRow(
+            label: isPhoneOnly ? 'Personal Email' : 'Registered Email',
+            controller: isPhoneOnly
+                ? TextEditingController(text: 'No email linked')
+                : _emailController,
+            icon: Icons.mail_outline,
+            readOnly: true,
+            badge: isPhoneOnly ? null : 'Farmer Verified',
+            suffixWidget: TextButton(
+              onPressed: () async {
+                final res = await context.push(AppRoutes.updateEmail);
+                if (res == true && mounted) _refreshProfile();
+              },
+              child: Text(
+                isPhoneOnly ? 'Add Email' : 'Change',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: primary,
+                ),
+              ),
+            ),
+          );
+        }),
       ] else ...[
         _buildInlineEditRow(
           label: 'Full Name',
           controller: _nameController,
           icon: Icons.person_outline,
         ),
-        _buildInlineEditRow(
-          label: 'Email Address',
-          controller: _emailController,
-          icon: Icons.mail_outline,
-          readOnly: true,
-          badge: 'Verified',
-          suffixWidget: TextButton(
-            onPressed: () async {
-              final res = await context.push(AppRoutes.updateEmail);
-              if (res == true && mounted) _refreshProfile();
-            },
-            child: const Text(
-              'Change',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: primary,
+        Builder(builder: (context) {
+          final isPhoneOnly = _emailController.text.toLowerCase().endsWith('@phone.agridirect.ph');
+          return _buildInlineEditRow(
+            label: 'Email Address',
+            controller: isPhoneOnly
+                ? TextEditingController(text: 'No email linked')
+                : _emailController,
+            icon: Icons.mail_outline,
+            readOnly: true,
+            badge: isPhoneOnly ? null : 'Verified',
+            suffixWidget: TextButton(
+              onPressed: () async {
+                final res = await context.push(AppRoutes.updateEmail);
+                if (res == true && mounted) _refreshProfile();
+              },
+              child: Text(
+                isPhoneOnly ? 'Add Email' : 'Change',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: primary,
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        }),
         _buildInlineEditRow(
           label: 'Contact Number',
           controller: _phoneController,
@@ -1834,54 +1895,64 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       ),
                     ),
                   ),
-                  _buildInlineEditRow(
-                    label: 'Registered Email',
-                    controller: _emailController,
-                    icon: Icons.mail_outline,
-                    readOnly: true,
-                    badge: 'Farmer Verified',
-                    suffixWidget: TextButton(
-                      onPressed: () async {
-                        final res = await context.push(AppRoutes.updateEmail);
-                        if (res == true && mounted) _refreshProfile();
-                      },
-                      child: const Text(
-                        'Change',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: primary,
+                  Builder(builder: (context) {
+                    final isPhoneOnly = _emailController.text.toLowerCase().endsWith('@phone.agridirect.ph');
+                    return _buildInlineEditRow(
+                      label: isPhoneOnly ? 'Personal Email' : 'Registered Email',
+                      controller: isPhoneOnly
+                          ? TextEditingController(text: 'No email linked')
+                          : _emailController,
+                      icon: Icons.mail_outline,
+                      readOnly: true,
+                      badge: isPhoneOnly ? null : 'Farmer Verified',
+                      suffixWidget: TextButton(
+                        onPressed: () async {
+                          final res = await context.push(AppRoutes.updateEmail);
+                          if (res == true && mounted) _refreshProfile();
+                        },
+                        child: Text(
+                          isPhoneOnly ? 'Add Email' : 'Change',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: primary,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ] else ...[
                   _buildInlineEditRow(
                     label: 'Full Name',
                     controller: _nameController,
                     icon: Icons.person_outline,
                   ),
-                  _buildInlineEditRow(
-                    label: 'Email Address',
-                    controller: _emailController,
-                    icon: Icons.mail_outline,
-                    readOnly: true,
-                    badge: 'Verified',
-                    suffixWidget: TextButton(
-                      onPressed: () async {
-                        final res = await context.push(AppRoutes.updateEmail);
-                        if (res == true && mounted) _refreshProfile();
-                      },
-                      child: const Text(
-                        'Change',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: primary,
+                  Builder(builder: (context) {
+                    final isPhoneOnly = _emailController.text.toLowerCase().endsWith('@phone.agridirect.ph');
+                    return _buildInlineEditRow(
+                      label: 'Email Address',
+                      controller: isPhoneOnly
+                          ? TextEditingController(text: 'No email linked')
+                          : _emailController,
+                      icon: Icons.mail_outline,
+                      readOnly: true,
+                      badge: isPhoneOnly ? null : 'Verified',
+                      suffixWidget: TextButton(
+                        onPressed: () async {
+                          final res = await context.push(AppRoutes.updateEmail);
+                          if (res == true && mounted) _refreshProfile();
+                        },
+                        child: Text(
+                          isPhoneOnly ? 'Add Email' : 'Change',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: primary,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   _buildInlineEditRow(
                     label: 'Contact Number',
                     controller: _phoneController,

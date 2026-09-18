@@ -414,6 +414,512 @@ class FarmerStrings {
       'en': 'No mobile number',
       'fil': 'Walang numero ng mobile',
     },
+
+    // ─── Product Catalog & Inventory ───
+    'my_inventory': {
+      'en': 'MY INVENTORY',
+      'fil': 'AKING INBENTARYO',
+    },
+    'product_catalog': {
+      'en': 'Product Catalog',
+      'fil': 'Katalogo ng Paninda',
+    },
+    'items_count': {
+      'en': 'Items',
+      'fil': 'Paninda',
+    },
+    'search_products_hint': {
+      'en': 'Search products or crop name...',
+      'fil': 'Maghanap ng paninda o pangalan ng ani...',
+    },
+    'filter_all_produce': {
+      'en': 'All Produce',
+      'fil': 'Lahat ng Paninda',
+    },
+    'filter_preorders': {
+      'en': '🌱 Pre-orders',
+      'fil': '🌱 Paunang Order',
+    },
+    'filter_standard_stock': {
+      'en': '📦 Standard Stock',
+      'fil': '📦 Karaniwang Stock',
+    },
+    'filter_in_stock': {
+      'en': '✅ In Stock',
+      'fil': '✅ May Stock',
+    },
+    'filter_low_stock': {
+      'en': '⚠️ Low Stock',
+      'fil': '⚠️ Kakaunti ang Stock',
+    },
+    'filter_out_of_stock': {
+      'en': '❌ Out of Stock',
+      'fil': '❌ Ubos Na',
+    },
+    'status_in_stock': {
+      'en': 'IN STOCK',
+      'fil': 'MAY STOCK',
+    },
+    'status_low_stock': {
+      'en': 'LOW STOCK',
+      'fil': 'KAKAUNTI ANG STOCK',
+    },
+    'status_sold_out': {
+      'en': 'SOLD OUT',
+      'fil': 'UBOS NA',
+    },
+    'status_preorder': {
+      'en': 'PRE-ORDER',
+      'fil': 'PAUNANG ORDER',
+    },
+    'status_pending_sync': {
+      'en': 'PENDING SYNC',
+      'fil': 'NAGHIHINTAY I-SYNC',
+    },
+    'ready_now': {
+      'en': 'Ready Now',
+      'fil': 'Handa Na',
+    },
+    'manage_btn': {
+      'en': 'Manage',
+      'fil': 'Pamahalaan',
+    },
+    'post_update_btn': {
+      'en': 'Post Update',
+      'fil': 'Mag-post ng Update',
+    },
+    'list_product_btn': {
+      'en': 'LIST PRODUCT',
+      'fil': 'MAGTINDA',
+    },
+    'add_first_product': {
+      'en': 'Add Your First Product',
+      'fil': 'Magdagdag ng Unang Paninda',
+    },
+    'empty_inventory_title': {
+      'en': 'Empty Inventory',
+      'fil': 'Walang Nakalistang Paninda',
+    },
+    'empty_inventory_sub': {
+      'en': 'Start listing your agricultural products to reach buyers.',
+      'fil': 'Simulang ilista ang iyong mga ani upang maabot ang mga mamimili.',
+    },
+    'no_results_title': {
+      'en': 'No Results Found',
+      'fil': 'Walang Nahanap na Paninda',
+    },
+    'filter_catalog_title': {
+      'en': 'Filter Catalog',
+      'fil': 'Salain ang Katalogo',
+    },
+    'listing_type_label': {
+      'en': 'Listing Type',
+      'fil': 'Uri ng Paninda',
+    },
+    'stock_status_label': {
+      'en': 'Stock Status',
+      'fil': 'Katayuan ng Stock',
+    },
+    'reset_filters': {
+      'en': 'Reset',
+      'fil': 'I-reset',
+    },
+    'apply_filters': {
+      'en': 'Apply Filters',
+      'fil': 'Ilapat ang Filter',
+    },
+
+    // ─── Add & Edit Product ───
+    'add_product_title': {
+      'en': 'Add New Product',
+      'fil': 'Magdagdag ng Paninda',
+    },
+    'edit_product_title': {
+      'en': 'Edit Product',
+      'fil': 'Baguhin ang Paninda',
+    },
+    'add_product_subtitle': {
+      'en': 'List fresh produce to the marketplace',
+      'fil': 'Magtinda ng sariwang ani sa pamilihan',
+    },
+    'edit_product_subtitle': {
+      'en': 'Update listing details & pricing',
+      'fil': 'Baguhin ang detalye at presyo ng paninda',
+    },
+    'online_status': {
+      'en': 'Online',
+      'fil': 'Online',
+    },
+    'offline_status': {
+      'en': 'Offline',
+      'fil': 'Offline',
+    },
+    'product_photos_title': {
+      'en': 'Product Photos',
+      'fil': 'Mga Larawan ng Paninda',
+    },
+    'product_photos_sub': {
+      'en': 'Upload up to 5 clear photos. First photo is the main cover.',
+      'fil': 'Mag-upload ng hanggang 5 malinaw na larawan. Ang unang larawan ang magiging pabalat.',
+    },
+    'upload_photos_box_title': {
+      'en': 'Upload Fresh Produce Photos',
+      'fil': 'Mag-upload ng Larawan ng Ani',
+    },
+    'upload_photos_box_sub': {
+      'en': 'High quality photos increase buyer trust and orders.',
+      'fil': 'Ang malilinaw na larawan ay nagpapataas ng tiwala at order ng mamimili.',
+    },
+    'camera_btn': {
+      'en': 'Camera',
+      'fil': 'Kamera',
+    },
+    'gallery_btn': {
+      'en': 'Gallery',
+      'fil': 'Galerya',
+    },
+    'main_cover_badge': {
+      'en': 'MAIN COVER',
+      'fil': 'PANGUNAHING PABALAT',
+    },
+    'basic_info_title': {
+      'en': 'Basic Information',
+      'fil': 'Pangunahing Impormasyon',
+    },
+    'basic_info_sub': {
+      'en': 'Name your product and choose its marketplace category',
+      'fil': 'Pangalanan ang iyong paninda at piliin ang kategorya nito',
+    },
+    'product_name_label': {
+      'en': 'Product / Crop Name *',
+      'fil': 'Pangalan ng Paninda / Ani *',
+    },
+    'product_name_hint': {
+      'en': 'e.g., Fresh Organic Native Tomatoes',
+      'fil': 'hal., Sariwang Katutubong Kamatis',
+    },
+    'product_category_label': {
+      'en': 'Product Category *',
+      'fil': 'Kategorya ng Paninda *',
+    },
+    'product_category_hint': {
+      'en': 'Select Category',
+      'fil': 'Pumili ng Kategorya',
+    },
+    'product_desc_label': {
+      'en': 'Product Description',
+      'fil': 'Paglalarawan ng Paninda',
+    },
+    'product_desc_hint': {
+      'en': 'Describe your produce, variety, cultivation method, taste...',
+      'fil': 'Ilarawan ang iyong ani, uri, paraan ng pagtatanim, lasa...',
+    },
+    'pricing_inventory_title': {
+      'en': 'Pricing & Inventory',
+      'fil': 'Presyo at Dami ng Stock',
+    },
+    'pricing_inventory_sub': {
+      'en': 'Set fair farm-gate pricing and your available quantity',
+      'fil': 'Itakda ang patas na presyo at magagamit na dami',
+    },
+    'price_per_unit_label': {
+      'en': 'Price per Unit (₱) *',
+      'fil': 'Presyo bawat Sukat (₱) *',
+    },
+    'unit_measure_label': {
+      'en': 'Unit of Measure *',
+      'fil': 'Sukat ng Paninda *',
+    },
+    'unit_measure_hint': {
+      'en': 'Select Unit (e.g. kg, piece)',
+      'fil': 'Pumili ng Sukat (hal. kg, piraso)',
+    },
+    'available_stock_label': {
+      'en': 'Available Stock / Quantity *',
+      'fil': 'Magagamit na Stock / Dami *',
+    },
+    'wholesale_toggle_label': {
+      'en': 'Wholesale Pricing Available?',
+      'fil': 'May Presyong Pakyawan (Wholesale)?',
+    },
+    'wholesale_toggle_sub': {
+      'en': 'Offer discounted rates for bulk orders',
+      'fil': 'Magbigay ng diskwento para sa maramihang order',
+    },
+    'min_wholesale_qty': {
+      'en': 'Min. Wholesale Quantity',
+      'fil': 'Pinakamababang Dami sa Pakyawan',
+    },
+    'wholesale_price_label': {
+      'en': 'Wholesale Price per Unit (₱)',
+      'fil': 'Presyong Pakyawan bawat Sukat (₱)',
+    },
+    'promotions_title': {
+      'en': 'Promotions & Deals',
+      'fil': 'Mga Promo at Diskwento',
+    },
+    'promotions_sub': {
+      'en': 'Attract more buyers with limited-time discounts',
+      'fil': 'Mang-akit ng mamimili gamit ang espesyal na diskwento',
+    },
+    'flash_sale_toggle': {
+      'en': 'Flash Sale / Promo Discount?',
+      'fil': 'Flash Sale o Espesyal na Diskwento?',
+    },
+    'discount_percent_label': {
+      'en': 'Discount Percentage (%)',
+      'fil': 'Porsyento ng Diskwento (%)',
+    },
+    'sale_duration_label': {
+      'en': 'Sale Duration',
+      'fil': 'Tagal ng Promo',
+    },
+    'free_shipping_toggle': {
+      'en': 'Free Delivery Offered?',
+      'fil': 'May Libreng Paghahatid (Delivery)?',
+    },
+    'free_shipping_sub': {
+      'en': 'You absorb delivery fee to encourage bigger orders',
+      'fil': 'Ikaw ang sasagot sa delivery fee para sa mas malaking order',
+    },
+    'farming_details_title': {
+      'en': 'Listing Type & Terms',
+      'fil': 'Uri ng Paninda at Kundisyon',
+    },
+    'farming_details_sub': {
+      'en': 'Choose between immediate stock or pre-order harvest',
+      'fil': 'Pumili sa pagitan ng agarang stock o paunang order bago anihin',
+    },
+    'preorder_toggle_label': {
+      'en': 'Is this a Pre-Order?',
+      'fil': 'Ito ba ay Paunang Order (Pre-Order)?',
+    },
+    'preorder_toggle_sub': {
+      'en': 'Allow buyers to reserve crops before harvest',
+      'fil': 'Pahintulutan ang mamimili na mag-reserve bago ang anihan',
+    },
+    'harvest_days_label': {
+      'en': 'Estimated Days to Harvest *',
+      'fil': 'Tinatayang Araw Bago Anihin *',
+    },
+    'live_preview_title': {
+      'en': 'Live Marketplace Preview',
+      'fil': 'Hitsura sa Pamilihan',
+    },
+    'publish_product_btn': {
+      'en': 'Publish Product',
+      'fil': 'I-tinda ang Produkto',
+    },
+    'save_offline_btn': {
+      'en': 'Save Offline',
+      'fil': 'I-save Offline',
+    },
+    'delete_product_tooltip': {
+      'en': 'Delete Product',
+      'fil': 'Burahin ang Paninda',
+    },
+    'delete_product_confirm_title': {
+      'en': 'Delete Product?',
+      'fil': 'Burahin ang Paninda?',
+    },
+    'delete_product_confirm_body': {
+      'en': 'Are you sure you want to delete this listing? This action cannot be undone.',
+      'fil': 'Sigurado ka bang nais mong burahin ang panindang ito? Hindi na ito maibabalik.',
+    },
+    'delete_btn': {
+      'en': 'Delete',
+      'fil': 'Burahin',
+    },
+
+    // ─── Orders & Order Details ───
+    'orders_page_title': {
+      'en': 'Customer Orders',
+      'fil': 'Mga Order ng Mamimili',
+    },
+    'orders_and_sales': {
+      'en': 'Orders & Sales',
+      'fil': 'Mga Order at Benta',
+    },
+    'orders_page_sub': {
+      'en': 'Track, prepare, and fulfill farm produce orders',
+      'fil': 'Subaybayan, ihanda, at ipadala ang mga order ng ani',
+    },
+    'tab_active_orders': {
+      'en': 'Active',
+      'fil': 'Aktibo',
+    },
+    'tab_completed_orders': {
+      'en': 'Completed',
+      'fil': 'Nakumpleto',
+    },
+    'tab_cancelled_orders': {
+      'en': 'Cancelled',
+      'fil': 'Kinansela',
+    },
+    'tab_active': {
+      'en': 'Active',
+      'fil': 'Aktibo',
+    },
+    'tab_completed': {
+      'en': 'Completed',
+      'fil': 'Nakumpleto',
+    },
+    'tab_cancelled': {
+      'en': 'Cancelled',
+      'fil': 'Kinansela',
+    },
+    'search_orders_hint': {
+      'en': 'Search by Order ID or Buyer name...',
+      'fil': 'Maghanap gamit ang Order ID o pangalan ng mamimili...',
+    },
+    'status_pending': {
+      'en': 'PENDING',
+      'fil': 'NAGHIHINTAY',
+    },
+    'status_confirmed': {
+      'en': 'CONFIRMED',
+      'fil': 'KUMPIRMADO',
+    },
+    'status_processing': {
+      'en': 'PREPARING',
+      'fil': 'INIHAHANDA',
+    },
+    'status_shipped': {
+      'en': 'SHIPPED',
+      'fil': 'IPINADALA',
+    },
+    'status_delivered': {
+      'en': 'DELIVERED',
+      'fil': 'NAIHATID',
+    },
+    'status_ready_pickup': {
+      'en': 'READY FOR PICKUP',
+      'fil': 'HANDA NA PARA SA PICKUP',
+    },
+    'status_picked_up': {
+      'en': 'PICKED UP',
+      'fil': 'NA-PICKUP NA',
+    },
+    'order_placed_on': {
+      'en': 'Placed on',
+      'fil': 'Petsa ng Order:',
+    },
+    'confirm_order_btn': {
+      'en': 'Confirm Order',
+      'fil': 'Kumpirmahin ang Order',
+    },
+    'ship_order_btn': {
+      'en': 'Ship Order',
+      'fil': 'Ipadala ang Order',
+    },
+    'mark_ready_btn': {
+      'en': 'Mark as Ready',
+      'fil': 'Markahan na Handa Na',
+    },
+    'mark_delivered_btn': {
+      'en': 'Mark Delivered',
+      'fil': 'Markahan na Naihatid Na',
+    },
+    'cancel_order_btn': {
+      'en': 'Cancel Order',
+      'fil': 'Kanselahin ang Order',
+    },
+    'view_order_details': {
+      'en': 'View Details',
+      'fil': 'Tingnan ang Detalye',
+    },
+    'customer_info_title': {
+      'en': 'Customer Information',
+      'fil': 'Impormasyon ng Mamimili',
+    },
+    'delivery_address_title': {
+      'en': 'Delivery Address',
+      'fil': 'Address ng Paghahatid',
+    },
+    'order_summary_title': {
+      'en': 'Order Summary',
+      'fil': 'Buod ng Order',
+    },
+    'subtotal_label': {
+      'en': 'Subtotal',
+      'fil': 'Halaga ng Paninda',
+    },
+    'delivery_fee_label': {
+      'en': 'Delivery Fee',
+      'fil': 'Bayad sa Paghahatid',
+    },
+    'total_payment_label': {
+      'en': 'Total Amount',
+      'fil': 'Kabuuang Babayaran',
+    },
+    'payment_method_label': {
+      'en': 'Payment Method',
+      'fil': 'Paraan ng Pagbabayad',
+    },
+
+    // ─── Community Hub ───
+    'community_page_title': {
+      'en': 'Farmer Community',
+      'fil': 'Komunidad ng Magsasaka',
+    },
+    'community_forum_tab': {
+      'en': 'Forum Feed',
+      'fil': 'Usapan sa Komunidad',
+    },
+    'community_articles_tab': {
+      'en': 'Articles & Guides',
+      'fil': 'Mga Gabay at Babasahin',
+    },
+    'share_update_hint': {
+      'en': 'Share a farm update or ask a question...',
+      'fil': 'Magbahagi ng balita sa sakahan o magtanong...',
+    },
+    'create_post_btn': {
+      'en': '+ New Post',
+      'fil': '+ Bagong Post',
+    },
+    'search_community_hint': {
+      'en': 'Search discussions or agricultural topics...',
+      'fil': 'Maghanap ng talakayan o paksang pansakahan...',
+    },
+    'like_action': {
+      'en': 'Like',
+      'fil': 'Gusto',
+    },
+    'comment_action': {
+      'en': 'Comment',
+      'fil': 'Komentaryo',
+    },
+    'share_action': {
+      'en': 'Share',
+      'fil': 'Ibahagi',
+    },
+    'create_post': {
+      'en': 'Create post',
+      'fil': 'Gumawa ng Post',
+    },
+    'public_community_hub': {
+      'en': 'Public Community Hub',
+      'fil': 'Pampublikong Hub ng Komunidad',
+    },
+    'add_to_post': {
+      'en': 'Add to your post',
+      'fil': 'Idagdag sa iyong post',
+    },
+
+    // ─── Web Seller Hub ───
+    'web_seller_hub': {
+      'en': 'SELLER HUB',
+      'fil': 'SENTRO NG MAGSASAKA',
+    },
+    'web_switch_to_buyer': {
+      'en': 'Switch to Buyer Mode',
+      'fil': 'Lumipat sa Pamilihan',
+    },
+    'web_preorders_title': {
+      'en': 'Farm Pre-Orders',
+      'fil': 'Mga Paunang Order sa Sakahan',
+    },
   };
 
   /// Retrieve localized string for [key] in specified [lang] or fallback to English.

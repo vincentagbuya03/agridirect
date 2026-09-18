@@ -891,13 +891,13 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   _buildMicroWeatherMetric(
                     icon: Icons.water_drop_outlined,
                     label: '$humidity%',
-                    sublabel: 'Humidity',
+                    sublabel: locale.s('Humidity', 'Alinsangan'),
                   ),
                   const SizedBox(width: 10),
                   _buildMicroWeatherMetric(
                     icon: Icons.air_rounded,
                     label: '$windSpeed km/h',
-                    sublabel: 'Wind',
+                    sublabel: locale.s('Wind', 'Hangin'),
                   ),
                 ],
               ),
@@ -1576,7 +1576,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   const Icon(Icons.touch_app_rounded, size: 13, color: Color(0xFF34D399)),
                   const SizedBox(width: 5),
                   Text(
-                    '${chartDates.isNotEmpty && _touchedChartIndex! < chartDates.length && chartDates[_touchedChartIndex!].isNotEmpty ? chartDates[_touchedChartIndex!] : chartLabels[_touchedChartIndex!]}: ₱${chartData[_touchedChartIndex!].toStringAsFixed(2)}${chartOrders.isNotEmpty && _touchedChartIndex! < chartOrders.length ? " (${chartOrders[_touchedChartIndex!]} orders)" : ""}',
+                    '${chartDates.isNotEmpty && _touchedChartIndex! < chartDates.length && chartDates[_touchedChartIndex!].isNotEmpty ? chartDates[_touchedChartIndex!] : chartLabels[_touchedChartIndex!]}: ₱${chartData[_touchedChartIndex!].toStringAsFixed(2)}${chartOrders.isNotEmpty && _touchedChartIndex! < chartOrders.length ? " (${chartOrders[_touchedChartIndex!]} ${locale.s("orders", "order")})" : ""}',
                     style: GoogleFonts.inter(
                       color: Colors.white,
                       fontSize: 11,
@@ -1691,6 +1691,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // 6. SPEED DIAL & FLOATING ACTION
   // ===========================================================================
   Widget _buildFloatingSpeedDial() {
+    final locale = FarmerLocaleService.instance;
     return Positioned(
       right: 16,
       bottom: 20,
@@ -1699,7 +1700,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         children: [
           if (_isSpeedDialOpen) ...[
             _buildSpeedDialItem(
-              label: 'Add Produce',
+              label: locale.s('Add Produce', 'Magdagdag ng Ani'),
               icon: Icons.inventory_2_outlined,
               color: AppColors.primary,
               onTap: () {
@@ -1709,7 +1710,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             ),
             const SizedBox(height: 12),
             _buildSpeedDialItem(
-              label: 'New Voucher',
+              label: locale.s('New Voucher', 'Bagong Voucher'),
               icon: Icons.confirmation_number_outlined,
               color: const Color(0xFF7C3AED),
               onTap: () {
@@ -1719,7 +1720,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             ),
             const SizedBox(height: 12),
             _buildSpeedDialItem(
-              label: 'Weather & Radar',
+              label: locale.s('Weather & Radar', 'Panahon at Radar'),
               icon: Icons.cloud_outlined,
               color: const Color(0xFF0D9488),
               onTap: () {
@@ -1729,7 +1730,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             ),
             const SizedBox(height: 12),
             _buildSpeedDialItem(
-              label: 'Consult Weather AI',
+              label: locale.s('Consult Weather AI', 'Kumonsulta sa Weather AI'),
               icon: Icons.auto_awesome_rounded,
               color: const Color(0xFF059669),
               onTap: () {

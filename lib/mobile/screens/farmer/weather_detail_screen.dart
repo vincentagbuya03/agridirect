@@ -7,6 +7,7 @@ import 'weather_map_screen.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../support/kiko_ai_chat_screen.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class WeatherDetailScreen extends StatefulWidget {
   final WeatherData weatherData;
@@ -197,127 +198,194 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     }
   }
 
+  String _localizeStatus(String status, FarmerLocaleService loc) {
+    switch (status) {
+      case 'SAFE':
+        return loc.s('SAFE', 'LIGTAS');
+      case 'OPTIMAL':
+        return loc.s('OPTIMAL', 'PINAKAMAHUSAY');
+      case 'NO NEED':
+        return loc.s('NO NEED', 'HINDI KAILANGAN');
+      case 'LOW':
+        return loc.s('LOW', 'MABABA');
+      case 'CAUTION':
+        return loc.s('CAUTION', 'MAG-INGAT');
+      case 'MODERATE':
+        return loc.s('MODERATE', 'KATAMTAMAN');
+      case 'MEDIUM':
+        return loc.s('MEDIUM', 'KATAMTAMAN');
+      case 'DELAY':
+        return loc.s('DELAY', 'IPAGPALIBAN');
+      case 'UNSAFE':
+        return loc.s('UNSAFE', 'HINDI LIGTAS');
+      case 'HIGH NEED':
+        return loc.s('HIGH NEED', 'KAILANGAN');
+      case 'HIGH':
+        return loc.s('HIGH', 'MATAAS');
+      default:
+        return status;
+    }
+  }
+
+  String _translateDayName(String dayName, FarmerLocaleService loc) {
+    if (!loc.isFilipino) return dayName;
+    switch (dayName.toLowerCase()) {
+      case 'monday':
+      case 'mon':
+        return 'Lunes';
+      case 'tuesday':
+      case 'tue':
+        return 'Martes';
+      case 'wednesday':
+      case 'wed':
+        return 'Miyerkules';
+      case 'thursday':
+      case 'thu':
+        return 'Huwebes';
+      case 'friday':
+      case 'fri':
+        return 'Biyernes';
+      case 'saturday':
+      case 'sat':
+        return 'Sabado';
+      case 'sunday':
+      case 'sun':
+        return 'Linggo';
+      default:
+        return dayName;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final weather = widget.weatherData;
-    final forecast = widget.forecast;
-    final desc = weather.description;
-    final temp = weather.temperature;
-    final feelsLike = weather.feelsLike.toStringAsFixed(0);
-    final humidity = weather.humidity;
-    final wind = weather.windSpeed.toStringAsFixed(1);
-    final location = weather.location;
-    final atmosphereGradient = _getAtmosphereGradient(desc);
-    final kikoAsset = _getKikoMascotAsset(desc, temp, weather.precipitationRate);
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        final weather = widget.weatherData;
+        final forecast = widget.forecast;
+        final desc = weather.description;
+        final temp = weather.temperature;
+        final feelsLike = weather.feelsLike.toStringAsFixed(0);
+        final humidity = weather.humidity;
+        final wind = weather.windSpeed.toStringAsFixed(1);
+        final location = weather.location;
+        final atmosphereGradient = _getAtmosphereGradient(desc);
+        final kikoAsset = _getKikoMascotAsset(desc, temp, weather.precipitationRate);
 
-    // Hourly forecast list for temperature curve (max 7 items)
-    final hourlyItems = (forecast?.forecasts ?? [])
-        .take(7)
-        .toList();
+        // Hourly forecast list for temperature curve (max 7 items)
+        final hourlyItems = (forecast?.forecasts ?? [])
+            .take(7)
+            .toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: Stack(
-        children: [
-          // Dynamic Atmospheric Gradient Background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: atmosphereGradient,
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0.0, 0.45, 1.0],
-              ),
-            ),
-          ),
-
-          // Ambient Background Glow Circles
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
-              ),
-            ),
-          ),
-
-          // Main Scrollable Content
-          SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              color: Colors.white,
-              backgroundColor: const Color(0xFF1E293B),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top Navigation Bar
-                    _buildTopBar(location),
-                    const SizedBox(height: 18),
-
-                    // Atmospheric Hero Header with Kiko Mascot
-                    _buildAtmosphericHero(
-                      temp: temp,
-                      desc: desc,
-                      feelsLike: feelsLike,
-                      wind: wind,
-                      humidity: humidity,
-                      kikoAsset: kikoAsset,
-                    ),
-                    const SizedBox(height: 22),
-
-                    // Next 24 Hours & Temperature Wave Curve Card
-                    if (hourlyItems.isNotEmpty) ...[
-                      _buildHourlyTemperatureCard(hourlyItems),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // 5-Day Horizon Forecast Cards
-                    if (forecast != null && forecast.forecasts.isNotEmpty) ...[
-                      _buildMultiDayHorizonCard(forecast),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // Kiko's Agricultural Advisory Box
-                    _buildKikoAdvisoryCard(
-                      desc: desc,
-                      temp: temp,
-                      humidity: humidity,
-                      wind: weather.windSpeed,
-                      kikoAsset: kikoAsset,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Agronomic Field Intelligence Bento Grid
-                    _buildAgroIntelligenceGrid(
-                      windSpeed: weather.windSpeed,
-                      humidity: humidity.toDouble(),
-                      temperature: temp,
-                      desc: desc,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Live Wind & Rain Radar Launcher
-                    _buildRadarLauncherCard(),
-                    const SizedBox(height: 20),
-
-                    // Consult Kiko AI Bar
-                    _buildConsultAiBar(),
-                  ],
+        return Scaffold(
+          backgroundColor: const Color(0xFF0F172A),
+          body: Stack(
+            children: [
+              // Dynamic Atmospheric Gradient Background
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: atmosphereGradient,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
                 ),
               ),
-            ),
+
+              // Ambient Background Glow Circles
+              Positioned(
+                top: -50,
+                right: -50,
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+
+              // Main Scrollable Content
+              SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  color: Colors.white,
+                  backgroundColor: const Color(0xFF1E293B),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 40),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top Navigation Bar
+                        _buildTopBar(location),
+                        const SizedBox(height: 18),
+
+                        // Atmospheric Hero Header with Kiko Mascot
+                        _buildAtmosphericHero(
+                          temp: temp,
+                          desc: desc,
+                          feelsLike: feelsLike,
+                          wind: wind,
+                          humidity: humidity,
+                          kikoAsset: kikoAsset,
+                          loc: loc,
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Next 24 Hours & Temperature Wave Curve Card
+                        if (hourlyItems.isNotEmpty) ...[
+                          _buildHourlyTemperatureCard(hourlyItems, loc),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // 5-Day Horizon Forecast Cards
+                        if (forecast != null && forecast.forecasts.isNotEmpty) ...[
+                          _buildMultiDayHorizonCard(forecast, loc),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Kiko's Agricultural Advisory Box
+                        _buildKikoAdvisoryCard(
+                          desc: desc,
+                          temp: temp,
+                          humidity: humidity,
+                          wind: weather.windSpeed,
+                          kikoAsset: kikoAsset,
+                          loc: loc,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Agronomic Field Intelligence Bento Grid
+                        _buildAgroIntelligenceGrid(
+                          windSpeed: weather.windSpeed,
+                          humidity: humidity.toDouble(),
+                          temperature: temp,
+                          desc: desc,
+                          loc: loc,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Live Wind & Rain Radar Launcher
+                        _buildRadarLauncherCard(loc),
+                        const SizedBox(height: 20),
+
+                        // Consult Kiko AI Bar
+                        _buildConsultAiBar(loc),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -444,6 +512,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     required String wind,
     required num humidity,
     required String kikoAsset,
+    required FarmerLocaleService loc,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -501,7 +570,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Feels like $feelsLike°C • Wind $wind km/h',
+                      '${loc.s("Feels like", "Pakiramdam")} $feelsLike°C • ${loc.s("Wind", "Hangin")} $wind km/h',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.white70,
@@ -556,11 +625,11 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildHeroStat(Icons.water_drop_outlined, '$humidity%', 'Humidity'),
+                _buildHeroStat(Icons.water_drop_outlined, '$humidity%', loc.s('Humidity', 'Alinsangan')),
                 _buildStatDivider(),
-                _buildHeroStat(Icons.air_rounded, '$wind km/h', 'Wind Speed'),
+                _buildHeroStat(Icons.air_rounded, '$wind km/h', loc.s('Wind Speed', 'Bilis ng Hangin')),
                 _buildStatDivider(),
-                _buildHeroStat(Icons.compress_rounded, '${widget.weatherData.pressure.toStringAsFixed(0)} hPa', 'Pressure'),
+                _buildHeroStat(Icons.compress_rounded, '${widget.weatherData.pressure.toStringAsFixed(0)} hPa', loc.s('Pressure', 'Presyon')),
               ],
             ),
           ),
@@ -604,7 +673,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'Radar',
+                        loc.s('Radar', 'Radar'),
                         style: GoogleFonts.inter(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -663,7 +732,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   // ===========================================================================
   // 3. HOURLY TIMELINE & SMOOTH TEMPERATURE WAVE CURVE
   // ===========================================================================
-  Widget _buildHourlyTemperatureCard(List<ForecastData> items) {
+  Widget _buildHourlyTemperatureCard(List<ForecastData> items, FarmerLocaleService loc) {
     final todayMin = items.map((i) => i.temperature).reduce((a, b) => a < b ? a : b).toStringAsFixed(0);
     final todayMax = items.map((i) => i.temperature).reduce((a, b) => a > b ? a : b).toStringAsFixed(0);
 
@@ -692,7 +761,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Next 24 Hours',
+                        loc.s('Next 24 Hours', 'Susunod na 24 Oras'),
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 14,
@@ -713,7 +782,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Range $todayMin° / $todayMax°',
+                  '${loc.s("Range", "Saklaw")} $todayMin° / $todayMax°',
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 11,
@@ -745,7 +814,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
             children: items.asMap().entries.map((entry) {
               final idx = entry.key;
               final item = entry.value;
-              final timeLabel = idx == 0 ? 'Now' : item.timeString.replaceAll(':00', '');
+              final timeLabel = idx == 0 ? loc.s('Now', 'Ngayon') : item.timeString.replaceAll(':00', '');
               final pop = ((item.rainProbability ?? 0) * 100).toInt();
 
               return Expanded(
@@ -792,7 +861,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   // ===========================================================================
   // 4. MULTI-DAY HORIZON FORECAST CARDS
   // ===========================================================================
-  Widget _buildMultiDayHorizonCard(WeatherForecast forecast) {
+  Widget _buildMultiDayHorizonCard(WeatherForecast forecast, FarmerLocaleService loc) {
     // Group forecast items by distinct day
     final distinctDays = <String, ForecastData>{};
     for (final item in forecast.forecasts) {
@@ -822,7 +891,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                '5-Day Extended Horizon',
+                loc.s('5-Day Extended Horizon', '5-Araw na Pagtataya'),
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 14,
@@ -837,7 +906,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
           ...daysList.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
-            final dayTitle = idx == 0 ? 'Today' : item.dayName;
+            final dayTitle = idx == 0 ? loc.s('Today', 'Ngayon') : _translateDayName(item.dayName, loc);
             final minT = (item.temperature - 2).toStringAsFixed(0);
             final maxT = (item.temperature + 3).toStringAsFixed(0);
             final pop = ((item.rainProbability ?? 0) * 100).toInt();
@@ -945,27 +1014,40 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     required num humidity,
     required double wind,
     required String kikoAsset,
+    required FarmerLocaleService loc,
   }) {
     String kikoSpeech;
     final lower = desc.toLowerCase();
     if (lower.contains('storm') || lower.contains('thunder')) {
-      kikoSpeech =
-          'Moo! ⚡ Thunderstorm & lightning alert! Suspend open field labor immediately, secure loose tools and farm shelters, and ensure drainage canals are clear to prevent waterlogging.';
+      kikoSpeech = loc.s(
+        'Moo! ⚡ Thunderstorm & lightning alert! Suspend open field labor immediately, secure loose tools and farm shelters, and ensure drainage canals are clear to prevent waterlogging.',
+        'Moo! ⚡ Babala sa bagyo at kidlat! Itigil muna ang pagtatrabaho sa bukas na bukid, itali ang mga kagamitan, at siguraduhing maayos ang mga kanal upang maiwasan ang pagbaha.',
+      );
     } else if (lower.contains('rain') || lower.contains('drizzle') || lower.contains('shower')) {
-      kikoSpeech =
-          'Moo! 🌧️ Wet field conditions detected. Delay foliar fertilizer and pesticide spraying today to avoid wash-off. Move harvested produce to dry storage!';
+      kikoSpeech = loc.s(
+        'Moo! 🌧️ Wet field conditions detected. Delay foliar fertilizer and pesticide spraying today to avoid wash-off. Move harvested produce to dry storage!',
+        'Moo! 🌧️ Basa ang bukirin. Ipagpaliban muna ang pag-spray ng pataba at pamatay-peste upang hindi maanod ng ulan. Ilagay ang inaning produkto sa tuyong imbakan!',
+      );
     } else if (wind > 14) {
-      kikoSpeech =
-          'Moo! 💨 Strong wind gusts detected (${wind.toStringAsFixed(1)} km/h). Stake tall crop trellises and avoid chemical spraying due to severe drift risk.';
+      kikoSpeech = loc.s(
+        'Moo! 💨 Strong wind gusts detected (${wind.toStringAsFixed(1)} km/h). Stake tall crop trellises and avoid chemical spraying due to severe drift risk.',
+        'Moo! 💨 Malakas na hanging nararanasan (${wind.toStringAsFixed(1)} km/h). Patatagin ang mga balag ng pananim at iwasan ang pag-spray dahil sa pagtangay ng hangin.',
+      );
     } else if (temp >= 36) {
-      kikoSpeech =
-          'Moo! ☀️ Intense heat wave alert (${temp.toStringAsFixed(0)}°C). Irrigate early before sunrise, check mulching, and protect field workers from midday heat!';
+      kikoSpeech = loc.s(
+        'Moo! ☀️ Intense heat wave alert (${temp.toStringAsFixed(0)}°C). Irrigate early before sunrise, check mulching, and protect field workers from midday heat!',
+        'Moo! ☀️ Babala sa matinding init (${temp.toStringAsFixed(0)}°C). Magpatubig nang maaga bago sumikat ang araw, lagyan ng mulch ang lupa, at protektahan ang mga manggagawa sa init ng tanghali!',
+      );
     } else if (humidity >= 80) {
-      kikoSpeech =
-          'Moo! ☁️ High humidity (${humidity.toStringAsFixed(0)}%) elevates fungal blight risk. Inspect lower leaves for spots and ensure good field aeration.';
+      kikoSpeech = loc.s(
+        'Moo! ☁️ High humidity (${humidity.toStringAsFixed(0)}%) elevates fungal blight risk. Inspect lower leaves for spots and ensure good field aeration.',
+        'Moo! ☁️ Mataas na alinsangan (${humidity.toStringAsFixed(0)}%) na nagpapataas ng panganib ng fungal blight. Suriin ang ilalim ng mga dahon at panatilihing maaliwalas ang taniman.',
+      );
     } else {
-      kikoSpeech =
-          'Moo! 🌿 Great farming weather today! Ideal conditions for weeding, seedling transplanting, and routine field operations in San Carlos.';
+      kikoSpeech = loc.s(
+        'Moo! 🌿 Great farming weather today! Ideal conditions for weeding, seedling transplanting, and routine field operations.',
+        'Moo! 🌿 Maganda ang panahon sa pagsasaka ngayon! Tamang-tama para sa paggagamas, paglilipat ng punla, at regular na gawain sa bukid.',
+      );
     }
 
     return Container(
@@ -1006,7 +1088,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                 Row(
                   children: [
                     Text(
-                      'Kiko\'s Farm Insight',
+                      loc.s('Kiko\'s Farm Insight', 'Payo ni Kiko sa Sakahan'),
                       style: GoogleFonts.poppins(
                         color: const Color(0xFF34D399),
                         fontWeight: FontWeight.w700,
@@ -1021,7 +1103,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'AI ADVICE',
+                        loc.s('AI ADVICE', 'PAYO NG AI'),
                         style: GoogleFonts.inter(
                           color: const Color(0xFF34D399),
                           fontSize: 9,
@@ -1056,6 +1138,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     required double humidity,
     required double temperature,
     required String desc,
+    required FarmerLocaleService loc,
   }) {
     final sprayingStatus = _getSprayingStatus(windSpeed, humidity, desc);
     final irrigationStatus = _getIrrigationStatus(humidity, temperature, desc);
@@ -1066,7 +1149,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Agronomic Field Intelligence',
+          loc.s('Agronomic Field Intelligence', 'Katalinuhan sa Pagbubukid'),
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: 15,
@@ -1079,22 +1162,24 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
             Expanded(
               child: _buildAgroBentoCard(
                 icon: Icons.science_outlined,
-                title: 'Spraying Window',
+                title: loc.s('Spraying Window', 'Oras ng Pag-spray'),
                 status: sprayingStatus,
                 subtitle: sprayingStatus == 'SAFE'
-                    ? 'Calm wind, safe to spray'
-                    : 'Risk of drift / wash-off',
+                    ? loc.s('Calm wind, safe to spray', 'Mahinang hangin, ligtas mag-spray')
+                    : loc.s('Risk of drift / wash-off', 'Panganib ng pagtangay o pagka-anod'),
+                loc: loc,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildAgroBentoCard(
                 icon: Icons.water_drop_outlined,
-                title: 'Irrigation Need',
+                title: loc.s('Irrigation Need', 'Pangangailangan sa Patubig'),
                 status: irrigationStatus,
                 subtitle: irrigationStatus == 'HIGH NEED'
-                    ? 'Dry soil condition'
-                    : 'Adequate moisture',
+                    ? loc.s('Dry soil condition', 'Tuyong kondisyon ng lupa')
+                    : loc.s('Adequate moisture', 'Sapat na halumigmig'),
+                loc: loc,
               ),
             ),
           ],
@@ -1105,22 +1190,24 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
             Expanded(
               child: _buildAgroBentoCard(
                 icon: Icons.bug_report_outlined,
-                title: 'Disease & Fungal Risk',
+                title: loc.s('Disease & Fungal Risk', 'Panganib sa Sakit at Fungi'),
                 status: diseaseRisk,
                 subtitle: diseaseRisk == 'HIGH'
-                    ? 'High moisture & warm'
-                    : 'Low pathogen pressure',
+                    ? loc.s('High moisture & warm', 'Mataas na kahalumigmigan at mainit')
+                    : loc.s('Low pathogen pressure', 'Mababang panganib sa peste'),
+                loc: loc,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildAgroBentoCard(
                 icon: Icons.agriculture_rounded,
-                title: 'Field Harvesting',
+                title: loc.s('Field Harvesting', 'Pag-aani sa Bukid'),
                 status: harvestingStatus,
                 subtitle: harvestingStatus == 'OPTIMAL'
-                    ? 'Dry produce condition'
-                    : 'Wet / lightning risk',
+                    ? loc.s('Dry produce condition', 'Tuyong kondisyon ng ani')
+                    : loc.s('Wet / lightning risk', 'Basa / panganib ng kidlat'),
+                loc: loc,
               ),
             ),
           ],
@@ -1134,6 +1221,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     required String title,
     required String status,
     required String subtitle,
+    required FarmerLocaleService loc,
   }) {
     final statusColor = _getStatusColor(status);
 
@@ -1159,7 +1247,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                   border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
-                  status,
+                  _localizeStatus(status, loc),
                   style: GoogleFonts.inter(
                     color: statusColor,
                     fontSize: 10,
@@ -1196,7 +1284,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   // ===========================================================================
   // 7. LIVE RADAR MAP LAUNCHER
   // ===========================================================================
-  Widget _buildRadarLauncherCard() {
+  Widget _buildRadarLauncherCard(FarmerLocaleService loc) {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -1235,7 +1323,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Live Wind & Rain Radar Map',
+                        loc.s('Live Wind & Rain Radar Map', 'Live Mapa ng Radar ng Hangin at Ulan'),
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 14,
@@ -1244,7 +1332,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Open interactive satellite & storm radar',
+                        loc.s('Open interactive satellite & storm radar', 'Buksan ang interactive satellite at radar ng bagyo'),
                         style: GoogleFonts.inter(
                           color: Colors.white60,
                           fontSize: 11.5,
@@ -1269,7 +1357,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   // ===========================================================================
   // 8. CONSULT KIKO AI BAR
   // ===========================================================================
-  Widget _buildConsultAiBar() {
+  Widget _buildConsultAiBar(FarmerLocaleService loc) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1287,7 +1375,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Ask Kiko AI about weather impact on crops…',
+              loc.s('Ask Kiko AI about weather impact on crops…', 'Tanungin si Kiko AI tungkol sa epekto ng panahon sa pananim…'),
               style: GoogleFonts.inter(
                 color: Colors.white70,
                 fontSize: 12,
@@ -1309,7 +1397,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               ),
             ),
             child: Text(
-              'Ask AI',
+              loc.s('Ask AI', 'Magtanong'),
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

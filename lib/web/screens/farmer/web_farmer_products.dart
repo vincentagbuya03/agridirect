@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/farmer/web_farmer_header.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class WebFarmerProducts extends StatefulWidget {
   final Function(int) onNavigate;
@@ -78,65 +79,70 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
 
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final sw = MediaQuery.of(context).size.width;
+        final isMobile = sw < 650;
 
-    return Scaffold(
-      backgroundColor: _surface,
-      body: Stack(
-        children: [
-          // Subtle background pattern
-          Positioned.fill(
-            child: CustomPaint(
-              painter: DotPatternPainter(
-                opacity: 0.02,
-                color: const Color(0xFF10B981),
-              ),
-            ),
-          ),
-          const Positioned.fill(
-            child: FloatingParticles(
-              count: 12,
-              maxSize: 2.0,
-              color: Color(0xFF10B981),
-            ),
-          ),
-          Column(
+        return Scaffold(
+          backgroundColor: _surface,
+          body: Stack(
             children: [
-              WebFarmerHeader(
-                currentIndex: widget.currentIndex,
-                onNavigate: (index, [route]) => widget.onNavigate(index),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 16 : 40,
-                    12,
-                    isMobile ? 16 : 40,
-                    48,
+              // Subtle background pattern
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: DotPatternPainter(
+                    opacity: 0.02,
+                    color: const Color(0xFF10B981),
                   ),
-                  child: FadeTransition(
-                    opacity: _fadeInController,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1400),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildHeader(),
-                            const SizedBox(height: 24),
-                            _buildMainContent(),
-                          ],
+                ),
+              ),
+              const Positioned.fill(
+                child: FloatingParticles(
+                  count: 12,
+                  maxSize: 2.0,
+                  color: Color(0xFF10B981),
+                ),
+              ),
+              Column(
+                children: [
+                  WebFarmerHeader(
+                    currentIndex: widget.currentIndex,
+                    onNavigate: (index, [route]) => widget.onNavigate(index),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        isMobile ? 16 : 40,
+                        12,
+                        isMobile ? 16 : 40,
+                        48,
+                      ),
+                      child: FadeTransition(
+                        opacity: _fadeInController,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1400),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildHeader(),
+                                const SizedBox(height: 24),
+                                _buildMainContent(),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -159,7 +165,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 runSpacing: 8,
                 children: [
                   Text(
-                    'Inventory & Products',
+                    FarmerLocaleService.instance.s('Inventory & Products', 'Imbentaryo at mga Produkto'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: isMobile ? 22 : 28,
                       fontWeight: FontWeight.w800,
@@ -175,7 +181,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                       border: Border.all(color: _primary.withValues(alpha: 0.3)),
                     ),
                     child: Text(
-                      'Live Catalog',
+                      FarmerLocaleService.instance.s('Live Catalog', 'Aktibong Katalogo'),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -187,7 +193,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               ),
               const SizedBox(height: 4),
               Text(
-                'Monitor stock levels, set prices, and publish fresh farm offerings.',
+                FarmerLocaleService.instance.s(
+                  'Monitor stock levels, set prices, and publish fresh farm offerings.',
+                  'Subaybayan ang dami ng stock, magtakda ng presyo, at magbenta ng sariwang ani.',
+                ),
                 style: GoogleFonts.inter(
                   fontSize: isMobile ? 13 : 14,
                   color: _muted,
@@ -201,7 +210,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             onPressed: () => context.go(AppRoutes.addProduct),
             icon: const Icon(Icons.add_rounded, size: 20),
             label: Text(
-              'Add New Product',
+              FarmerLocaleService.instance.s('Add New Product', 'Magdagdag ng Bagong Produkto'),
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -331,18 +340,18 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           Row(
             children: [
               buildKpiCard(
-                title: 'Total Items',
+                title: FarmerLocaleService.instance.s('Total Products', 'Kabuuang Produkto'),
                 value: '$totalProducts',
-                badgeText: 'Active Listings',
+                badgeText: FarmerLocaleService.instance.s('Active Listings', 'Aktibong Paninda'),
                 icon: Icons.inventory_2_rounded,
                 color: _primary,
                 bgColor: _primaryLight,
               ),
               const SizedBox(width: 12),
               buildKpiCard(
-                title: 'Total Value',
+                title: FarmerLocaleService.instance.s('Stock Valuation', 'Tantiyang Halaga ng Stock'),
                 value: '₱${totalValuation.toStringAsFixed(0)}',
-                badgeText: 'Estimated Revenue',
+                badgeText: FarmerLocaleService.instance.s('Estimated Revenue', 'Tantiyang Kita'),
                 icon: Icons.account_balance_wallet_rounded,
                 color: const Color(0xFF2563EB),
                 bgColor: const Color(0xFFDBEAFE),
@@ -353,18 +362,20 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           Row(
             children: [
               buildKpiCard(
-                title: 'Low Stock',
-                value: '$lowStockCount items',
-                badgeText: lowStockCount > 0 ? 'Needs Restock' : 'Healthy Stock',
+                title: FarmerLocaleService.instance.s('Low Stock Alerts', 'Alerto sa Kakaunting Stock'),
+                value: '$lowStockCount ${FarmerLocaleService.instance.s('items', 'produkto')}',
+                badgeText: lowStockCount > 0 
+                    ? FarmerLocaleService.instance.s('Needs Restock', 'Kailangang Dagdagan') 
+                    : FarmerLocaleService.instance.s('Healthy Inventory', 'Sapat ang Imbentaryo'),
                 icon: Icons.warning_amber_rounded,
                 color: const Color(0xFFD97706),
                 bgColor: const Color(0xFFFEF3C7),
               ),
               const SizedBox(width: 12),
               buildKpiCard(
-                title: 'Pre-Orders',
-                value: '$preorderCount items',
-                badgeText: 'Upcoming Harvest',
+                title: FarmerLocaleService.instance.s('Active Pre-Orders', 'Aktibong Paunang Order'),
+                value: '$preorderCount ${FarmerLocaleService.instance.s('items', 'produkto')}',
+                badgeText: FarmerLocaleService.instance.s('Upcoming Harvest', 'Paparating na Ani'),
                 icon: Icons.eco_rounded,
                 color: const Color(0xFF9333EA),
                 bgColor: const Color(0xFFF3E8FF),
@@ -378,36 +389,38 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     return Row(
       children: [
         buildKpiCard(
-          title: 'Total Products',
+          title: FarmerLocaleService.instance.s('Total Products', 'Kabuuang Produkto'),
           value: '$totalProducts',
-          badgeText: 'Active Listings',
+          badgeText: FarmerLocaleService.instance.s('Active Listings', 'Aktibong Paninda'),
           icon: Icons.inventory_2_rounded,
           color: _primary,
           bgColor: _primaryLight,
         ),
         const SizedBox(width: 16),
         buildKpiCard(
-          title: 'Stock Valuation',
+          title: FarmerLocaleService.instance.s('Stock Valuation', 'Tantiyang Halaga ng Stock'),
           value: '₱${totalValuation.toStringAsFixed(2)}',
-          badgeText: 'Estimated Revenue',
+          badgeText: FarmerLocaleService.instance.s('Estimated Revenue', 'Tantiyang Kita'),
           icon: Icons.account_balance_wallet_rounded,
           color: const Color(0xFF2563EB),
           bgColor: const Color(0xFFDBEAFE),
         ),
         const SizedBox(width: 16),
         buildKpiCard(
-          title: 'Low Stock Alerts',
-          value: '$lowStockCount items',
-          badgeText: lowStockCount > 0 ? 'Needs Restock' : 'Healthy Inventory',
+          title: FarmerLocaleService.instance.s('Low Stock Alerts', 'Alerto sa Kakaunting Stock'),
+          value: '$lowStockCount ${FarmerLocaleService.instance.s('items', 'produkto')}',
+          badgeText: lowStockCount > 0 
+              ? FarmerLocaleService.instance.s('Needs Restock', 'Kailangang Dagdagan') 
+              : FarmerLocaleService.instance.s('Healthy Inventory', 'Sapat ang Imbentaryo'),
           icon: Icons.warning_amber_rounded,
           color: const Color(0xFFD97706),
           bgColor: const Color(0xFFFEF3C7),
         ),
         const SizedBox(width: 16),
         buildKpiCard(
-          title: 'Active Pre-Orders',
-          value: '$preorderCount items',
-          badgeText: 'Upcoming Harvest',
+          title: FarmerLocaleService.instance.s('Active Pre-Orders', 'Aktibong Paunang Order'),
+          value: '$preorderCount ${FarmerLocaleService.instance.s('items', 'produkto')}',
+          badgeText: FarmerLocaleService.instance.s('Upcoming Harvest', 'Paparating na Ani'),
           icon: Icons.eco_rounded,
           color: const Color(0xFF9333EA),
           bgColor: const Color(0xFFF3E8FF),
@@ -422,6 +435,39 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     final sortOptions = ['Default', 'Name', 'Price: Low to High', 'Price: High to Low', 'Stock Level'];
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 768;
+
+    String getCategoryLabel(String cat) {
+      switch (cat) {
+        case 'All': return FarmerLocaleService.instance.s('All', 'Lahat');
+        case 'Vegetables': return FarmerLocaleService.instance.s('Vegetables', 'Gulay');
+        case 'Fruits': return FarmerLocaleService.instance.s('Fruits', 'Prutas');
+        case 'Grains': return FarmerLocaleService.instance.s('Grains', 'Bigas at Butil');
+        case 'Poultry': return FarmerLocaleService.instance.s('Poultry', 'Manukan');
+        case 'Pre-Orders': return FarmerLocaleService.instance.s('Pre-Orders', 'Paunang Order');
+        default: return cat;
+      }
+    }
+
+    String getStockLabel(String opt) {
+      switch (opt) {
+        case 'All': return FarmerLocaleService.instance.s('All', 'Lahat');
+        case 'In Stock': return FarmerLocaleService.instance.s('In Stock', 'May Stock');
+        case 'Low Stock': return FarmerLocaleService.instance.s('Low Stock', 'Kakaunting Stock');
+        case 'Out of Stock': return FarmerLocaleService.instance.s('Out of Stock', 'Ubos Na');
+        default: return opt;
+      }
+    }
+
+    String getSortLabel(String opt) {
+      switch (opt) {
+        case 'Default': return FarmerLocaleService.instance.s('Default', 'Karaniwan');
+        case 'Name': return FarmerLocaleService.instance.s('Name', 'Pangalan');
+        case 'Price: Low to High': return FarmerLocaleService.instance.s('Price: Low to High', 'Presyo: Mababa pataas');
+        case 'Price: High to Low': return FarmerLocaleService.instance.s('Price: High to Low', 'Presyo: Mataas pababa');
+        case 'Stock Level': return FarmerLocaleService.instance.s('Stock Level', 'Dami ng Stock');
+        default: return opt;
+      }
+    }
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -456,7 +502,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                     onChanged: (val) => setState(() => _searchQuery = val),
                     style: GoogleFonts.inter(fontSize: 14, color: _dark),
                     decoration: InputDecoration(
-                      hintText: 'Search products by name...',
+                      hintText: FarmerLocaleService.instance.s('Search products by name...', 'Maghanap ng produkto gamit ang pangalan...'),
                       hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
                       prefixIcon: const Icon(
                         Icons.search_rounded,
@@ -576,7 +622,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                       padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
                         label: Text(
-                          cat,
+                          getCategoryLabel(cat),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -626,7 +672,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                           if (val != null) setState(() => _selectedStockFilter = val);
                         },
                         items: stockOptions.map((opt) {
-                          return DropdownMenuItem(value: opt, child: Text('Stock: $opt'));
+                          return DropdownMenuItem(
+                            value: opt,
+                            child: Text('${FarmerLocaleService.instance.s('Stock', 'Stock')}: ${getStockLabel(opt)}'),
+                          );
                         }).toList(),
                       ),
                     ),
@@ -653,7 +702,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                           if (val != null) setState(() => _sortBy = val);
                         },
                         items: sortOptions.map((opt) {
-                          return DropdownMenuItem(value: opt, child: Text('Sort: $opt'));
+                          return DropdownMenuItem(
+                            value: opt,
+                            child: Text('${FarmerLocaleService.instance.s('Sort', 'Ayos')}: ${getSortLabel(opt)}'),
+                          );
                         }).toList(),
                       ),
                     ),
@@ -777,7 +829,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           ),
           const SizedBox(height: 16),
           Text(
-            'No matching products found',
+            FarmerLocaleService.instance.s('No matching products found', 'Walang natagpuang produkto'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -786,7 +838,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           ),
           const SizedBox(height: 6),
           Text(
-            'Try clearing your search query or selecting a different stock filter.',
+            FarmerLocaleService.instance.s(
+              'Try clearing your search query or selecting a different stock filter.',
+              'Subukang burahin ang paghahanap o pumili ng ibang filter ng stock.',
+            ),
             style: GoogleFonts.inter(fontSize: 14, color: _muted),
             textAlign: TextAlign.center,
           ),
@@ -802,7 +857,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             },
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: Text(
-              'Reset Filters',
+              FarmerLocaleService.instance.s('Reset Filters', 'I-reset ang mga Filter'),
               style: GoogleFonts.inter(fontWeight: FontWeight.w700),
             ),
             style: OutlinedButton.styleFrom(
@@ -864,16 +919,16 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     String statusLabel;
     if (isPreorder) {
       statusColor = const Color(0xFF9333EA);
-      statusLabel = 'Pre-Order';
+      statusLabel = FarmerLocaleService.instance.s('Pre-Order', 'Paunang Order');
     } else if (stock > 10) {
       statusColor = _primary;
-      statusLabel = 'In Stock';
+      statusLabel = FarmerLocaleService.instance.s('In Stock', 'May Stock');
     } else if (stock > 0) {
       statusColor = const Color(0xFFD97706);
-      statusLabel = 'Low Stock';
+      statusLabel = FarmerLocaleService.instance.s('Low Stock', 'Kakaunting Stock');
     } else {
       statusColor = Colors.red;
-      statusLabel = 'Out of Stock';
+      statusLabel = FarmerLocaleService.instance.s('Out of Stock', 'Ubos Na');
     }
 
     return GestureDetector(
@@ -998,7 +1053,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                           Row(
                             children: [
                               Text(
-                                'Stock: ',
+                                '${FarmerLocaleService.instance.s('Stock', 'Dami')}: ',
                                 style: GoogleFonts.inter(fontSize: 11, color: _muted),
                               ),
                               Text(
@@ -1042,7 +1097,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Edit',
+                                    FarmerLocaleService.instance.s('Edit', 'I-edit'),
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -1094,7 +1149,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               columns: [
                 DataColumn(
                   label: Text(
-                    'Product',
+                    FarmerLocaleService.instance.s('Product', 'Produkto'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: _dark,
@@ -1104,7 +1159,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 ),
                 DataColumn(
                   label: Text(
-                    'Stock Available',
+                    FarmerLocaleService.instance.s('Stock Available', 'Mayroong Stock'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: _dark,
@@ -1114,7 +1169,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 ),
                 DataColumn(
                   label: Text(
-                    'Unit Price',
+                    FarmerLocaleService.instance.s('Unit Price', 'Presyo bawat Yunit'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: _dark,
@@ -1124,7 +1179,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 ),
                 DataColumn(
                   label: Text(
-                    'Status',
+                    FarmerLocaleService.instance.s('Status', 'Katayuan'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: _dark,
@@ -1134,7 +1189,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 ),
                 DataColumn(
                   label: Text(
-                    'Action',
+                    FarmerLocaleService.instance.s('Action', 'Aksyon'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: _dark,
@@ -1160,19 +1215,19 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 if (isPreorder) {
                   statusBg = const Color(0xFFF3E8FF);
                   statusFg = const Color(0xFF9333EA);
-                  statusLabel = 'Pre-Order';
+                  statusLabel = FarmerLocaleService.instance.s('Pre-Order', 'Paunang Order');
                 } else if (stock > 10) {
                   statusBg = _primaryLight;
                   statusFg = _primaryDark;
-                  statusLabel = 'In Stock';
+                  statusLabel = FarmerLocaleService.instance.s('In Stock', 'May Stock');
                 } else if (stock > 0) {
                   statusBg = const Color(0xFFFEF3C7);
                   statusFg = const Color(0xFFD97706);
-                  statusLabel = 'Low Stock';
+                  statusLabel = FarmerLocaleService.instance.s('Low Stock', 'Kakaunting Stock');
                 } else {
                   statusBg = const Color(0xFFFEE2E2);
                   statusFg = Colors.red;
-                  statusLabel = 'Out of Stock';
+                  statusLabel = FarmerLocaleService.instance.s('Out of Stock', 'Ubos Na');
                 }
 
                 return DataRow(
@@ -1256,7 +1311,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                         onPressed: () => _openProduct(product),
                         icon: const Icon(Icons.edit_note_rounded, size: 16),
                         label: Text(
-                          'Manage',
+                          FarmerLocaleService.instance.s('Manage', 'Pamahalaan'),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1503,9 +1558,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Product updated successfully!'),
-            backgroundColor: Color(0xFF16A34A),
+          SnackBar(
+            content: Text(FarmerLocaleService.instance.s('Product updated successfully!', 'Matagumpay na na-update ang produkto!')),
+            backgroundColor: const Color(0xFF16A34A),
           ),
         );
       }
@@ -1513,7 +1568,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update product: $e'),
+            content: Text('${FarmerLocaleService.instance.s('Failed to update product', 'Bigo sa pag-update ng produkto')}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1530,24 +1585,30 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          'Delete Product?',
+          FarmerLocaleService.instance.s('Delete Product?', 'Tanggalin ang Produkto?'),
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Are you sure you want to permanently delete "${widget.product['name']}"? This action cannot be undone.',
+          FarmerLocaleService.instance.s(
+            'Are you sure you want to permanently delete "${widget.product['name']}"? This action cannot be undone.',
+            'Sigurado ka bang nais mong permanenteng tanggalin ang "${widget.product['name']}"? Hindi na ito mababawi.',
+          ),
           style: GoogleFonts.inter(),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
+            child: Text(
+              FarmerLocaleService.instance.s('Cancel', 'Kanselahin'),
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: Text(
-              'Delete',
+              FarmerLocaleService.instance.s('Delete', 'Tanggalin'),
               style: GoogleFonts.inter(fontWeight: FontWeight.bold),
             ),
           ),
@@ -1568,9 +1629,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
         if (mounted) {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Product deleted successfully!'),
-              backgroundColor: Color(0xFF16A34A),
+            SnackBar(
+              content: Text(FarmerLocaleService.instance.s('Product deleted successfully!', 'Matagumpay na natanggal ang produkto!')),
+              backgroundColor: const Color(0xFF16A34A),
             ),
           );
         }
@@ -1581,7 +1642,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete product: $e'),
+            content: Text('${FarmerLocaleService.instance.s('Failed to delete product', 'Bigo sa pagtanggal ng produkto')}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1595,543 +1656,573 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 16,
-      backgroundColor: Colors.white,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 580,
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.edit_note_rounded,
-                      color: Color(0xFF16A34A),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Manage Product',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF111827),
-                          ),
-                        ),
-                        Text(
-                          'Edit listing details and inventory status',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF3F4F6),
-                      iconSize: 18,
-                    ),
-                  ),
-                ],
-              ),
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 16,
+          backgroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 580,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
             ),
-            const Divider(height: 1),
-
-            // Scrollable Content Form
-            Expanded(
-              child: _isLoadingDropdowns
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF16A34A),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.edit_note_rounded,
+                          color: Color(0xFF16A34A),
+                        ),
                       ),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Form(
-                        key: _formKey,
+                      const SizedBox(width: 14),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Product Name
-                            _buildFieldLabel('Product Name'),
-                            TextFormField(
-                              controller: _nameController,
-                              style: GoogleFonts.inter(fontSize: 14),
-                              decoration: _buildInputDecoration(
-                                'e.g. Organic Tomatoes',
-                              ),
-                              validator: (val) =>
-                                  val == null || val.trim().isEmpty
-                                  ? 'Product name is required'
-                                  : null,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Row: Category & Unit
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildFieldLabel('Category'),
-                                      DropdownButtonFormField<String>(
-                                        initialValue: _selectedCategory,
-                                        items: _categories
-                                            .map(
-                                              (c) => DropdownMenuItem<String>(
-                                                value: c['id'],
-                                                child: Text(
-                                                  c['name'],
-                                                  style: GoogleFonts.inter(
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (val) => setState(
-                                          () => _selectedCategory = val,
-                                        ),
-                                        decoration: _buildInputDecoration(
-                                          'Select Category',
-                                        ),
-                                        validator: (val) =>
-                                            val == null ? 'Required' : null,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildFieldLabel('Unit'),
-                                      DropdownButtonFormField<String>(
-                                        initialValue: _selectedUnit,
-                                        items: _units
-                                            .map(
-                                              (u) => DropdownMenuItem<String>(
-                                                value: u['id'],
-                                                child: Text(
-                                                  u['name'],
-                                                  style: GoogleFonts.inter(
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (val) =>
-                                            setState(() => _selectedUnit = val),
-                                        decoration: _buildInputDecoration(
-                                          'Select Unit',
-                                        ),
-                                        validator: (val) =>
-                                            val == null ? 'Required' : null,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Row: Price & Stock
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildFieldLabel('Price (₱)'),
-                                      TextFormField(
-                                        controller: _priceController,
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        style: GoogleFonts.inter(fontSize: 14),
-                                        decoration: _buildInputDecoration(
-                                          '0.00',
-                                        ),
-                                        validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
-                                            return 'Required';
-                                          }
-                                          if (double.tryParse(val) == null) {
-                                            return 'Invalid price';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildFieldLabel('Stock Quantity'),
-                                      TextFormField(
-                                        controller: _stockController,
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        style: GoogleFonts.inter(fontSize: 14),
-                                        decoration: _buildInputDecoration('0'),
-                                        validator: (val) {
-                                          if (val == null || val.trim().isEmpty) {
-                                            return 'Required';
-                                          }
-                                          if (double.tryParse(val) == null) {
-                                            return 'Invalid stock';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Preorder details
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isPreorder,
-                                  activeColor: const Color(0xFF16A34A),
-                                  onChanged: (val) => setState(
-                                    () => _isPreorder = val ?? false,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'This is a pre-order product',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_isPreorder) ...[
-                              const SizedBox(height: 12),
-                              _buildFieldLabel('Days to Harvest'),
-                              TextFormField(
-                                controller: _harvestDaysController,
-                                keyboardType: TextInputType.number,
-                                style: GoogleFonts.inter(fontSize: 14),
-                                decoration: _buildInputDecoration('e.g. 30'),
-                                validator: (val) {
-                                  if (_isPreorder &&
-                                      (val == null || val.trim().isEmpty)) {
-                                    return 'Harvest days required for pre-orders';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-                            const Divider(height: 1),
-                            const SizedBox(height: 16),
-                            _buildFieldLabel('Promotions & Offers'),
                             Text(
-                              'Boost your sales by opting into marketplace promotions.',
+                              loc.s('Manage Product', 'Pamahalaan ang Produkto'),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF111827),
+                              ),
+                            ),
+                            Text(
+                              loc.s(
+                                'Edit listing details and inventory status',
+                                'I-edit ang detalye ng paninda at imbentaryo',
+                              ),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF6B7280),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isFreeShipping,
-                                  activeColor: const Color(0xFF16A34A),
-                                  onChanged: (val) => setState(() => _isFreeShipping = val ?? false),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Free Shipping (Cover delivery costs)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isWholesale,
-                                  activeColor: const Color(0xFF16A34A),
-                                  onChanged: (val) => setState(() => _isWholesale = val ?? false),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Wholesale Pricing (Offer bulk discounts)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isFlashSale,
-                                  activeColor: const Color(0xFF16A34A),
-                                  onChanged: (val) => setState(() => _isFlashSale = val ?? false),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Flash Sale (Join next flash sale)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_isFlashSale) ...[
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 32, right: 8, bottom: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildFieldLabel('Flash Sale Discount (%)'),
-                                    TextFormField(
-                                      controller: _discountPercentController,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      style: GoogleFonts.inter(fontSize: 14),
-                                      decoration: _buildInputDecoration('e.g. 35').copyWith(
-                                        suffixText: '% OFF',
-                                        helperText: 'Discount percentage during active flash sale events',
-                                      ),
-                                      validator: (val) {
-                                        if (_isFlashSale) {
-                                          if (val == null || val.trim().isEmpty) {
-                                            return 'Please enter a discount %';
-                                          }
-                                          final d = double.tryParse(val.trim());
-                                          if (d == null || d <= 0 || d >= 100) {
-                                            return 'Enter a percentage between 1 and 99';
-                                          }
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildFieldLabel('Countdown & Duration'),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      children: [
-                                        _buildDurationChip('Today Midnight', 'midnight'),
-                                        _buildDurationChip('24 Hours', '24_hours'),
-                                        _buildDurationChip('3 Days', '3_days'),
-                                        _buildDurationChip('7 Days', '7_days'),
-                                        _buildDurationChip('Custom End Date', 'custom'),
-                                      ],
-                                    ),
-                                    if (_flashDurationOption == 'custom') ...[
-                                      const SizedBox(height: 8),
-                                      InkWell(
-                                        onTap: () async {
-                                          final picked = await showDatePicker(
-                                            context: context,
-                                            initialDate: _flashSaleEndDate ?? DateTime.now().add(const Duration(days: 1)),
-                                            firstDate: DateTime.now(),
-                                            lastDate: DateTime.now().add(const Duration(days: 90)),
-                                          );
-                                          if (picked != null) {
-                                            setState(() {
-                                              _flashSaleEndDate = DateTime(
-                                                picked.year,
-                                                picked.month,
-                                                picked.day,
-                                                23,
-                                                59,
-                                                59,
-                                              );
-                                            });
-                                          }
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF8FAFC),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.event_rounded, size: 16, color: Color(0xFF16A34A)),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                _flashSaleEndDate != null
-                                                    ? 'Ends: ${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
-                                                    : 'Pick Custom End Date',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: const Color(0xFF1E293B),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-
-                            // Description
-                            _buildFieldLabel('Description'),
-                            TextFormField(
-                              controller: _descriptionController,
-                              maxLines: 4,
-                              style: GoogleFonts.inter(fontSize: 14),
-                              decoration: _buildInputDecoration(
-                                'Product description...',
-                              ),
-                            ),
                           ],
                         ),
                       ),
-                    ),
-            ),
-            const Divider(height: 1),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFF3F4F6),
+                          iconSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
 
-            // Actions
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _deleteProduct,
-                    icon: const Icon(
-                      Icons.delete_forever_rounded,
-                      color: Colors.red,
-                      size: 18,
-                    ),
-                    label: Text(
-                      'Delete',
-                      style: GoogleFonts.inter(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  OutlinedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      'Cancel',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _saveProduct,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(
-                            'Save Changes',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w700,
+                // Scrollable Content Form
+                Expanded(
+                  child: _isLoadingDropdowns
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF16A34A),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Product Name
+                                _buildFieldLabel(loc.s('Product Name', 'Pangalan ng Produkto')),
+                                TextFormField(
+                                  controller: _nameController,
+                                  style: GoogleFonts.inter(fontSize: 14),
+                                  decoration: _buildInputDecoration(
+                                    loc.s('e.g. Organic Tomatoes', 'hal. Organikong Kamatis'),
+                                  ),
+                                  validator: (val) =>
+                                      val == null || val.trim().isEmpty
+                                          ? loc.s('Product name is required', 'Kailangan ang pangalan ng produkto')
+                                          : null,
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Row: Category & Unit
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel(loc.s('Category', 'Kategorya')),
+                                          DropdownButtonFormField<String>(
+                                            initialValue: _selectedCategory,
+                                            items: _categories
+                                                .map(
+                                                  (c) => DropdownMenuItem<String>(
+                                                    value: c['id'],
+                                                    child: Text(
+                                                      c['name'],
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(),
+                                            onChanged: (val) => setState(
+                                              () => _selectedCategory = val,
+                                            ),
+                                            decoration: _buildInputDecoration(
+                                              loc.s('Select Category', 'Pumili ng Kategorya'),
+                                            ),
+                                            validator: (val) =>
+                                                val == null ? loc.s('Required', 'Kailangan') : null,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel(loc.s('Unit', 'Yunit')),
+                                          DropdownButtonFormField<String>(
+                                            initialValue: _selectedUnit,
+                                            items: _units
+                                                .map(
+                                                  (u) => DropdownMenuItem<String>(
+                                                    value: u['id'],
+                                                    child: Text(
+                                                      u['name'],
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(),
+                                            onChanged: (val) =>
+                                                setState(() => _selectedUnit = val),
+                                            decoration: _buildInputDecoration(
+                                              loc.s('Select Unit', 'Pumili ng Yunit'),
+                                            ),
+                                            validator: (val) =>
+                                                val == null ? loc.s('Required', 'Kailangan') : null,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Row: Price & Stock
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel(loc.s('Price (₱)', 'Presyo (₱)')),
+                                          TextFormField(
+                                            controller: _priceController,
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                            style: GoogleFonts.inter(fontSize: 14),
+                                            decoration: _buildInputDecoration(
+                                              '0.00',
+                                            ),
+                                            validator: (val) {
+                                              if (val == null || val.trim().isEmpty) {
+                                                return loc.s('Required', 'Kailangan');
+                                              }
+                                              if (double.tryParse(val) == null) {
+                                                return loc.s('Invalid price', 'Maling presyo');
+                                              }
+                                              return null;
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel(loc.s('Stock Quantity', 'Dami ng Stock')),
+                                          TextFormField(
+                                            controller: _stockController,
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                            style: GoogleFonts.inter(fontSize: 14),
+                                            decoration: _buildInputDecoration('0'),
+                                            validator: (val) {
+                                              if (val == null || val.trim().isEmpty) {
+                                                return loc.s('Required', 'Kailangan');
+                                              }
+                                              if (double.tryParse(val) == null) {
+                                                return loc.s('Invalid stock', 'Maling bilang ng stock');
+                                              }
+                                              return null;
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Preorder details
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _isPreorder,
+                                      activeColor: const Color(0xFF16A34A),
+                                      onChanged: (val) => setState(
+                                        () => _isPreorder = val ?? false,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      loc.s(
+                                        'This is a pre-order product',
+                                        'Ito ay produktong paunang order',
+                                      ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF374151),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_isPreorder) ...[
+                                  const SizedBox(height: 12),
+                                  _buildFieldLabel(loc.s('Days to Harvest', 'Araw Bago Mag-ani')),
+                                  TextFormField(
+                                    controller: _harvestDaysController,
+                                    keyboardType: TextInputType.number,
+                                    style: GoogleFonts.inter(fontSize: 14),
+                                    decoration: _buildInputDecoration(loc.s('e.g. 30', 'hal. 30')),
+                                    validator: (val) {
+                                      if (_isPreorder &&
+                                          (val == null || val.trim().isEmpty)) {
+                                        return loc.s(
+                                          'Harvest days required for pre-orders',
+                                          'Kailangan ang araw ng pag-ani para sa pre-order',
+                                        );
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                _buildFieldLabel(loc.s('Promotions & Offers', 'Mga Promosyon at Alok')),
+                                Text(
+                                  loc.s(
+                                    'Boost your sales by opting into marketplace promotions.',
+                                    'Palakasin ang benta sa pamamagitan ng pagsali sa mga promosyon.',
+                                  ),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF6B7280),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _isFreeShipping,
+                                      activeColor: const Color(0xFF16A34A),
+                                      onChanged: (val) => setState(() => _isFreeShipping = val ?? false),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      loc.s(
+                                        'Free Shipping (Cover delivery costs)',
+                                        'Libreng Pagpapadala (Sagot ang delivery)',
+                                      ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF374151),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _isWholesale,
+                                      activeColor: const Color(0xFF16A34A),
+                                      onChanged: (val) => setState(() => _isWholesale = val ?? false),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      loc.s(
+                                        'Wholesale Pricing (Offer bulk discounts)',
+                                        'Pakakyaw na Presyo (May diskwento sa maramihan)',
+                                      ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF374151),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _isFlashSale,
+                                      activeColor: const Color(0xFF16A34A),
+                                      onChanged: (val) => setState(() => _isFlashSale = val ?? false),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      loc.s(
+                                        'Flash Sale (Join next flash sale)',
+                                        'Flash Sale (Sumali sa susunod na flash sale)',
+                                      ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF374151),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_isFlashSale) ...[
+                                  const SizedBox(height: 8),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 32, right: 8, bottom: 8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildFieldLabel(loc.s('Flash Sale Discount (%)', 'Diskwento sa Flash Sale (%)')),
+                                        TextFormField(
+                                          controller: _discountPercentController,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          style: GoogleFonts.inter(fontSize: 14),
+                                          decoration: _buildInputDecoration(loc.s('e.g. 35', 'hal. 35')).copyWith(
+                                            suffixText: '% OFF',
+                                            helperText: loc.s(
+                                              'Discount percentage during active flash sale events',
+                                              'Porsyento ng diskwento habang may aktibong flash sale',
+                                            ),
+                                          ),
+                                          validator: (val) {
+                                            if (_isFlashSale) {
+                                              if (val == null || val.trim().isEmpty) {
+                                                return loc.s('Please enter a discount %', 'Mangyaring maglagay ng % ng diskwento');
+                                              }
+                                              final d = double.tryParse(val.trim());
+                                              if (d == null || d <= 0 || d >= 100) {
+                                                return loc.s('Enter a percentage between 1 and 99', 'Maglagay ng porsyento sa pagitan ng 1 at 99');
+                                              }
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildFieldLabel(loc.s('Countdown & Duration', 'Tagal at Oras')),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            _buildDurationChip(loc.s('Today Midnight', 'Hatinggabi Ngayon'), 'midnight'),
+                                            _buildDurationChip(loc.s('24 Hours', '24 Oras'), '24_hours'),
+                                            _buildDurationChip(loc.s('3 Days', '3 Araw'), '3_days'),
+                                            _buildDurationChip(loc.s('7 Days', '7 Araw'), '7_days'),
+                                            _buildDurationChip(loc.s('Custom End Date', 'Ibang Petsa ng Pagtatapos'), 'custom'),
+                                          ],
+                                        ),
+                                        if (_flashDurationOption == 'custom') ...[
+                                          const SizedBox(height: 8),
+                                          InkWell(
+                                            onTap: () async {
+                                              final picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: _flashSaleEndDate ?? DateTime.now().add(const Duration(days: 1)),
+                                                firstDate: DateTime.now(),
+                                                lastDate: DateTime.now().add(const Duration(days: 90)),
+                                              );
+                                              if (picked != null) {
+                                                setState(() {
+                                                  _flashSaleEndDate = DateTime(
+                                                    picked.year,
+                                                    picked.month,
+                                                    picked.day,
+                                                    23,
+                                                    59,
+                                                    59,
+                                                  );
+                                                });
+                                              }
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF8FAFC),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.event_rounded, size: 16, color: Color(0xFF16A34A)),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    _flashSaleEndDate != null
+                                                        ? '${loc.s('Ends', 'Magtatapos')}: ${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
+                                                        : loc.s('Pick Custom End Date', 'Pumili ng Petsa ng Pagtatapos'),
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: const Color(0xFF1E293B),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+
+                                // Description
+                                _buildFieldLabel(loc.s('Description', 'Paglalarawan')),
+                                TextFormField(
+                                  controller: _descriptionController,
+                                  maxLines: 4,
+                                  style: GoogleFonts.inter(fontSize: 14),
+                                  decoration: _buildInputDecoration(
+                                    loc.s('Product description...', 'Paglalarawan ng produkto...'),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                        ),
+                ),
+                const Divider(height: 1),
+
+                // Actions
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _deleteProduct,
+                        icon: const Icon(
+                          Icons.delete_forever_rounded,
+                          color: Colors.red,
+                          size: 18,
+                        ),
+                        label: Text(
+                          loc.s('Delete', 'Tanggalin'),
+                          style: GoogleFonts.inter(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      OutlinedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          loc.s('Cancel', 'Kanselahin'),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: _isLoading ? null : _saveProduct,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                loc.s('Save Changes', 'I-save ang Pagbabago'),
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

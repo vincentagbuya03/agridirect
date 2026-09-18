@@ -24,6 +24,7 @@ import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/widgets/post_detail_dialog.dart';
 import '../../../shared/widgets/forum_video_player.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -220,108 +221,114 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final showSidebar = sw >= 850;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        final sw = MediaQuery.of(context).size.width;
+        final showSidebar = sw >= 850;
 
-    return Scaffold(
-      backgroundColor: _surface,
-      body: Stack(
-        children: [
-          // Subtle dot pattern background
-          Positioned.fill(
-            child: CustomPaint(
-              painter: DotPatternPainter(
-                opacity: 0.03,
-                color: const Color(0xFF10B981),
+        return Scaffold(
+          backgroundColor: _surface,
+          body: Stack(
+            children: [
+              // Subtle dot pattern background
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: DotPatternPainter(
+                    opacity: 0.03,
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
               ),
-            ),
-          ),
-          // Particles
-          const Positioned.fill(
-            child: FloatingParticles(
-              count: 8,
-              maxSize: 1.8,
-              color: Color(0xFF34D399),
-              height: 1000,
-            ),
-          ),
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildNavBar(),
-                _buildTopBar(),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1280),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: sw < 700 ? 16 : 28,
-                        vertical: 24,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Main content feed (Forum / Articles)
-                          Expanded(
-                            child: _buildMainContent(),
+              // Particles
+              const Positioned.fill(
+                child: FloatingParticles(
+                  count: 8,
+                  maxSize: 1.8,
+                  color: Color(0xFF34D399),
+                  height: 1000,
+                ),
+              ),
+              SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildNavBar(),
+                    _buildTopBar(),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1280),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: sw < 700 ? 16 : 28,
+                            vertical: 24,
                           ),
-                          // Right sidebar
-                          if (showSidebar) ...[
-                            const SizedBox(width: 28),
-                            SizedBox(
-                              width: 320,
-                              child: _buildRightSidebar(),
-                            ),
-                          ],
-                        ],
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Main content feed (Forum / Articles)
+                              Expanded(
+                                child: _buildMainContent(),
+                              ),
+                              // Right sidebar
+                              if (showSidebar) ...[
+                                const SizedBox(width: 28),
+                                SizedBox(
+                                  width: 320,
+                                  child: _buildRightSidebar(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 56),
+                    const AgriDirectWebFooter(),
+                  ],
                 ),
-                const SizedBox(height: 56),
-                const AgriDirectWebFooter(),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-      floatingActionButton: AuthService().isSeller
-          ? Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: AgriColors.primaryGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: AgriColors.emerald500.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+          floatingActionButton: AuthService().isSeller
+              ? Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: AgriColors.primaryGradient,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AgriColors.emerald500.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () async {
-                  final result = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => const CreatePostDialog(),
-                  );
-                  if (result == true && mounted) {
-                    _refreshForumPosts();
-                  }
-                },
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                icon: const Icon(Icons.edit_rounded, size: 20),
-                label: Text(
-                  'New Post',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            )
-          : null,
+                  child: FloatingActionButton.extended(
+                    onPressed: () async {
+                      final result = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => const CreatePostDialog(),
+                      );
+                      if (result == true && mounted) {
+                        _refreshForumPosts();
+                      }
+                    },
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    icon: const Icon(Icons.edit_rounded, size: 20),
+                    label: Text(
+                      loc.s('New Post', 'Bagong Post'),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                )
+              : null,
+        );
+      },
     );
   }
 
@@ -358,6 +365,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   // ─── Top Bar ───
   Widget _buildTopBar() {
+    final loc = FarmerLocaleService.instance;
     final sw = MediaQuery.of(context).size.width;
     final isCompact = sw < 750;
 
@@ -373,9 +381,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           children: [
             Row(
               children: [
-                const Text(
-                  'Community Hub',
-                  style: TextStyle(
+                Text(
+                  loc.s('Community Hub', 'Sentro ng Komunidad'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: _dark,
@@ -407,9 +415,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     dividerColor: Colors.transparent,
                     tabAlignment: TabAlignment.center,
-                    tabs: const [
-                      Tab(text: 'Forum'),
-                      Tab(text: 'Articles'),
+                    tabs: [
+                      Tab(text: loc.s('Forum', 'Talakayan')),
+                      Tab(text: loc.s('Articles', 'Mga Artikulo')),
                     ],
                   ),
                 ),
@@ -426,9 +434,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               ),
               child: TextField(
                 decoration: InputDecoration(
-                  hintText: 'Search topics, pests, crops...',
-                  hintStyle: TextStyle(color: _muted, fontSize: 13),
-                  prefixIcon: Icon(
+                  hintText: loc.s('Search topics, pests, crops...', 'Maghanap ng paksa, peste, pananim...'),
+                  hintStyle: const TextStyle(color: _muted, fontSize: 13),
+                  prefixIcon: const Icon(
                     Icons.search_rounded,
                     color: _muted,
                     size: 18,
@@ -455,9 +463,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
             child: Row(
               children: [
-                const Text(
-                  'Community Hub',
-                  style: TextStyle(
+                Text(
+                  loc.s('Community Hub', 'Sentro ng Komunidad'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: _dark,
@@ -475,9 +483,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     child: TextField(
                       decoration: InputDecoration(
-                        hintText: 'Search topics, pests, crops...',
-                        hintStyle: TextStyle(color: _muted, fontSize: 13),
-                        prefixIcon: Icon(
+                        hintText: loc.s('Search topics, pests, crops...', 'Maghanap ng paksa, peste, pananim...'),
+                        hintStyle: const TextStyle(color: _muted, fontSize: 13),
+                        prefixIcon: const Icon(
                           Icons.search_rounded,
                           color: _muted,
                           size: 18,
@@ -514,9 +522,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     dividerColor: Colors.transparent,
                     tabAlignment: TabAlignment.center,
-                    tabs: const [
-                      Tab(text: 'Forum'),
-                      Tab(text: 'Articles'),
+                    tabs: [
+                      Tab(text: loc.s('Forum', 'Talakayan')),
+                      Tab(text: loc.s('Articles', 'Mga Artikulo')),
                     ],
                   ),
                 ),
@@ -640,6 +648,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildForumCard(ForumPostItem post, [bool isHovered = false]) {
+    final loc = FarmerLocaleService.instance;
     return GestureDetector(
       onTap: () => _showPostDetailFlow(post),
       child: AnimatedContainer(
@@ -753,14 +762,14 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     child: Icon(Icons.more_horiz_rounded, size: 18, color: _muted),
                   ),
-                  tooltip: 'Options',
+                  tooltip: loc.s('Options', 'Mga Pagpipilian'),
                   padding: EdgeInsets.zero,
                   onSelected: (val) async {
                     if (val == 'report') {
                       final submitted = await showDialog<bool>(
                         context: context,
                         builder: (context) => ReportContentDialog(
-                          contentLabel: 'post',
+                          contentLabel: loc.s('post', 'post'),
                           contentTitle: post.title,
                           onSubmit: (reason, details) {
                             return SupabaseDataService().reportForumPost(
@@ -774,8 +783,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
                       if (submitted == true && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Report submitted. Our team will review it soon.'),
+                          SnackBar(
+                            content: Text(loc.s('Report submitted. Our team will review it soon.', 'Naipadala na ang ulat. Susuriin ito ng aming koponan sa lalong madaling panahon.')),
                           ),
                         );
                       }
@@ -783,17 +792,17 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Delete Post'),
-                          content: const Text('Are you sure you want to delete this post?'),
+                          title: Text(loc.s('Delete Post', 'Burahin ang Post')),
+                          content: Text(loc.s('Are you sure you want to delete this post?', 'Sigurado ka bang nais mong burahin ang post na ito?')),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
+                              child: Text(loc.s('Cancel', 'Kanselahin')),
                             ),
                             TextButton(
                               onPressed: () => Navigator.pop(context, true),
                               style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              child: const Text('Delete'),
+                              child: Text(loc.s('Delete', 'Burahin')),
                             ),
                           ],
                         ),
@@ -808,7 +817,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                           _refreshForumPosts();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post deleted successfully')),
+                              SnackBar(content: Text(loc.s('Post deleted successfully', 'Matagumpay na nabura ang post'))),
                             );
                           }
                         } catch (e) {
@@ -826,24 +835,24 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     final isAuthor = post.userId == currentUserId;
                     return [
                       if (isAuthor)
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
-                              SizedBox(width: 8),
-                              Text('Delete Post', style: TextStyle(color: Colors.red)),
+                              const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                              const SizedBox(width: 8),
+                              Text(loc.s('Delete Post', 'Burahin ang Post'), style: const TextStyle(color: Colors.red)),
                             ],
                           ),
                         )
                       else
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'report',
                           child: Row(
                             children: [
-                              Icon(Icons.report_gmailerrorred_rounded, size: 18),
-                              SizedBox(width: 8),
-                              Text('Report Post'),
+                              const Icon(Icons.report_gmailerrorred_rounded, size: 18),
+                              const SizedBox(width: 8),
+                              Text(loc.s('Report Post', 'I-report ang Post')),
                             ],
                           ),
                         ),
@@ -955,7 +964,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 const Spacer(),
                 if (post.comments > 0)
                   Text(
-                    '${post.comments} ${post.comments == 1 ? "comment" : "comments"}',
+                    '${post.comments} ${loc.s(post.comments == 1 ? "comment" : "comments", "komento")}',
                     style: GoogleFonts.inter(fontSize: 12, color: _muted),
                   ),
               ],
@@ -971,7 +980,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               Expanded(
                 child: _buildFacebookActionBtn(
                   icon: post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
-                  label: 'Like',
+                  label: loc.s('Like', 'I-like'),
                   color: post.isLiked ? const Color(0xFF3B82F6) : _muted,
                   onTap: () async {
                     if (!AuthService().isLoggedIn) {
@@ -1003,7 +1012,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               Expanded(
                 child: _buildFacebookActionBtn(
                   icon: Icons.chat_bubble_outline_rounded,
-                  label: 'Comment',
+                  label: loc.s('Comment', 'Magkomento'),
                   color: _muted,
                   onTap: () {
                     if (!AuthService().isLoggedIn) {
@@ -1017,14 +1026,14 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                Expanded(
                  child: _buildFacebookActionBtn(
                    icon: Icons.share_outlined,
-                   label: 'Share',
+                   label: loc.s('Share', 'Ibahagi'),
                    color: _muted,
                    onTap: () async {
                      final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${post.id}';
                      await Clipboard.setData(ClipboardData(text: shareUrl));
                      if (mounted) {
                        ScaffoldMessenger.of(context).showSnackBar(
-                         const SnackBar(content: Text('Link copied to clipboard!')),
+                         SnackBar(content: Text(loc.s('Link copied to clipboard!', 'Nakopya ang link sa clipboard!'))),
                        );
                      }
                    },
@@ -1074,6 +1083,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildFacebookCreatePostCard() {
+    final loc = FarmerLocaleService.instance;
     final auth = AuthService();
     final displayName = auth.isLoggedIn ? auth.userName : 'Farmer';
     final avatarUrl = auth.isLoggedIn ? auth.userAvatarUrl : null;
@@ -1149,7 +1159,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          "Share updates, harvest news, or ask the community, $firstName...",
+                          loc.s(
+                            "Share updates, harvest news, or ask the community, $firstName...",
+                            "Magbahagi ng balita, ani, o magtanong sa komunidad, $firstName...",
+                          ),
                           style: GoogleFonts.inter(
                             fontSize: 13.5,
                             color: _muted,
@@ -1199,7 +1212,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Post',
+                      loc.s('Post', 'I-post'),
                       style: GoogleFonts.plusJakartaSans(
                         color: Colors.white,
                         fontSize: 13.5,
@@ -1281,6 +1294,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticlesFeed() {
+    final loc = FarmerLocaleService.instance;
     return FutureBuilder<List<ArticleItem>>(
       future: _articlesFuture,
       initialData: _cachedArticles,
@@ -1305,9 +1319,15 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               children: [
                 Icon(Icons.menu_book_rounded, size: 48, color: Colors.grey.shade400),
                 const SizedBox(height: 12),
-                Text('No articles published yet', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16, color: _dark)),
+                Text(
+                  loc.s('No articles published yet', 'Wala pang nailathalang artikulo'),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16, color: _dark),
+                ),
                 const SizedBox(height: 4),
-                Text('Admin publications and DA advisories will appear here.', style: GoogleFonts.inter(fontSize: 13, color: _muted)),
+                Text(
+                  loc.s('Admin publications and DA advisories will appear here.', 'Dito lalabas ang mga opisyal na babasahin at payo mula sa DA.'),
+                  style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                ),
               ],
             ),
           );
@@ -1328,6 +1348,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticleCard(ArticleItem article) {
+    final loc = FarmerLocaleService.instance;
     final sw = MediaQuery.of(context).size.width;
     final isSmall = sw < 600;
 
@@ -1344,8 +1365,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            'FEATURED ARTICLE',
-            style: TextStyle(
+            loc.s('FEATURED ARTICLE', 'TAMPOC NA ARTIKULO'),
+            style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: _primary,
@@ -1365,7 +1386,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         const SizedBox(height: 6),
         Text(
           article.excerpt,
-          style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
+          style: const TextStyle(fontSize: 13, color: _muted, height: 1.4),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1373,8 +1394,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         Row(
           children: [
             Text(
-              'By ${article.author}',
-              style: TextStyle(fontSize: 12, color: _muted),
+              '${loc.s("By", "Ni")} ${article.author}',
+              style: const TextStyle(fontSize: 12, color: _muted),
             ),
             const SizedBox(width: 8),
             Container(
@@ -1488,12 +1509,13 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildMarketPriceTrends() {
+    final loc = FarmerLocaleService.instance;
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _marketPricesFuture,
       builder: (context, snapshot) {
         final prices = snapshot.data ?? [
-          {'item': 'Palay / Rice', 'price': '₱45 / kg', 'trend': 'Stable', 'up': null},
-          {'item': 'Fresh Eggs', 'price': '₱7 / pc', 'trend': 'Stable', 'up': null},
+          {'item': loc.s('Palay / Rice', 'Palay / Bigas'), 'price': '₱45 / kg', 'trend': loc.s('Stable', 'Matatag'), 'up': null},
+          {'item': loc.s('Fresh Eggs', 'Sariwang Itlog'), 'price': '₱7 / pc', 'trend': loc.s('Stable', 'Matatag'), 'up': null},
         ];
 
         return Container(
@@ -1510,9 +1532,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 children: [
                   const Icon(Icons.trending_up_rounded, color: _primary, size: 20),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Market Price Index',
-                    style: TextStyle(
+                  Text(
+                    loc.s('Market Price Index', 'Presyo sa Pamilihan'),
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: _dark,
@@ -1524,6 +1546,12 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               ...prices.map((p) {
                 final isUp = p['up'] == true;
                 final isDown = p['up'] == false;
+                String itemStr = p['item'] as String;
+                if (itemStr == 'Palay / Rice') itemStr = loc.s('Palay / Rice', 'Palay / Bigas');
+                if (itemStr == 'Fresh Eggs') itemStr = loc.s('Fresh Eggs', 'Sariwang Itlog');
+
+                String trendStr = p['trend'] as String;
+                if (trendStr.toLowerCase() == 'stable') trendStr = loc.s('Stable', 'Matatag');
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -1531,7 +1559,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        p['item'] as String,
+                        itemStr,
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1560,7 +1588,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              p['trend'] as String,
+                              trendStr,
                               style: GoogleFonts.inter(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -1629,7 +1657,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                     Text(
                       '$desc · $location',
-                      style: TextStyle(fontSize: 12, color: _muted),
+                      style: const TextStyle(fontSize: 12, color: _muted),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1644,6 +1672,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildTrendingTopics() {
+    final loc = FarmerLocaleService.instance;
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: SupabaseDataService().getTrendingTopics(),
       builder: (context, snapshot) {
@@ -1659,9 +1688,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Trending Topics',
-                style: TextStyle(
+              Text(
+                loc.s('Trending Topics', 'Mga Patok na Paksa'),
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: _dark,
@@ -1671,8 +1700,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               if (topics.isEmpty &&
                   snapshot.connectionState != ConnectionState.waiting)
                 Text(
-                  'No trending topics yet',
-                  style: TextStyle(fontSize: 12, color: _muted),
+                  loc.s('No trending topics yet', 'Wala pang patok na paksa'),
+                  style: const TextStyle(fontSize: 12, color: _muted),
                 )
               else
                 ...topics.asMap().entries.map((entry) {
@@ -1724,7 +1753,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                           ),
                           child: Text(
                             '${t['engagement']}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: _primary,
@@ -1743,6 +1772,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildPopularTags() {
+    final loc = FarmerLocaleService.instance;
     return FutureBuilder<List<String>>(
       future: SupabaseDataService().getPopularTags(),
       builder: (context, snapshot) {
@@ -1758,9 +1788,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Popular Tags',
-                style: TextStyle(
+              Text(
+                loc.s('Popular Tags', 'Mga Sikat na Tag'),
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: _dark,
@@ -1770,8 +1800,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               if (tags.isEmpty &&
                   snapshot.connectionState != ConnectionState.waiting)
                 Text(
-                  'No tags found',
-                  style: TextStyle(fontSize: 12, color: _muted),
+                  loc.s('No tags found', 'Walang nahanap na tag'),
+                  style: const TextStyle(fontSize: 12, color: _muted),
                 )
               else
                 Wrap(
@@ -1790,7 +1820,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       ),
                       child: Text(
                         tag,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: _muted,
@@ -1807,6 +1837,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildTopContributors() {
+    final loc = FarmerLocaleService.instance;
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: SupabaseDataService().getTopContributors(),
       builder: (context, snapshot) {
@@ -1827,9 +1858,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Top Contributors',
-                style: TextStyle(
+              Text(
+                loc.s('Top Contributors', 'Nangungunang Nag-ambag'),
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: _dark,
@@ -1839,8 +1870,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               if (contributors.isEmpty &&
                   snapshot.connectionState != ConnectionState.waiting)
                 Text(
-                  'No contributors yet',
-                  style: TextStyle(fontSize: 12, color: _muted),
+                  loc.s('No contributors yet', 'Wala pang nag-aambag'),
+                  style: const TextStyle(fontSize: 12, color: _muted),
                 )
               else
                 ...contributors.asMap().entries.map((entry) {
@@ -1888,8 +1919,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                                 ),
                               ),
                               Text(
-                                c['posts'],
-                                style: TextStyle(fontSize: 11, color: _muted),
+                                '${c['posts']} ${loc.s("posts", "post")}',
+                                style: const TextStyle(fontSize: 11, color: _muted),
                               ),
                             ],
                           ),

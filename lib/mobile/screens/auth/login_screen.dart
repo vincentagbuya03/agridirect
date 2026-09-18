@@ -111,11 +111,14 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     // Prevent double clicking
     if (_isLoading || _isGoogleLoading) return;
 
-    final email = _emailController.text.trim();
+    final identifier = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _showErrorModal('Missing Fields', 'Please enter your email and password.');
+    if (identifier.isEmpty || password.isEmpty) {
+      _showErrorModal(
+        'Missing Fields',
+        'Please enter your email or mobile number and password.',
+      );
       return;
     }
 
@@ -127,7 +130,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
 
     setState(() => _isLoading = true);
     final auth = AuthService();
-    final success = await auth.login(email: email, password: password);
+    final success = await auth.login(email: identifier, password: password);
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -142,7 +145,8 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       } else {
         _showErrorModal(
           'Login Failed',
-          auth.errorMessage ?? 'Invalid email or password. Please try again.',
+          auth.errorMessage ??
+              'Invalid email/mobile number or password. Please try again.',
         );
       }
     }
@@ -510,15 +514,15 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
 
                                       const SizedBox(height: 18),
 
-                                      // Email Address Field
-                                      _buildInputLabel('Email Address'),
+                                      // Email or Mobile Number Field
+                                      _buildInputLabel('Email or Mobile Number'),
                                       const SizedBox(height: 6),
                                       _buildTextField(
                                         controller: _emailController,
-                                        hintText: 'name@example.com',
-                                        prefixIcon: Icons.mail_outline_rounded,
+                                        hintText: 'name@example.com or 09XXXXXXXXX',
+                                        prefixIcon: Icons.alternate_email_rounded,
                                         keyboardType: TextInputType.emailAddress,
-                                        autofillHints: const [AutofillHints.email],
+                                        autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
                                       ),
                                       const SizedBox(height: 12),
 

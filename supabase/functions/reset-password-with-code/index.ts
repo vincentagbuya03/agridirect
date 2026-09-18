@@ -68,9 +68,9 @@ function buildCorsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("origin");
   const allowedOrigins = getAllowedOrigins();
 
-  const allowOrigin = origin == null || origin.trim().isEmpty
+  const allowOrigin = !origin || origin.trim().length === 0
     ? "*"
-    : allowedOrigins.length == 0
+    : allowedOrigins.length === 0
     ? origin
     : allowedOrigins.includes(origin)
     ? origin
@@ -294,32 +294,65 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    // Resolve user_id from users or role-aware view.
-    let userId: string | null = null;
+    // Collect all candidate user IDs that match the identifier (email or phone variants).
+    const candidateUserIds: string[] = [];
 
-    const userFromUsers = await adminClient
+    // 1. Check users table by email
+    const usersByEmail = await adminClient
       .from("users")
       .select("user_id")
       .ilike("email", email)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(5);
 
-    if (userFromUsers.data?.user_id) {
-      userId = String(userFromUsers.data.user_id);
-    }
-
-    if (!userId) {
-      const userFromView = await adminClient
-        .from("v_users_with_roles")
-        .select("user_id")
-        .ilike("email", email)
-        .maybeSingle();
-
-      if (userFromView.data?.user_id) {
-        userId = String(userFromView.data.user_id);
+    if (usersByEmail.data) {
+      for (const row of usersByEmail.data) {
+        if (row.user_id && !candidateUserIds.includes(String(row.user_id))) {
+          candidateUserIds.push(String(row.user_id));
+        }
       }
     }
 
-    if (!userId) {
+    // 2. Check v_users_with_roles view by email
+    if (candidateUserIds.length === 0) {
+      const viewByEmail = await adminClient
+        .from("v_users_with_roles")
+        .select("user_id")
+        .ilike("email", email)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (viewByEmail.data) {
+        for (const row of viewByEmail.data) {
+          if (row.user_id && !candidateUserIds.includes(String(row.user_id))) {
+            candidateUserIds.push(String(row.user_id));
+          }
+        }
+      }
+    }
+
+    // 3. Check users table by phone variants or synthetic email
+    const digits = email.replace(/[^\d]/g, "");
+    if (digits.length >= 10) {
+      const tenDigits = digits.slice(-10);
+      const usersByPhone = await adminClient
+        .from("users")
+        .select("user_id")
+        .or(`phone.eq.+63${tenDigits},phone.eq.63${tenDigits},phone.eq.0${tenDigits},phone.eq.${tenDigits},phone.ilike.%${tenDigits},email.eq.63${tenDigits}@phone.agridirect.ph`)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (usersByPhone.data) {
+        for (const row of usersByPhone.data) {
+          if (row.user_id && !candidateUserIds.includes(String(row.user_id))) {
+            candidateUserIds.push(String(row.user_id));
+          }
+        }
+      }
+    }
+
+    if (candidateUserIds.length === 0) {
+      console.warn(`[reset-password] No user found for identifier: ${email}`);
       return new Response(
         JSON.stringify({ error: "Invalid or expired code." }),
         {
@@ -329,52 +362,75 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    // First attempt normal verification (works if code is still unused).
+    // 4. Resolve exact userId by checking which candidate user has a matching verification code
+    let resolvedUserId: string | null = null;
+    let matchingCodeRow: VerificationRow | null = null;
+
+    const codesQuery = await adminClient
+      .from("verification_codes")
+      .select("code_id, user_id, verification_code, verification_type, used_at, expires_at, created_at")
+      .in("user_id", candidateUserIds)
+      .eq("verification_code", code)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (codesQuery.data && codesQuery.data.length > 0) {
+      const foundRow = codesQuery.data[0] as unknown as VerificationRow & { user_id: string };
+      resolvedUserId = String(foundRow.user_id);
+      matchingCodeRow = foundRow;
+    } else {
+      // Fallback: pick the first candidate if no matching code row found immediately
+      resolvedUserId = candidateUserIds[0];
+    }
+
+    const userId = resolvedUserId;
+
+    // 5. Verify the code
+    let isVerified = false;
+
+    // First attempt normal verification via RPC (works if code is still unused)
     const verifyRes = await adminClient.rpc("verify_user_code", {
       p_user_id: userId,
       p_code: code,
     });
 
-    const verifySuccess = Boolean(
-      (verifyRes.data as { success?: boolean } | null)?.success,
-    );
+    if (Boolean((verifyRes.data as { success?: boolean } | null)?.success)) {
+      isVerified = true;
+    } else {
+      // Fallback: code may have already been consumed during the explicit "Verify Code" step
+      if (matchingCodeRow) {
+        const now = Date.now();
+        const usedAt = matchingCodeRow.used_at ? new Date(matchingCodeRow.used_at).getTime() : null;
+        const expiresAt = matchingCodeRow.expires_at ? new Date(matchingCodeRow.expires_at).getTime() : null;
 
-    // Fallback: code may already be consumed by the explicit "Verify Code" step.
-    if (!verifySuccess) {
-      const recentVerification = await adminClient
+        // Valid if:
+        // a) Unused and not expired
+        // b) Used within the last 15 minutes as part of the current verification flow
+        if (usedAt == null && expiresAt != null && expiresAt > now) {
+          isVerified = true;
+        } else if (usedAt != null && now - usedAt <= 15 * 60 * 1000) {
+          isVerified = true;
+        }
+      }
+    }
+
+    if (!isVerified) {
+      console.warn(`[reset-password] Verification failed for user: ${userId}, code: ${code}`);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired code." }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Ensure the code is marked as used
+    if (matchingCodeRow?.code_id && !matchingCodeRow.used_at) {
+      await adminClient
         .from("verification_codes")
-        .select("code_id, verification_code, verification_type, used_at, expires_at, created_at")
-        .eq("user_id", userId)
-        .eq("verification_type", "password_reset")
-        .eq("verification_code", code)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const row = recentVerification.data as VerificationRow | null;
-      if (row == null || row.used_at == null) {
-        return new Response(
-          JSON.stringify({ error: "Invalid or expired code." }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      const now = Date.now();
-      const usedAt = new Date(row.used_at).getTime();
-      const recentlyVerified = now - usedAt <= 10 * 60 * 1000; // 10 minutes
-
-      if (!recentlyVerified) {
-        return new Response(
-          JSON.stringify({ error: "Invalid or expired code." }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
+        .update({ used_at: new Date().toISOString() })
+        .eq("code_id", matchingCodeRow.code_id);
     }
 
     const updateRes = await adminClient.auth.admin.updateUserById(userId, {

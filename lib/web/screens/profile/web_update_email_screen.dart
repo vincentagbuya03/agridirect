@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
@@ -69,21 +70,9 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
     });
 
     try {
-      // 1. Verify current password credentials first for security
-      final currentUser = SupabaseConfig.client.auth.currentUser;
-      if (currentUser?.email != null) {
-        final reauth = await SupabaseConfig.client.auth.signInWithPassword(
-          email: currentUser!.email!,
-          password: password,
-        );
-        if (reauth.user == null) {
-          throw const AuthException('Incorrect password provided.');
-        }
-      }
-
-      // 2. Request Email Update via Supabase Auth
-      await SupabaseConfig.client.auth.updateUser(
-        UserAttributes(email: newEmail),
+      await AuthService().linkRealEmail(
+        newEmail: newEmail,
+        password: password,
       );
 
       if (!mounted) return;
@@ -91,6 +80,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
         _isLoading = false;
         _isSuccess = true;
         _pendingNewEmail = newEmail;
+        _currentEmail = newEmail;
       });
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -102,7 +92,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to update email: $e';
+        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
       });
     }
   }
@@ -206,6 +196,8 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
   }
 
   Widget _buildWebForm() {
+    final isPhoneAccount = _currentEmail.trim().toLowerCase().endsWith('@phone.agridirect.ph');
+
     return Form(
       key: _formKey,
       child: Column(
@@ -216,11 +208,14 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF059669).withValues(alpha: 0.1),
+                  color: (isPhoneAccount ? const Color(0xFFF59E0B) : const Color(0xFF059669)).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.email_outlined,
-                    color: Color(0xFF059669), size: 28),
+                child: Icon(
+                  isPhoneAccount ? Icons.phone_android_rounded : Icons.email_outlined,
+                  color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -228,7 +223,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Update Email Address',
+                      isPhoneAccount ? 'Link Email Address' : 'Update Email Address',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -237,7 +232,9 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Change the primary email address associated with your AgriDirect account.',
+                      isPhoneAccount
+                          ? 'Add your personal email to receive receipts, order updates, and recover your account.'
+                          : 'Change the primary email address associated with your AgriDirect account.',
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         color: const Color(0xFF64748B),
@@ -262,15 +259,18 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_user_rounded,
-                      color: Color(0xFF059669), size: 20),
+                  Icon(
+                    isPhoneAccount ? Icons.phone_android_rounded : Icons.verified_user_rounded,
+                    color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Current Registered Email',
+                          isPhoneAccount ? 'Sign-up Method' : 'Current Registered Email',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -278,7 +278,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
                           ),
                         ),
                         Text(
-                          _currentEmail,
+                          isPhoneAccount ? 'Registered with Phone Number' : _currentEmail,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -292,15 +292,18 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: isPhoneAccount ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: (isPhoneAccount ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Text(
-                      'Active',
+                      isPhoneAccount ? 'No Email' : 'Active',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF059669),
+                        color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
                       ),
                     ),
                   ),
@@ -445,7 +448,9 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
-                      'Send Verification to New Email',
+                      _currentEmail.trim().toLowerCase().endsWith('@phone.agridirect.ph')
+                          ? 'Link Email Address'
+                          : 'Update Email Address',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -478,7 +483,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Verification Email Sent!',
+              'Email Linked Successfully!',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -487,7 +492,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'We sent a confirmation link to $_pendingNewEmail',
+              'Your personal email address ($_pendingNewEmail) is now linked.',
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -498,7 +503,7 @@ class _WebUpdateEmailScreenState extends State<WebUpdateEmailScreen> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
               child: Text(
-                'Please check your email inbox and click the confirmation link to complete updating your account email.',
+                'You can now use this email address to log in, receive order receipts and tracking alerts, and recover your account password.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 14,

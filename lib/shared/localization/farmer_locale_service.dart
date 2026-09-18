@@ -50,6 +50,16 @@ class FarmerLocaleService extends ChangeNotifier {
     await setLanguage(next);
   }
 
+  /// Alias for toggleLanguage
+  Future<void> toggleLocale() => toggleLanguage();
+
   /// Helper to get translated string for current language
   String t(String key) => FarmerStrings.get(key, lang: _currentLanguage);
+
+  /// Helper to return Filipino or English based on active language
+  String s(String en, String fil) => isFilipino ? fil : en;
+
+  /// Shorthand static helpers
+  static String tr(String key) => _instance.t(key);
+  static String str(String en, String fil) => _instance.s(en, fil);
 }

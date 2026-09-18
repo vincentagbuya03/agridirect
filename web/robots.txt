@@ -6,7 +6,7 @@ Allow: /shop
 Allow: /community
 
 # Host
-Host: https://agridirect-app.vercel.app
+Host: https://www.agridirect.site
 
 # Sitemap
-Sitemap: https://agridirect-app.vercel.app/sitemap.xml
+Sitemap: https://www.agridirect.site/sitemap.xml

@@ -8,6 +8,7 @@ import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import '../../../mobile/screens/farmer/farmer_order_details_screen.dart';
 import '../../widgets/farmer/web_farmer_header.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class WebFarmerOrders extends StatefulWidget {
   final Function(int) onNavigate;
@@ -175,65 +176,93 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
       _countForStatus('PROCESSING') +
       _countForStatus('SHIPPED');
 
+  String _getStatusFilterLabel(String st) {
+    final loc = FarmerLocaleService.instance;
+    switch (st) {
+      case 'ALL':
+        return loc.s('All Orders', 'Lahat ng Order');
+      case 'PENDING':
+        return loc.s('Pending', 'Nakabinbin');
+      case 'CONFIRMED':
+        return loc.s('Confirmed', 'Kumpirmado');
+      case 'PROCESSING':
+        return loc.s('Processing', 'Inihahanda');
+      case 'SHIPPED':
+        return loc.s('Shipped / Ready', 'Naipadala / Handa');
+      case 'DELIVERED':
+        return loc.s('Delivered', 'Naihatid Na');
+      case 'CANCELLED':
+        return loc.s('Cancelled', 'Kinansela');
+      default:
+        return st;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 768;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        final sw = MediaQuery.of(context).size.width;
+        final isMobile = sw < 768;
 
-    return Scaffold(
-      backgroundColor: _surface,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.025, color: _primary),
-            ),
-          ),
-          Column(
+        return Scaffold(
+          backgroundColor: _surface,
+          body: Stack(
             children: [
-              WebFarmerHeader(
-                currentIndex: widget.currentIndex,
-                onNavigate: (index, [route]) => widget.onNavigate(index),
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: DotPatternPainter(opacity: 0.025, color: _primary),
+                ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 16 : 36,
-                    12,
-                    isMobile ? 16 : 36,
-                    48,
+              Column(
+                children: [
+                  WebFarmerHeader(
+                    currentIndex: widget.currentIndex,
+                    onNavigate: (index, [route]) => widget.onNavigate(index),
                   ),
-                  child: FadeTransition(
-                    opacity: _fadeInController,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1400),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildTopHeader(isMobile),
-                            const SizedBox(height: 20),
-                            _buildMetricsStrip(isMobile),
-                            const SizedBox(height: 24),
-                            _buildControlHub(isMobile),
-                            const SizedBox(height: 16),
-                            _buildOrdersContent(isMobile),
-                          ],
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        isMobile ? 16 : 36,
+                        12,
+                        isMobile ? 16 : 36,
+                        48,
+                      ),
+                      child: FadeTransition(
+                        opacity: _fadeInController,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1400),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildTopHeader(isMobile, loc),
+                                const SizedBox(height: 20),
+                                _buildMetricsStrip(isMobile, loc),
+                                const SizedBox(height: 24),
+                                _buildControlHub(isMobile, loc),
+                                const SizedBox(height: 16),
+                                _buildOrdersContent(isMobile, loc),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildTopHeader(bool isMobile) {
+  Widget _buildTopHeader(bool isMobile, FarmerLocaleService loc) {
     return Row(
       children: [
         Expanded(
@@ -264,7 +293,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          'FARMER ORDER HUB',
+                          loc.s('FARMER ORDER HUB', 'SENTRO NG MGA ORDER'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
@@ -279,7 +308,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               ),
               const SizedBox(height: 8),
               Text(
-                'Order Fulfillment & Sales',
+                loc.s('Order Fulfillment & Sales', 'Pangangasiwa ng Order at Benta'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 22 : 28,
                   fontWeight: FontWeight.w900,
@@ -289,7 +318,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               ),
               const SizedBox(height: 4),
               Text(
-                'Manage incoming buyer requests, prepare harvests, and track farm shipments.',
+                loc.s(
+                  'Manage incoming buyer requests, prepare harvests, and track farm shipments.',
+                  'Pamahalaan ang mga order ng mamimili, ihanda ang ani, at subaybayan ang pagpapadala.',
+                ),
                 style: GoogleFonts.inter(
                   fontSize: isMobile ? 12 : 13.5,
                   color: _muted,
@@ -323,7 +355,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   if (!isMobile) ...[
                     const SizedBox(width: 8),
                     Text(
-                      'Refresh',
+                      loc.s('Refresh', 'I-refresh'),
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -341,40 +373,42 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Executive KPI Metrics Strip ──────────────────────────────────────────
-  Widget _buildMetricsStrip(bool isMobile) {
+  Widget _buildMetricsStrip(bool isMobile, FarmerLocaleService loc) {
     final metrics = [
       _MetricData(
-        title: 'Total Orders',
+        title: loc.s('Total Orders', 'Kabuuan ng Order'),
         value: _orders.length.toString(),
-        subtitle: 'All-time volume',
+        subtitle: loc.s('All-time volume', 'Kabuuang dami'),
         icon: Icons.receipt_long_rounded,
         color: const Color(0xFF0284C7),
         bgColor: const Color(0xFFF0F9FF),
         borderColor: const Color(0xFFBAE6FD),
       ),
       _MetricData(
-        title: 'Action Required',
+        title: loc.s('Action Required', 'Kailangan ng Aksyon'),
         value: _pendingCount.toString(),
-        subtitle: _pendingCount > 0 ? 'Needs confirmation' : 'All caught up',
+        subtitle: _pendingCount > 0
+            ? loc.s('Needs confirmation', 'Kailangan kumpirmahin')
+            : loc.s('All caught up', 'Lahat naasikaso'),
         icon: Icons.hourglass_top_rounded,
         color: const Color(0xFFD97706),
         bgColor: const Color(0xFFFFFBEB),
         borderColor: const Color(0xFFFDE68A),
-        badgeText: _pendingCount > 0 ? 'URGENT' : null,
+        badgeText: _pendingCount > 0 ? loc.s('URGENT', 'APURAHAN') : null,
       ),
       _MetricData(
-        title: 'In Fulfillment',
+        title: loc.s('In Fulfillment', 'Kasalukuyang Inihahanda'),
         value: _inProgressCount.toString(),
-        subtitle: 'Processing & In-Transit',
+        subtitle: loc.s('Processing & In-Transit', 'Inihahanda at Papunta Na'),
         icon: Icons.local_shipping_rounded,
         color: const Color(0xFF7C3AED),
         bgColor: const Color(0xFFF5F3FF),
         borderColor: const Color(0xFFDDD6FE),
       ),
       _MetricData(
-        title: 'Delivered Revenue',
+        title: loc.s('Delivered Revenue', 'Kita sa Naihatid'),
         value: '₱${_totalDeliveredRevenue.toStringAsFixed(2)}',
-        subtitle: 'Completed sales payout',
+        subtitle: loc.s('Completed sales payout', 'Kabuuang natapos na benta'),
         icon: Icons.account_balance_wallet_rounded,
         color: _primary,
         bgColor: const Color(0xFFECFDF5),
@@ -500,7 +534,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Control Hub (Search, Filters, Sort) ───────────────────────────────────
-  Widget _buildControlHub(bool isMobile) {
+  Widget _buildControlHub(bool isMobile, FarmerLocaleService loc) {
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -551,7 +585,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              st,
+                              _getStatusFilterLabel(st),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: isSelected
@@ -615,7 +649,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   onChanged: (v) => setState(() => _searchQuery = v),
                   style: GoogleFonts.inter(fontSize: 13, color: _dark),
                   decoration: InputDecoration(
-                    hintText: 'Search order #, customer, item...',
+                    hintText: loc.s(
+                      'Search order #, customer, item...',
+                      'Maghanap ng order #, mamimili, produkto...',
+                    ),
                     hintStyle: GoogleFonts.inter(color: _muted, fontSize: 12.5),
                     prefixIcon: const Icon(
                       Icons.search_rounded,
@@ -656,18 +693,18 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                         setState(() => _selectedFulfillment = val);
                       }
                     },
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'ALL',
-                        child: Text('All Methods'),
+                        child: Text(loc.s('All Methods', 'Lahat ng Paraan')),
                       ),
                       DropdownMenuItem(
                         value: 'DELIVERY',
-                        child: Text('🚚 Delivery Orders'),
+                        child: Text(loc.s('🚚 Delivery Orders', '🚚 Mga Ihahatid')),
                       ),
                       DropdownMenuItem(
                         value: 'PICKUP',
-                        child: Text('🏪 Farm Pickups (COP)'),
+                        child: Text(loc.s('🏪 Farm Pickups (COP)', '🏪 Kukunin sa Bukid (COP)')),
                       ),
                     ],
                   ),
@@ -699,18 +736,18 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     onChanged: (val) {
                       if (val != null) setState(() => _sortBy = val);
                     },
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'NEWEST',
-                        child: Text('Sort: Newest First'),
+                        child: Text(loc.s('Sort: Newest First', 'Ayos: Pinakabago')),
                       ),
                       DropdownMenuItem(
                         value: 'OLDEST',
-                        child: Text('Sort: Oldest First'),
+                        child: Text(loc.s('Sort: Oldest First', 'Ayos: Pinakaluma')),
                       ),
                       DropdownMenuItem(
                         value: 'HIGHEST',
-                        child: Text('Sort: Highest Amount'),
+                        child: Text(loc.s('Sort: Highest Amount', 'Ayos: Pinakamalaking Halaga')),
                       ),
                     ],
                   ),
@@ -724,7 +761,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Orders Data View ──────────────────────────────────────────────────────
-  Widget _buildOrdersContent(bool isMobile) {
+  Widget _buildOrdersContent(bool isMobile, FarmerLocaleService loc) {
     if (!_ordersLoaded) {
       return _buildSkeleton(isMobile);
     }
@@ -745,8 +782,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
             children: [
               Container(
                 padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -757,7 +794,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               ),
               const SizedBox(height: 16),
               Text(
-                'No Orders Found',
+                loc.s('No Orders Found', 'Walang Nahanap na Order'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -767,8 +804,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               const SizedBox(height: 6),
               Text(
                 _searchQuery.isNotEmpty || _selectedStatus != 'ALL'
-                    ? 'No records match your active search or filter criteria.'
-                    : 'Your customer orders will appear here once placed.',
+                    ? loc.s(
+                        'No records match your active search or filter criteria.',
+                        'Walang tumutugma sa iyong paghahanap o filter.',
+                      )
+                    : loc.s(
+                        'Your customer orders will appear here once placed.',
+                        'Lalabas dito ang mga order kapag may bumili na.',
+                      ),
                 style: GoogleFonts.inter(fontSize: 13, color: _muted),
                 textAlign: TextAlign.center,
               ),
@@ -783,7 +826,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     });
                   },
                   icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
-                  label: const Text('Reset All Filters'),
+                  label: Text(loc.s('Reset All Filters', 'I-reset ang mga Filter')),
                   style: TextButton.styleFrom(
                     foregroundColor: _primary,
                     textStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -802,7 +845,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
         physics: const NeverScrollableScrollPhysics(),
         itemCount: filtered.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (ctx, i) => _buildMobileOrderCard(filtered[i]),
+        itemBuilder: (ctx, i) => _buildMobileOrderCard(filtered[i], loc),
       );
     }
 
@@ -829,13 +872,13 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  _headerCell('ORDER ID', flex: 4),
-                  _headerCell('DATE', flex: 2),
-                  _headerCell('CUSTOMER', flex: 3),
-                  _headerCell('ITEMS', flex: 4),
-                  _headerCell('TOTAL', flex: 2),
-                  _headerCell('STATUS', flex: 3),
-                  _headerCell('ACTION', flex: 3, align: TextAlign.end),
+                  _headerCell(loc.s('ORDER ID', 'ORDER ID'), flex: 4),
+                  _headerCell(loc.s('DATE', 'PETSA'), flex: 2),
+                  _headerCell(loc.s('CUSTOMER', 'MAMIMILI'), flex: 3),
+                  _headerCell(loc.s('ITEMS', 'MGA PRODUKTO'), flex: 4),
+                  _headerCell(loc.s('TOTAL', 'KABUUAN'), flex: 2),
+                  _headerCell(loc.s('STATUS', 'KATAYUAN'), flex: 3),
+                  _headerCell(loc.s('ACTION', 'AKSYON'), flex: 3, align: TextAlign.end),
                 ],
               ),
             ),
@@ -848,7 +891,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               itemCount: filtered.length,
               separatorBuilder: (_, _) =>
                   const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              itemBuilder: (ctx, i) => _buildDesktopTableRow(filtered[i]),
+              itemBuilder: (ctx, i) => _buildDesktopTableRow(filtered[i], loc),
             ),
           ],
         ),
@@ -877,7 +920,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Desktop Table Row ─────────────────────────────────────────────────────
-  Widget _buildDesktopTableRow(Map<String, dynamic> o) {
+  Widget _buildDesktopTableRow(Map<String, dynamic> o, FarmerLocaleService loc) {
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
     final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
     final canProgress = status != 'DELIVERED' && status != 'CANCELLED';
@@ -900,14 +943,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     Clipboard.setData(ClipboardData(text: id));
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Copied order ID: $id'),
+                        content: Text('${loc.s('Copied order ID', 'Nakopya ang order ID')}: $id'),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
                   },
                   child: Tooltip(
-                    message: 'Click to copy: ${o['orderId'] ?? ''}',
+                    message: '${loc.s('Click to copy', 'Pindutin para kopyahin')}: ${o['orderId'] ?? ''}',
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -973,7 +1016,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      o['customerName'] ?? 'Customer',
+                      o['customerName'] ?? loc.s('Customer', 'Mamimili'),
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -1004,7 +1047,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      isCop ? '🏪 COP' : '🚚 Ship',
+                      isCop ? loc.s('🏪 COP', '🏪 Kukunin') : loc.s('🚚 Ship', '🚚 Ipadala'),
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1112,7 +1155,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       size: 20,
                       color: _muted,
                     ),
-                    tooltip: 'View Full Details',
+                    tooltip: loc.s('View Full Details', 'Tingnan ang Buong Detalye'),
                     splashRadius: 18,
                   ),
                 ],
@@ -1125,7 +1168,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Mobile Order Card ─────────────────────────────────────────────────────
-  Widget _buildMobileOrderCard(Map<String, dynamic> o) {
+  Widget _buildMobileOrderCard(Map<String, dynamic> o, FarmerLocaleService loc) {
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
     final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
     final canProgress = status != 'DELIVERED' && status != 'CANCELLED';
@@ -1176,7 +1219,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      isCop ? '🏪 Pickup' : '🚚 Delivery',
+                      isCop ? loc.s('🏪 Pickup', '🏪 Kukunin') : loc.s('🚚 Delivery', '🚚 Ihahatid'),
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1219,7 +1262,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  o['customerName'] ?? 'Customer',
+                  o['customerName'] ?? loc.s('Customer', 'Mamimili'),
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1262,7 +1305,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'TOTAL AMOUNT',
+                    loc.s('TOTAL AMOUNT', 'KABUUANG HALAGA'),
                     style: GoogleFonts.inter(
                       fontSize: 9.5,
                       color: _muted,
@@ -1295,7 +1338,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       ),
                     ),
                     child: Text(
-                      'Details',
+                      loc.s('Details', 'Detalye'),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1350,34 +1393,40 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   // ─── Status Label Helpers ──────────────────────────────────────────────────
   String _getNextActionShortLabel(String status, dynamic paymentMethod) {
+    final loc = FarmerLocaleService.instance;
     final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
     switch (status) {
       case 'PENDING':
-        return 'Confirm';
+        return loc.s('Confirm', 'Kumpirmahin');
       case 'CONFIRMED':
-        return 'Prepare';
+        return loc.s('Prepare', 'Ihanda');
       case 'PROCESSING':
-        return isCop ? 'Ready Pickup' : 'Ship';
+        return isCop ? loc.s('Ready Pickup', 'Handang Kunin') : loc.s('Ship', 'Ipadala');
       case 'SHIPPED':
-        return isCop ? 'Complete' : 'Delivered';
+        return isCop ? loc.s('Complete', 'Tapusin') : loc.s('Delivered', 'Naihatid');
       default:
-        return 'Done';
+        return loc.s('Done', 'Tapos Na');
     }
   }
 
   String _getNextActionLabel(String status, dynamic paymentMethod) {
+    final loc = FarmerLocaleService.instance;
     final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
     switch (status) {
       case 'PENDING':
-        return 'Confirm Order';
+        return loc.s('Confirm Order', 'Kumpirmahin ang Order');
       case 'CONFIRMED':
-        return 'Prepare Harvest / Items';
+        return loc.s('Prepare Harvest / Items', 'Ihanda ang Ani / Produkto');
       case 'PROCESSING':
-        return isCop ? 'Mark Ready for Pickup' : 'Ship Order via Courier';
+        return isCop
+            ? loc.s('Mark Ready for Pickup', 'Markahan bilang Handang Kunin')
+            : loc.s('Ship Order via Courier', 'Ipadala sa Courier');
       case 'SHIPPED':
-        return isCop ? 'Complete Buyer Pickup' : 'Mark Delivered';
+        return isCop
+            ? loc.s('Complete Buyer Pickup', 'Kumpirmahing Nakuha ng Mamimili')
+            : loc.s('Mark Delivered', 'Markahan bilang Naihatid');
       default:
-        return 'Order Completed';
+        return loc.s('Order Completed', 'Tapos na ang Order');
     }
   }
 
@@ -1510,6 +1559,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   Future<void> _processOrderConfirmation(Map<String, dynamic> o) async {
+    final loc = FarmerLocaleService.instance;
     final orderIdStr = o['orderId'] ?? '#0000';
     final rawOrderId = o['rawOrderId']?.toString();
     if (rawOrderId == null) return;
@@ -1518,30 +1568,54 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
 
     String nextStatus = 'CONFIRMED';
-    String actionText = 'Confirm Order';
-    String confirmationMsg = 'Mark Order $orderIdStr as CONFIRMED?';
+    String actionText = loc.s('Confirm Order', 'Kumpirmahin ang Order');
+    String confirmationMsg = loc.s(
+      'Mark Order $orderIdStr as CONFIRMED?',
+      'Markahan ang Order $orderIdStr bilang KUMPIRMADO?',
+    );
 
     if (status == 'PENDING') {
       nextStatus = 'CONFIRMED';
-      actionText = 'Confirm Order';
-      confirmationMsg =
-          'Accept and confirm Order $orderIdStr? The buyer will be notified.';
+      actionText = loc.s('Confirm Order', 'Kumpirmahin ang Order');
+      confirmationMsg = loc.s(
+        'Accept and confirm Order $orderIdStr? The buyer will be notified.',
+        'Tanggapin at kumpirmahin ang Order $orderIdStr? May abiso sa mamimili.',
+      );
     } else if (status == 'CONFIRMED') {
       nextStatus = 'PROCESSING';
-      actionText = 'Prepare Order';
-      confirmationMsg = 'Start preparing items for Order $orderIdStr?';
+      actionText = loc.s('Prepare Order', 'Ihanda ang Order');
+      confirmationMsg = loc.s(
+        'Start preparing items for Order $orderIdStr?',
+        'Simulan ang paghahanda para sa Order $orderIdStr?',
+      );
     } else if (status == 'PROCESSING') {
       nextStatus = 'SHIPPED';
-      actionText = isCop ? 'Ready for Pickup' : 'Ship Order';
+      actionText = isCop
+          ? loc.s('Ready for Pickup', 'Handang Kunin')
+          : loc.s('Ship Order', 'Ipadala ang Order');
       confirmationMsg = isCop
-          ? 'Mark Order $orderIdStr as Ready for Pickup at your farm?'
-          : 'Mark Order $orderIdStr as Shipped with courier?';
+          ? loc.s(
+              'Mark Order $orderIdStr as Ready for Pickup at your farm?',
+              'Markahan ang Order $orderIdStr bilang Handa nang Kunin sa bukid?',
+            )
+          : loc.s(
+              'Mark Order $orderIdStr as Shipped with courier?',
+              'Markahan ang Order $orderIdStr bilang Naipadala sa courier?',
+            );
     } else if (status == 'SHIPPED') {
       nextStatus = 'DELIVERED';
-      actionText = isCop ? 'Complete Pickup' : 'Mark Delivered';
+      actionText = isCop
+          ? loc.s('Complete Pickup', 'Tapusin ang Pagkuha')
+          : loc.s('Mark Delivered', 'Markahan bilang Naihatid');
       confirmationMsg = isCop
-          ? 'Confirm buyer has picked up Order $orderIdStr?'
-          : 'Confirm Order $orderIdStr has been successfully delivered?';
+          ? loc.s(
+              'Confirm buyer has picked up Order $orderIdStr?',
+              'Kumpirmahing nakuha na ng mamimili ang Order $orderIdStr?',
+            )
+          : loc.s(
+              'Confirm Order $orderIdStr has been successfully delivered?',
+              'Kumpirmahing naihatid na ang Order $orderIdStr?',
+            );
     }
 
     final confirm = await showDialog<bool>(
@@ -1562,19 +1636,40 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
         await OrderService().updateOrderStatus(rawOrderId, nextStatus);
         if (mounted) {
           _updateOrderStatusLocally(rawOrderId, nextStatus);
-          String successMsg = 'Order updated successfully.';
+          String successMsg = loc.s(
+            'Order updated successfully.',
+            'Matagumpay na na-update ang order.',
+          );
           if (nextStatus == 'SHIPPED') {
             successMsg = isCop
-                ? 'Order is ready for farm pickup! Buyer notified.'
-                : 'Order marked as shipped and in-transit!';
+                ? loc.s(
+                    'Order is ready for farm pickup! Buyer notified.',
+                    'Handa na ang order para kunin sa bukid! May abiso na sa mamimili.',
+                  )
+                : loc.s(
+                    'Order marked as shipped and in-transit!',
+                    'Naipadala na ang order at papunta na!',
+                  );
           } else if (nextStatus == 'DELIVERED') {
             successMsg = isCop
-                ? 'Pickup completed! Order finalized.'
-                : 'Order delivered successfully!';
+                ? loc.s(
+                    'Pickup completed! Order finalized.',
+                    'Nakuha na ang order! Tapos na.',
+                  )
+                : loc.s(
+                    'Order delivered successfully!',
+                    'Matagumpay na naihatid ang order!',
+                  );
           } else if (nextStatus == 'CONFIRMED') {
-            successMsg = 'Order accepted! Ready to harvest & pack.';
+            successMsg = loc.s(
+              'Order accepted! Ready to harvest & pack.',
+              'Tinanggap ang order! Handa nang mag-ani at mag-impake.',
+            );
           } else if (nextStatus == 'PROCESSING') {
-            successMsg = 'Order is now processing!';
+            successMsg = loc.s(
+              'Order is now processing!',
+              'Kasalukuyan nang inihahanda ang order!',
+            );
           }
 
           late OverlayEntry overlayEntry;
@@ -1699,12 +1794,26 @@ class _StatusBadge extends StatelessWidget {
   }
 
   String get _labelText {
+    final loc = FarmerLocaleService.instance;
     final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
     if (isCop) {
-      if (status == 'DELIVERED') return 'PICKED UP';
-      if (status == 'SHIPPED') return 'READY PICKUP';
+      if (status == 'DELIVERED') return loc.s('PICKED UP', 'NAKUHA NA');
+      if (status == 'SHIPPED') return loc.s('READY PICKUP', 'HANDANG KUNIN');
     }
-    return status;
+    switch (status) {
+      case 'DELIVERED':
+        return loc.s('DELIVERED', 'NAIHATID NA');
+      case 'SHIPPED':
+        return loc.s('SHIPPED', 'NAIPADALA');
+      case 'PROCESSING':
+        return loc.s('PROCESSING', 'INIHAHANDA');
+      case 'CONFIRMED':
+        return loc.s('CONFIRMED', 'KUMPIRMADO');
+      case 'CANCELLED':
+        return loc.s('CANCELLED', 'KINANSELA');
+      default:
+        return loc.s('PENDING', 'NAKABINBIN');
+    }
   }
 
   @override
@@ -1832,7 +1941,7 @@ class _ConfirmDialog extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'Cancel',
+                        FarmerLocaleService.instance.s('Cancel', 'Kanselahin'),
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF64748B),
@@ -1964,7 +2073,7 @@ class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Status Updated',
+                      FarmerLocaleService.instance.s('Status Updated', 'Na-update ang Katayuan'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,

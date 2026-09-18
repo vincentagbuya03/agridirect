@@ -51,7 +51,6 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   String _searchQuery = '';
   String _filterSegment = 'all'; // all, vip, active, new, dormant, suspended
   String _sortBy = 'spend'; // spend, orders, newest, oldest, name
-  bool _piiMasked = false; // default false for admin operations
   late VoidCallback _dataRefreshListener;
 
   final TextEditingController _searchController = TextEditingController();
@@ -142,46 +141,6 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               title: 'Buyer & Consumer Management',
               subtitle: 'Monitor registered shoppers, purchasing volume, lifetime value, and order history.',
               actions: [
-                // Privacy Mode Toggle Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _piiMasked ? AdminUi.brandSoft : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _piiMasked ? AdminUi.brand.withValues(alpha: 0.3) : const Color(0xFFD3DFD7),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _piiMasked ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        size: 14,
-                        color: _piiMasked ? AdminUi.brand : AdminUi.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Privacy Mode',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _piiMasked ? AdminUi.brand : AdminUi.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Transform.scale(
-                        scale: 0.75,
-                        child: Switch(
-                          value: _piiMasked,
-                          onChanged: (v) => setState(() => _piiMasked = v),
-                          activeThumbColor: AdminUi.brand,
-                          activeTrackColor: AdminUi.brandSecondary.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
@@ -813,14 +772,15 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   Widget _buildMobileUserCard(Map<String, dynamic> user) {
-    final name = (user['name'] ?? 'Registered Buyer').toString();
+    final rawName = (user['name'] ?? 'Registered Buyer').toString();
     final rawEmail = (user['email'] ?? 'No email').toString();
     final rawPhone = (user['phone'] ?? 'No phone').toString();
     final rawUserId = (user['user_id'] ?? '').toString();
     final shortId = rawUserId.length >= 8 ? rawUserId.substring(0, 8) : rawUserId;
 
-    final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-    final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+    final name = _maskName(rawName);
+    final email = _maskString(rawEmail);
+    final phone = _maskPhone(rawPhone);
 
     final ordersCount = (user['orders_count'] as num? ?? 0).toInt();
     final totalSpent = ((user['total_spent'] as num?)?.toDouble() ?? 0.0);
@@ -1129,14 +1089,15 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   Widget _buildRow(Map<String, dynamic> user) {
-    final name = (user['name'] ?? 'Registered Buyer').toString();
+    final rawName = (user['name'] ?? 'Registered Buyer').toString();
     final rawEmail = (user['email'] ?? 'No email').toString();
     final rawPhone = (user['phone'] ?? 'No phone').toString();
     final rawUserId = (user['user_id'] ?? '').toString();
     final shortId = rawUserId.length >= 8 ? rawUserId.substring(0, 8) : rawUserId;
 
-    final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-    final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+    final name = _maskName(rawName);
+    final email = _maskString(rawEmail);
+    final phone = _maskPhone(rawPhone);
 
     final ordersCount = (user['orders_count'] as num? ?? 0).toInt();
     final totalSpent = ((user['total_spent'] as num?)?.toDouble() ?? 0.0);
@@ -1468,11 +1429,12 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               final totalSpend = ((data['total_spent'] as num?)?.toDouble() ?? 0.0);
               final isVip = totalSpend >= 1000 || orders.length >= 2;
 
-              final name = profile['name'] ?? 'Buyer';
-              final rawEmail = profile['email'] ?? 'No email';
-              final rawPhone = profile['phone'] ?? 'No phone';
-              final email = _piiMasked ? _maskString(rawEmail) : rawEmail;
-              final phone = _piiMasked ? _maskPhone(rawPhone) : rawPhone;
+              final rawName = (profile['name'] ?? 'Buyer').toString();
+              final rawEmail = (profile['email'] ?? 'No email').toString();
+              final rawPhone = (profile['phone'] ?? 'No phone').toString();
+              final name = _maskName(rawName);
+              final email = _maskString(rawEmail);
+              final phone = _maskPhone(rawPhone);
 
               return Padding(
                 padding: EdgeInsets.all(isMobile ? 18 : 28),
@@ -1889,6 +1851,17 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
         ),
       ],
     );
+  }
+
+  String _maskName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed == 'Registered Buyer' || trimmed == 'Buyer') return name;
+    final parts = trimmed.split(RegExp(r'\s+'));
+    return parts.map((part) {
+      if (part.length <= 1) return part;
+      if (part.length == 2) return '${part[0]}*';
+      return '${part[0]}${'*' * (part.length - 1)}';
+    }).join(' ');
   }
 
   String _maskString(String str) {

@@ -403,49 +403,90 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Farm logo avatar
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+                  // Farm logo avatar with tap to edit
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () async {
+                      await context.push(AppRoutes.myDetails);
+                      _loadFarmerData();
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: (_farmerImageUrl != null &&
+                                    _farmerImageUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    key: ValueKey(_farmerImageUrl),
+                                    imageUrl: _farmerImageUrl!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, _) =>
+                                        Container(color: Colors.white24),
+                                    errorWidget: (_, _, _) => Container(
+                                      color: Colors.white,
+                                      alignment: Alignment.center,
+                                      child: const Icon(
+                                        Icons.storefront_rounded,
+                                        size: 32,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: Colors.white,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.storefront_rounded,
+                                      size: 32,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                    child: ClipOval(
-                      child: (_farmerImageUrl != null &&
-                              _farmerImageUrl!.isNotEmpty)
-                          ? CachedNetworkImage(
-                              key: ValueKey(_farmerImageUrl),
-                              imageUrl: _farmerImageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) =>
-                                  Container(color: Colors.white24),
-                              errorWidget: (_, _, _) => Container(
-                                color: Colors.white,
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.person_rounded,
-                                  size: 36,
-                                  color: Color(0xFF059669),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: Colors.white,
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.person_rounded,
-                                size: 36,
-                                color: Color(0xFF059669),
-                              ),
-                            ),
                     ),
                   ),
                   const SizedBox(width: 16),

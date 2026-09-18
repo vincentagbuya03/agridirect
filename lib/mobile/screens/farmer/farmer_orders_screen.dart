@@ -7,6 +7,8 @@ import '../../../shared/models/order/order_model.dart';
 import 'farmer_order_details_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 
 class FarmerOrdersScreen extends StatefulWidget {
   const FarmerOrdersScreen({super.key});
@@ -148,25 +150,32 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _buildModernHeader(),
-            _buildSegmentedTabBar(),
-            if (_selectedTab == 0) _buildSubStatusFilterChips(),
-            Expanded(child: _buildOrdersContent()),
-          ],
-        ),
-      ),
+    final locale = FarmerLocaleService.instance;
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _buildModernHeader(),
+                _buildSegmentedTabBar(),
+                if (_selectedTab == 0) _buildSubStatusFilterChips(),
+                Expanded(child: _buildOrdersContent()),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildModernHeader() {
+    final locale = FarmerLocaleService.instance;
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -186,48 +195,61 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 child: const Icon(
                   Icons.receipt_long_rounded,
                   color: AppColors.primary,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'FARMER PORTAL',
+                      locale.s('FARMER PORTAL', 'PORTAL NG MAGSASAKA'),
                       style: GoogleFonts.inter(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
+                        letterSpacing: 1.0,
                         color: AppColors.primary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Orders & Sales',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                        letterSpacing: -0.4,
+                    const SizedBox(height: 1),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        locale.s('Orders & Sales', 'Mga Order at Benta'),
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                          letterSpacing: -0.4,
+                        ),
+                        maxLines: 1,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
+              const FarmerLanguageToggle(compact: true),
+              const SizedBox(width: 6),
               IconButton(
                 icon: Icon(
                   _isSearchExpanded
                       ? Icons.close_rounded
                       : Icons.search_rounded,
                   color: const Color(0xFF475569),
-                  size: 22,
+                  size: 20,
                 ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: const EdgeInsets.all(7),
                 style: IconButton.styleFrom(
                   backgroundColor: const Color(0xFFF1F5F9),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 onPressed: () {
@@ -240,17 +262,19 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   });
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               IconButton(
                 icon: const Icon(
                   Icons.refresh_rounded,
                   color: AppColors.primary,
-                  size: 22,
+                  size: 20,
                 ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: const EdgeInsets.all(7),
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 onPressed: _loadOrders,
@@ -275,7 +299,10 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 ),
                 onChanged: (val) => setState(() => _searchQuery = val),
                 decoration: InputDecoration(
-                  hintText: 'Search customer, order #, or item…',
+                  hintText: locale.s(
+                    'Search customer, order #, or item…',
+                    'Maghanap ng mamimili, order #, o paninda…',
+                  ),
                   hintStyle: GoogleFonts.inter(
                     fontSize: 13,
                     color: const Color(0xFF94A3B8),
@@ -310,6 +337,13 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildSegmentedTabBar() {
+    final locale = FarmerLocaleService.instance;
+    final tabLabels = [
+      locale.s('Active', 'Aktibo'),
+      locale.s('Completed', 'Nakumpleto'),
+      locale.s('Cancelled', 'Kinansela'),
+    ];
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       padding: const EdgeInsets.all(4),
@@ -329,6 +363,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         children: List.generate(_tabs.length, (i) {
           final isSelected = _selectedTab == i;
           final count = _getTabOrderCount(i);
+          final label = i < tabLabels.length ? tabLabels[i] : _tabs[i];
 
           return Expanded(
             child: GestureDetector(
@@ -336,7 +371,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               behavior: HitTestBehavior.opaque,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
@@ -352,24 +387,29 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      _tabs[i],
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w600,
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF64748B),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                     if (count > 0) ...[
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                          horizontal: 5,
+                          vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
@@ -380,7 +420,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                         child: Text(
                           '$count',
                           style: GoogleFonts.inter(
-                            fontSize: 10,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w800,
                             color: isSelected
                                 ? Colors.white
@@ -407,11 +447,12 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildSubStatusFilterChips() {
+    final locale = FarmerLocaleService.instance;
     final subFilters = [
-      {'label': 'All Active', 'key': 'ALL'},
-      {'label': 'Pending', 'key': 'PENDING'},
-      {'label': 'Processing', 'key': 'PROCESSING'},
-      {'label': 'Shipped', 'key': 'SHIPPED'},
+      {'label': locale.s('All Active', 'Lahat ng Aktibo'), 'key': 'ALL'},
+      {'label': locale.s('Pending', 'Nakabinbin'), 'key': 'PENDING'},
+      {'label': locale.s('Processing', 'Inihahanda'), 'key': 'PROCESSING'},
+      {'label': locale.s('Shipped', 'Ipinadala'), 'key': 'SHIPPED'},
     ];
 
     return Container(
@@ -485,6 +526,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildModernRevenueBanner(List<Map<String, dynamic>> orders) {
+    final loc = FarmerLocaleService.instance;
     final now = DateTime.now();
     final todayOrders = orders.where((o) {
       final date = o['createdAt'] as DateTime;
@@ -550,7 +592,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'TODAY\'S SALES REVENUE',
+                    loc.s("TODAY'S SALES REVENUE", 'KITA NGAYONG ARAW'),
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -567,7 +609,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${todayOrders.length} Today',
+                  '${todayOrders.length} ${loc.s("Today", "Ngayong Araw")}',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -592,13 +634,13 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             children: [
               _buildMetricPill(
                 icon: Icons.hourglass_top_rounded,
-                label: '$pendingCount Pending',
+                label: '$pendingCount ${loc.s("Pending", "Nakabinbin")}',
                 color: Colors.amber.shade200,
               ),
               const SizedBox(width: 8),
               _buildMetricPill(
                 icon: Icons.local_shipping_rounded,
-                label: '$activeCount In Progress',
+                label: '$activeCount ${loc.s("In Progress", "Pinoproseso")}',
                 color: Colors.white,
               ),
             ],
@@ -638,15 +680,38 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildModernOrderCard(Map<String, dynamic> order) {
+    final locale = FarmerLocaleService.instance;
     final rawStatus = (order['status'] ?? 'PENDING').toString().toUpperCase();
     final isCop = order['paymentMethod']?.toString().toUpperCase() == 'COP';
     String displayStatus = order['status']?.toString() ?? 'Pending';
 
     if (isCop) {
       if (rawStatus == 'SHIPPED') {
-        displayStatus = 'Ready for Pickup';
+        displayStatus = locale.s('Ready for Pickup', 'Handa nang Kunin');
       } else if (rawStatus == 'DELIVERED') {
-        displayStatus = 'Picked Up';
+        displayStatus = locale.s('Picked Up', 'Nakuha Na');
+      }
+    } else {
+      switch (rawStatus) {
+        case 'PENDING':
+          displayStatus = locale.s('Pending', 'Nakabinbin');
+          break;
+        case 'CONFIRMED':
+          displayStatus = locale.s('Confirmed', 'Kumpirmado');
+          break;
+        case 'PROCESSING':
+          displayStatus = locale.s('Processing', 'Inihahanda');
+          break;
+        case 'SHIPPED':
+          displayStatus = locale.s('Shipped', 'Ipinadala');
+          break;
+        case 'DELIVERED':
+          displayStatus = locale.s('Delivered', 'Naihatid');
+          break;
+        case 'CANCELLED':
+        case 'REFUNDED':
+          displayStatus = locale.s('Cancelled', 'Kinansela');
+          break;
       }
     }
 
@@ -661,7 +726,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     final customerName = order['customerName']?.toString() ?? 'Customer';
     final timeAgo = order['timeAgo']?.toString() ?? '';
     final paymentMethod =
-        order['paymentMethod']?.toString() ?? (isCop ? 'Pickup' : 'Cash on Delivery');
+        order['paymentMethod']?.toString() ?? (isCop ? locale.s('Pickup', 'Kukunin') : locale.s('Cash on Delivery', 'Bayad Pagka-deliver'));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -777,14 +842,14 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                           const SizedBox(height: 2),
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.access_time_rounded,
                                 size: 12,
-                                color: const Color(0xFF94A3B8),
+                                color: Color(0xFF94A3B8),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                timeAgo.isNotEmpty ? timeAgo : 'Recently',
+                                timeAgo.isNotEmpty ? timeAgo : locale.s('Recently', 'Kamakailan'),
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF64748B),
@@ -836,7 +901,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ITEMS ORDERED',
+                              locale.s('ITEMS ORDERED', 'MGA IN-ORDER'),
                               style: GoogleFonts.inter(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w800,
@@ -846,7 +911,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              order['items']?.toString() ?? 'Produce items',
+                              order['items']?.toString() ?? locale.s('Produce items', 'Mga paninda'),
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -861,7 +926,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'TOTAL VALUE',
+                            locale.s('TOTAL VALUE', 'KABUUANG HALAGA'),
                             style: GoogleFonts.inter(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
@@ -950,7 +1015,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Cancellation Reason',
+                                locale.s('Cancellation Reason', 'Dahilan ng Pagkansela'),
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
@@ -1001,10 +1066,10 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                               ),
                         label: Text(
                           isUpdating
-                              ? 'Updating…'
+                              ? locale.s('Updating…', 'Ina-update…')
                               : (isDeliveredOrCancelled
-                                  ? 'Order Finalized'
-                                  : 'Update Status'),
+                                  ? locale.s('Order Finalized', 'Tapos na ang Order')
+                                  : locale.s('Update Status', 'Baguhin ang Status')),
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -1029,7 +1094,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                         Icons.chevron_right_rounded,
                         color: Color(0xFF475569),
                       ),
-                      tooltip: 'View Details',
+                      tooltip: locale.s('View Details', 'Tingnan ang Detalye'),
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0xFFF8FAFC),
                         shape: RoundedRectangleBorder(
@@ -1210,36 +1275,51 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     final allStatuses = [
       {
         'label': 'CONFIRMED',
-        'title': 'Confirm Order',
-        'desc': 'Accept and notify customer preparation has started',
+        'title': FarmerLocaleService.instance.s('Confirm Order', 'Kumpirmahin ang Order'),
+        'desc': FarmerLocaleService.instance.s(
+          'Accept and notify customer preparation has started',
+          'Tanggapin at abisuhan ang mamimili na sinimulan na ang paghahanda',
+        ),
         'icon': Icons.check_circle_rounded,
         'color': const Color(0xFF2563EB),
       },
       {
         'label': 'PROCESSING',
-        'title': 'Mark as Processing',
-        'desc': 'Harvesting or packing items for dispatch',
+        'title': FarmerLocaleService.instance.s('Mark as Processing', 'Ihanda / I-proseso'),
+        'desc': FarmerLocaleService.instance.s(
+          'Harvesting or packing items for dispatch',
+          'Inaani o ibinabalot ang mga paninda para sa pagpapadala',
+        ),
         'icon': Icons.inventory_2_rounded,
         'color': const Color(0xFF4F46E5),
       },
       {
         'label': 'SHIPPED',
-        'title': 'Out for Delivery / Ready',
-        'desc': 'Handed over to courier or ready for pickup',
+        'title': FarmerLocaleService.instance.s('Out for Delivery / Ready', 'Ipinapadala Na / Handa Na'),
+        'desc': FarmerLocaleService.instance.s(
+          'Handed over to courier or ready for pickup',
+          'Naibigay na sa rider/courier o handa nang kunin',
+        ),
         'icon': Icons.local_shipping_rounded,
         'color': const Color(0xFF7C3AED),
       },
       {
         'label': 'DELIVERED',
-        'title': 'Mark as Delivered',
-        'desc': 'Customer has received and accepted order',
+        'title': FarmerLocaleService.instance.s('Mark as Delivered', 'Naihatid Na'),
+        'desc': FarmerLocaleService.instance.s(
+          'Customer has received and accepted order',
+          'Natanggap at naaprubahan na ng mamimili ang order',
+        ),
         'icon': Icons.task_alt_rounded,
         'color': const Color(0xFF059669),
       },
       {
         'label': 'CANCELLED',
-        'title': 'Cancel Order',
-        'desc': 'Unable to fulfill (reason required)',
+        'title': FarmerLocaleService.instance.s('Cancel Order', 'Kanselahin ang Order'),
+        'desc': FarmerLocaleService.instance.s(
+          'Unable to fulfill (reason required)',
+          'Hindi kayang punan (kailangan ng dahilan)',
+        ),
         'icon': Icons.cancel_rounded,
         'color': const Color(0xFFDC2626),
       },
@@ -1304,25 +1384,27 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Update Order Status',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          FarmerLocaleService.instance.s('Update Order Status', 'I-update ang Katayuan ng Order'),
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Order ${_formatOrderId(order['orderId'])} • Current: $currentStatus',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF64748B),
+                        Text(
+                          '${FarmerLocaleService.instance.s('Order', 'Order')} ${_formatOrderId(order['orderId'])} • ${FarmerLocaleService.instance.s('Current:', 'Kasalukuyan:')} $currentStatus',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1331,7 +1413,10 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'No further status transitions available for this order.',
+                    FarmerLocaleService.instance.s(
+                      'No further status transitions available for this order.',
+                      'Wala nang susunod na katayuan para sa order na ito.',
+                    ),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: const Color(0xFF64748B),
@@ -1422,7 +1507,12 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Order status updated to $label'),
+                    content: Text(
+                      FarmerLocaleService.instance.s(
+                        'Order status updated to $label',
+                        'Nai-update ang katayuan ng order sa $label',
+                      ),
+                    ),
                     backgroundColor: AppColors.primary,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
@@ -1478,12 +1568,12 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
 
   Future<void> _showCancellationReasonSheet(Map<String, dynamic> order) async {
     final predefinedReasons = [
-      'Item out of stock',
-      'Customer requested cancellation',
-      'Harvest delay or weather damage',
-      'Logistics / delivery unavailable',
-      'Duplicate order',
-      'Payment verification failed',
+      FarmerLocaleService.instance.s('Item out of stock', 'Ubos na ang stock / paninda'),
+      FarmerLocaleService.instance.s('Customer requested cancellation', 'Hiniling ng mamimili na kanselahin'),
+      FarmerLocaleService.instance.s('Harvest delay or weather damage', 'Naantala ang ani o napinsala ng panahon'),
+      FarmerLocaleService.instance.s('Logistics / delivery unavailable', 'Walang magagamit na courier / delivery'),
+      FarmerLocaleService.instance.s('Duplicate order', 'Dobleng order'),
+      FarmerLocaleService.instance.s('Payment verification failed', 'Pumalya ang pagpapatunay ng bayad'),
     ];
 
     String? selectedReason;
@@ -1527,8 +1617,8 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEE2E2),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFEE2E2),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -1542,7 +1632,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Cancel Order',
+                                FarmerLocaleService.instance.s('Cancel Order', 'Kanselahin ang Order'),
                                 style: GoogleFonts.poppins(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -1550,7 +1640,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                 ),
                               ),
                               Text(
-                                'Order ${_formatOrderId(order['orderId'])}',
+                                '${FarmerLocaleService.instance.s('Order', 'Order')} ${_formatOrderId(order['orderId'])}',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF64748B),
@@ -1562,7 +1652,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Select a reason for cancellation:',
+                        FarmerLocaleService.instance.s('Select a reason for cancellation:', 'Pumili ng dahilan ng pagkansela:'),
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1637,7 +1727,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                 ),
                               ),
                               child: Text(
-                                '✏️ Other Reason',
+                                FarmerLocaleService.instance.s('✏️ Other Reason', '✏️ Ibang Dahilan'),
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: isCustom
@@ -1661,7 +1751,10 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                           maxLength: 200,
                           style: GoogleFonts.inter(fontSize: 13),
                           decoration: InputDecoration(
-                            hintText: 'Provide detailed cancellation reason…',
+                            hintText: FarmerLocaleService.instance.s(
+                              'Provide detailed cancellation reason…',
+                              'Magbigay ng detalyadong dahilan ng pagkansela…',
+                            ),
                             hintStyle: GoogleFonts.inter(
                               fontSize: 12,
                               color: const Color(0xFF94A3B8),
@@ -1703,7 +1796,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                 ),
                               ),
                               child: Text(
-                                'Go Back',
+                                FarmerLocaleService.instance.s('Go Back', 'Bumalik'),
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -1722,8 +1815,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                 if (reason.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: const Text(
-                                        'Please select or provide a reason.',
+                                      content: Text(
+                                        FarmerLocaleService.instance.s(
+                                          'Please select or provide a reason.',
+                                          'Mangyaring pumili o magbigay ng dahilan.',
+                                        ),
                                       ),
                                       backgroundColor: Colors.orange,
                                       behavior: SnackBarBehavior.floating,
@@ -1749,8 +1845,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: const Text(
-                                          'Order cancelled successfully',
+                                        content: Text(
+                                          FarmerLocaleService.instance.s(
+                                            'Order cancelled successfully',
+                                            'Matagumpay na nakansela ang order',
+                                          ),
                                         ),
                                         backgroundColor: Colors.red,
                                         behavior: SnackBarBehavior.floating,
@@ -1785,7 +1884,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Failed to cancel order: $e',
+                                          '${FarmerLocaleService.instance.s('Failed to cancel order:', 'Nabigong kanselahin ang order:')} $e',
                                         ),
                                         backgroundColor: Colors.red,
                                         behavior: SnackBarBehavior.floating,
@@ -1816,7 +1915,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                 ),
                               ),
                               child: Text(
-                                'Confirm Cancel',
+                                FarmerLocaleService.instance.s('Confirm Cancel', 'Kumpirmahin ang Kansela'),
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -1838,6 +1937,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildEmptyOrdersState() {
+    final tabNamesFil = ['Aktibo', 'Nakumpleto', 'Nakansela'];
+    final selectedTabName = FarmerLocaleService.instance.isFilipino
+        ? tabNamesFil[_selectedTab.clamp(0, tabNamesFil.length - 1)]
+        : _tabs[_selectedTab];
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -1859,8 +1963,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             const SizedBox(height: 16),
             Text(
               _searchQuery.isNotEmpty
-                  ? 'No Matching Orders'
-                  : 'No ${_tabs[_selectedTab]} Orders',
+                  ? FarmerLocaleService.instance.s('No Matching Orders', 'Walang Tugmang Order')
+                  : FarmerLocaleService.instance.s(
+                      'No ${_tabs[_selectedTab]} Orders',
+                      'Walang $selectedTabName na Order',
+                    ),
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -1870,8 +1977,14 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             const SizedBox(height: 6),
             Text(
               _searchQuery.isNotEmpty
-                  ? 'Try searching with a different keyword.'
-                  : 'Orders in this category will automatically show up here.',
+                  ? FarmerLocaleService.instance.s(
+                      'Try searching with a different keyword.',
+                      'Subukang maghanap gamit ang ibang salita.',
+                    )
+                  : FarmerLocaleService.instance.s(
+                      'Orders in this category will automatically show up here.',
+                      'Awtomatikong lalabas dito ang mga order sa kategoryang ito.',
+                    ),
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 13,
@@ -1889,7 +2002,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 _loadOrders();
               },
               icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Refresh Orders'),
+              label: Text(FarmerLocaleService.instance.s('Refresh Orders', 'I-refresh ang mga Order')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,

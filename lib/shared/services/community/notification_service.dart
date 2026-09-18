@@ -17,6 +17,8 @@ import '../communication/call_service.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import '../../screens/post_detail_screen.dart';
+import 'message_service.dart';
+import '../core/supabase_config.dart';
 
 class NotificationService {
   static const String channelId = 'agridirect_channel';
@@ -28,6 +30,18 @@ class NotificationService {
         channelId,
         channelName,
         description: channelDescription,
+        importance: Importance.max,
+      );
+
+  static const String messagesChannelId = 'agridirect_messages_channel';
+  static const String messagesChannelName = 'AgriDirect Messages';
+  static const String messagesChannelDescription =
+      'Direct messages and chat notifications';
+  static const AndroidNotificationChannel _messagesChannel =
+      AndroidNotificationChannel(
+        messagesChannelId,
+        messagesChannelName,
+        description: messagesChannelDescription,
         importance: Importance.max,
       );
 
@@ -51,6 +65,7 @@ class NotificationService {
   String? _activeCallId; // Guard against double incoming-call dialog
   final ValueNotifier<Set<String>> onlineUsersNotifier = ValueNotifier({});
   final Map<String, DateTime> _lastActiveCache = {};
+  final Map<String, List<Message>> _conversationMessagesCache = {};
   Timer? _activeStatusTimer;
 
   DateTime? getLastActive(String userId) {
@@ -60,6 +75,15 @@ class NotificationService {
   /// Call this when entering a chat screen to suppress notifications for that chat
   void setActiveConversation(String? conversationId) {
     _activeConversationId = conversationId;
+    if (conversationId != null && conversationId.isNotEmpty) {
+      _conversationMessagesCache.remove(conversationId);
+      if (!_isWeb) {
+        flutterLocalNotificationsPlugin.cancel(
+          conversationId.hashCode,
+          tag: 'conv_$conversationId',
+        );
+      }
+    }
   }
 
   SupabaseClient get supabase => Supabase.instance.client;
@@ -224,6 +248,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
   }
 
@@ -238,6 +263,7 @@ class NotificationService {
         >();
 
     await androidPlugin?.createNotificationChannel(_androidChannel);
+    await androidPlugin?.createNotificationChannel(_messagesChannel);
   }
 
   // Force sync FCM token on device startup / user login
@@ -555,8 +581,9 @@ class NotificationService {
 
     // Skip call notifications in foreground — the Realtime path already
     // opened the InAppCallScreen dialog with a ringtone.
+    final inferredLinkType = _inferLinkTypeFromData(message.data);
     final linkType =
-        (message.data['link_type'] ?? _inferLinkTypeFromData(message.data))
+        (message.data['link_type'] ?? inferredLinkType)
             .toString();
     if (linkType == 'call') {
       debugPrint('Suppressed FCM call notification (handled by Realtime dialog)');
@@ -564,16 +591,46 @@ class NotificationService {
     }
 
     final senderName = message.data['sender_name']?.toString().trim();
-    final conversationId = message.data['conversation_id']?.toString();
-    
+    final conversationId = (message.data['conversation_id'] ?? message.data['link_id'])?.toString();
+    final notificationCode = (message.data['notification_code'] ?? message.data['notificationCode'])?.toString();
+
     // Suppress notification if we are already in the conversation
     if (conversationId != null && conversationId == _activeConversationId) {
       debugPrint('Suppressed notification for active conversation: $conversationId');
       return;
     }
 
+    final isChat = linkType == 'conversation' ||
+        inferredLinkType == 'conversation' ||
+        notificationCode == 'new_message' ||
+        (conversationId != null && conversationId.isNotEmpty && message.data['sender_name'] != null);
+
+    if (isChat && conversationId != null && conversationId.isNotEmpty) {
+      final senderName = (message.data['sender_name'] ?? message.notification?.title ?? 'AgriDirect User').toString().trim();
+      final body = message.notification?.body ??
+          message.data['body']?.toString() ??
+          message.data['message']?.toString() ??
+          '';
+      final senderAvatarUrl = (message.data['sender_avatar'] ??
+              message.data['sender_avatar_url'] ??
+              message.data['image_url'] ??
+              message.notification?.android?.imageUrl)
+          ?.toString();
+      final senderId = message.data['sender_id']?.toString();
+
+      await showChatNotification(
+        notificationId: conversationId.hashCode,
+        senderName: senderName,
+        messageText: body,
+        conversationId: conversationId,
+        senderAvatarUrl: senderAvatarUrl,
+        senderId: senderId,
+      );
+      return;
+    }
+
     final title = (senderName != null && senderName.isNotEmpty)
-        ? 'New message from $senderName'
+        ? senderName
         : (message.notification?.title ?? message.data['title']?.toString() ?? 'AgriDirect Alert');
 
     final body = message.notification?.body ??
@@ -680,14 +737,236 @@ class NotificationService {
     );
   }
 
+  Future<void> showChatNotification({
+    required int notificationId,
+    required String senderName,
+    required String messageText,
+    required String conversationId,
+    String? senderAvatarUrl,
+    String? senderId,
+  }) async {
+    if (_isWeb) return;
+
+    if (conversationId == _activeConversationId) {
+      debugPrint('Suppressed chat notification for active conversation: $conversationId');
+      return;
+    }
+
+    final avatarBytes = await _downloadImageBytes(senderAvatarUrl);
+    final avatarBitmap = avatarBytes != null ? ByteArrayAndroidBitmap(avatarBytes) : null;
+    final avatarIcon = avatarBytes != null ? ByteArrayAndroidIcon(avatarBytes) : null;
+
+    final person = Person(
+      name: senderName.isNotEmpty ? senderName : 'AgriDirect User',
+      icon: avatarIcon,
+      key: senderId ?? conversationId,
+      important: true,
+    );
+
+    final history = _conversationMessagesCache.putIfAbsent(conversationId, () => []);
+    history.add(Message(messageText, DateTime.now(), person));
+    if (history.length > 5) {
+      history.removeAt(0);
+    }
+
+    final messagingStyle = MessagingStyleInformation(
+      person,
+      conversationTitle: senderName,
+      groupConversation: false,
+      messages: List<Message>.from(history),
+    );
+
+    final actions = <AndroidNotificationAction>[
+      const AndroidNotificationAction(
+        'reply_action',
+        'Reply',
+        inputs: <AndroidNotificationActionInput>[
+          AndroidNotificationActionInput(
+            label: 'Type a reply...',
+          ),
+        ],
+        allowGeneratedReplies: true,
+      ),
+      const AndroidNotificationAction(
+        'like_action',
+        'Like',
+        showsUserInterface: false,
+        cancelNotification: false,
+      ),
+    ];
+
+    final androidDetails = AndroidNotificationDetails(
+      messagesChannelId,
+      messagesChannelName,
+      channelDescription: messagesChannelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.message,
+      playSound: true,
+      enableVibration: true,
+      icon: '@mipmap/ic_launcher',
+      largeIcon: avatarBitmap,
+      styleInformation: messagingStyle,
+      actions: actions,
+      tag: 'conv_$conversationId',
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      categoryIdentifier: 'CHAT_MESSAGE',
+    );
+
+    await flutterLocalNotificationsPlugin.show(
+      notificationId,
+      senderName,
+      messageText,
+      NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      ),
+      payload: 'conversation:$conversationId',
+    );
+  }
+
+  Future<void> showChatNotificationFromRemoteMessage(RemoteMessage message) async {
+    await ensureLocalNotificationsInitialized();
+    final data = message.data;
+    final conversationId = (data['conversation_id'] ?? data['link_id'] ?? '').toString();
+    if (conversationId.isEmpty) return;
+
+    final senderName = (data['sender_name'] ?? message.notification?.title ?? 'AgriDirect User').toString().trim();
+    final messageText = (message.notification?.body ?? data['body'] ?? data['message'] ?? '').toString().trim();
+    final senderAvatarUrl = (data['sender_avatar'] ?? data['sender_avatar_url'] ?? data['image_url'] ?? message.notification?.android?.imageUrl)?.toString().trim();
+    final senderId = data['sender_id']?.toString();
+
+    await showChatNotification(
+      notificationId: conversationId.hashCode,
+      senderName: senderName,
+      messageText: messageText,
+      conversationId: conversationId,
+      senderAvatarUrl: senderAvatarUrl,
+      senderId: senderId,
+    );
+  }
+
+  Future<void> _handleInlineReply({
+    required String conversationId,
+    required String replyText,
+  }) async {
+    try {
+      debugPrint('📨 Sending inline reply to conversation $conversationId: $replyText');
+      await MessageService().sendMessage(
+        conversationId: conversationId,
+        messageText: replyText,
+      );
+      await flutterLocalNotificationsPlugin.cancel(
+        conversationId.hashCode,
+        tag: 'conv_$conversationId',
+      );
+    } catch (e) {
+      debugPrint('Error sending inline reply: $e');
+    }
+  }
+
+  Future<void> _handleInlineLike({
+    required String conversationId,
+  }) async {
+    try {
+      debugPrint('👍 Sending inline Like to conversation $conversationId');
+      await MessageService().sendMessage(
+        conversationId: conversationId,
+        messageText: '👍',
+      );
+      await flutterLocalNotificationsPlugin.cancel(
+        conversationId.hashCode,
+        tag: 'conv_$conversationId',
+      );
+    } catch (e) {
+      debugPrint('Error sending inline like: $e');
+    }
+  }
+
   Future<void> _onDidReceiveNotificationResponse(
     NotificationResponse notificationResponse,
   ) async {
     final payload = notificationResponse.payload;
-    debugPrint('Notification tapped with payload: $payload');
+    final actionId = notificationResponse.actionId;
+    final input = notificationResponse.input;
+    debugPrint('Notification tapped: payload=$payload, actionId=$actionId, input=$input');
 
     final parsed = _parsePayload(payload);
+    final linkType = parsed.$1;
+    final linkId = parsed.$2;
+
+    if (actionId == 'reply_action') {
+      if (input != null && input.trim().isNotEmpty && linkType == 'conversation') {
+        await _handleInlineReply(conversationId: linkId, replyText: input.trim());
+        return;
+      }
+      await navigateFromLink(linkType: linkType, linkId: linkId);
+      return;
+    }
+
+    if (actionId == 'like_action' && linkType == 'conversation') {
+      await _handleInlineLike(conversationId: linkId);
+      return;
+    }
+
     await navigateFromLink(linkType: parsed.$1, linkId: parsed.$2);
+  }
+
+  static Future<void> handleBackgroundNotificationResponse(
+    NotificationResponse notificationResponse,
+  ) async {
+    final payload = notificationResponse.payload;
+    final actionId = notificationResponse.actionId;
+    final input = notificationResponse.input;
+    debugPrint('Background notification response: payload=$payload, actionId=$actionId, input=$input');
+
+    if (payload == null || payload.isEmpty) return;
+    final separator = payload.indexOf(':');
+    final linkType = separator > 0 ? payload.substring(0, separator) : payload;
+    final linkId = separator > 0 && separator < payload.length - 1 ? payload.substring(separator + 1) : '';
+
+    if (linkType != 'conversation' || linkId.isEmpty) return;
+
+    try {
+      if (actionId == 'reply_action' && input != null && input.trim().isNotEmpty) {
+        await _sendBackgroundMessage(linkId, input.trim());
+      } else if (actionId == 'like_action') {
+        await _sendBackgroundMessage(linkId, '👍');
+      }
+    } catch (e) {
+      debugPrint('Error handling background notification response: $e');
+    }
+  }
+
+  static Future<void> _sendBackgroundMessage(String conversationId, String text) async {
+    try {
+      await SupabaseConfig.initialize();
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await client.from('messages').insert({
+        'conversation_id': conversationId,
+        'sender_id': userId,
+        'message_text': text,
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await client.from('conversations').update({
+        'last_message_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('conversation_id', conversationId);
+
+      final plugin = FlutterLocalNotificationsPlugin();
+      await plugin.cancel(conversationId.hashCode, tag: 'conv_$conversationId');
+    } catch (e) {
+      debugPrint('Error sending message from background notification: $e');
+    }
   }
 
   // Helper to get payload from message
@@ -1436,17 +1715,32 @@ class NotificationService {
           ),
           callback: (payload) async {
             final linkType = payload.newRecord['link_type']?.toString();
+            final linkId = payload.newRecord['link_id']?.toString() ?? '';
             // Suppress foreground notification if we are already in the conversation
             if (linkType == 'conversation') {
-              final linkId = payload.newRecord['link_id']?.toString() ?? '';
               if (linkId == _activeConversationId) {
                 return;
               }
+              final title = payload.newRecord['title']?.toString() ?? 'AgriDirect';
+              final body = payload.newRecord['body']?.toString() ?? '';
+              final imageUrl = payload.newRecord['image_url']?.toString() ??
+                  payload.newRecord['metadata']?['image_url']?.toString() ??
+                  payload.newRecord['metadata']?['imageUrl']?.toString() ??
+                  payload.newRecord['metadata']?['sender_avatar']?.toString();
+
+              await showChatNotification(
+                notificationId: linkId.hashCode,
+                senderName: title,
+                messageText: body,
+                conversationId: linkId,
+                senderAvatarUrl: imageUrl,
+                senderId: payload.newRecord['metadata']?['sender_id']?.toString(),
+              );
+              return;
             }
 
             final title = payload.newRecord['title']?.toString() ?? 'AgriDirect';
             final body = payload.newRecord['body']?.toString() ?? '';
-            final linkId = payload.newRecord['link_id']?.toString() ?? '';
             final imageUrl = payload.newRecord['image_url']?.toString() ??
                 payload.newRecord['metadata']?['image_url']?.toString() ??
                 payload.newRecord['metadata']?['imageUrl']?.toString();
@@ -1496,4 +1790,9 @@ class NotificationService {
     _mobileNotificationsSubscription?.unsubscribe();
     _mobileNotificationsSubscription = null;
   }
+}
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  NotificationService.handleBackgroundNotificationResponse(notificationResponse);
 }

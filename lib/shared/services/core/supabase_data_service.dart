@@ -2,6 +2,7 @@ import 'package:agridirect/shared/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -963,7 +964,10 @@ class SupabaseDataService {
               .eq('product_id', productId);
         } catch (_) {}
         try {
-          await _client.from('product_images').delete().eq('product_id', productId);
+          await _client
+              .from('product_images')
+              .delete()
+              .eq('product_id', productId);
         } catch (_) {}
 
         try {
@@ -2862,8 +2866,11 @@ class SupabaseDataService {
 
       final farmers = rows.map((item) {
         // Farm Logo: strictly image_url or logo_url (NEVER personal user avatar or face_photo_path)
-        final rawAvatar = (item['logo_url'] ?? item['image_url'])?.toString().trim();
-        final isValidLogo = rawAvatar != null &&
+        final rawAvatar = (item['logo_url'] ?? item['image_url'])
+            ?.toString()
+            .trim();
+        final isValidLogo =
+            rawAvatar != null &&
             rawAvatar.isNotEmpty &&
             !rawAvatar.toLowerCase().contains('face_photo') &&
             !rawAvatar.toLowerCase().contains('valid_id') &&
@@ -2871,20 +2878,24 @@ class SupabaseDataService {
         final avatarUrl = isValidLogo ? _resolveImageUrl(rawAvatar) : null;
 
         // Farm Cover Photo (strictly cover_url or banner_url)
-        final rawCoverPath = (item['cover_url'] ??
-                item['cover_image_url'] ??
-                item['farm_banner_url'] ??
-                item['banner_url'])
-            ?.toString()
-            .trim();
-        final isValidCover = rawCoverPath != null &&
+        final rawCoverPath =
+            (item['cover_url'] ??
+                    item['cover_image_url'] ??
+                    item['farm_banner_url'] ??
+                    item['banner_url'])
+                ?.toString()
+                .trim();
+        final isValidCover =
+            rawCoverPath != null &&
             rawCoverPath.isNotEmpty &&
             !rawCoverPath.toLowerCase().contains('face_photo') &&
             !rawCoverPath.toLowerCase().contains('avatar') &&
             !rawCoverPath.toLowerCase().contains('profile_picture') &&
             !rawCoverPath.toLowerCase().contains('selfie') &&
             (avatarUrl == null || rawCoverPath != rawAvatar);
-        String? resolvedCover = isValidCover ? _resolveImageUrl(rawCoverPath) : null;
+        String? resolvedCover = isValidCover
+            ? _resolveImageUrl(rawCoverPath)
+            : null;
 
         final farmName = item['farm_name']?.toString().trim();
         final fullName = item['full_name']?.toString().trim();

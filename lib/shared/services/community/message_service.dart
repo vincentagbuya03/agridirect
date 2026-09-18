@@ -404,12 +404,15 @@ class MessageService {
             customer:customers (
               customer_id,
               user_id,
-              user:users (user_id, name, email)
+              user:users (user_id, name, email, avatar_url)
             ),
             farmer:farmers (
               farmer_id,
               farm_name,
-              user_id
+              user_id,
+              logo_url,
+              avatar_url,
+              user:users (avatar_url)
             )
           ''')
           .eq('conversation_id', conversationId)
@@ -425,6 +428,7 @@ class MessageService {
       final customerData = conv?['customer'] as Map<String, dynamic>?;
       final customerUserData = customerData?['user'] as Map<String, dynamic>?;
       final farmerData = conv?['farmer'] as Map<String, dynamic>?;
+      final farmerUserData = farmerData?['user'] as Map<String, dynamic>?;
 
       final customerName =
           (customerUserData?['name'] as String?)?.trim().isNotEmpty == true
@@ -441,15 +445,35 @@ class MessageService {
 
       String? targetUserId;
       String resolvedSenderName;
+      String? resolvedSenderAvatar;
 
       if (senderContext.customerId == customerId) {
         // Sender is Customer -> target is Farmer!
         targetUserId = farmerUserId;
         resolvedSenderName = customerName;
+        resolvedSenderAvatar = customerUserData?['avatar_url']?.toString();
       } else {
         // Sender is Farmer -> target is Customer!
         targetUserId = customerUserId;
         resolvedSenderName = farmName;
+        resolvedSenderAvatar = (farmerData?['logo_url'] ??
+                farmerData?['avatar_url'] ??
+                farmerUserData?['avatar_url'])
+            ?.toString();
+      }
+
+      if (resolvedSenderAvatar == null || resolvedSenderAvatar.trim().isEmpty) {
+        try {
+          final userProfile = await _client
+              .from('users')
+              .select('avatar_url')
+              .eq('user_id', senderContext.userId)
+              .maybeSingle();
+          final userAvatar = (userProfile?['avatar_url'] as String?)?.trim();
+          if (userAvatar != null && userAvatar.isNotEmpty) {
+            resolvedSenderAvatar = userAvatar;
+          }
+        } catch (_) {}
       }
 
       if (targetUserId == null || targetUserId.isEmpty) {
@@ -464,8 +488,9 @@ class MessageService {
         'send-push-notification',
         body: {
           'targetUserId': targetUserId,
-          'title': 'New message from $resolvedSenderName',
+          'title': resolvedSenderName,
           'body': preview,
+          'imageUrl': resolvedSenderAvatar,
           'notificationCode': 'new_message',
           'linkType': 'conversation',
           'linkId': conversationId,
@@ -473,6 +498,9 @@ class MessageService {
             'conversation_id': conversationId,
             'sender_id': senderContext.userId,
             'sender_name': resolvedSenderName,
+            'sender_avatar': resolvedSenderAvatar ?? '',
+            'sender_avatar_url': resolvedSenderAvatar ?? '',
+            'image_url': resolvedSenderAvatar ?? '',
             'as_farmer': (senderContext.customerId == customerId) ? 'true' : 'false',
           },
         },

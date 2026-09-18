@@ -38,7 +38,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Handling background message: ${message.messageId}');
 
   final data = message.data;
-  final linkType = data['link_type']?.toString() ?? '';
+  final linkType = (data['link_type'] ?? data['linkType'] ?? '').toString();
+  final notificationCode = (data['notification_code'] ?? data['notificationCode'] ?? '').toString();
 
   if (linkType == 'call') {
     try {
@@ -107,6 +108,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       await FlutterCallkitIncoming.showCallkitIncoming(callKitParams);
     } catch (e) {
       debugPrint('Error showing background CallKit: $e');
+    }
+  } else if (linkType == 'conversation' ||
+      notificationCode == 'new_message' ||
+      data['conversation_id'] != null) {
+    try {
+      await NotificationService().showChatNotificationFromRemoteMessage(message);
+    } catch (e) {
+      debugPrint('Error showing background chat notification: $e');
     }
   }
 }

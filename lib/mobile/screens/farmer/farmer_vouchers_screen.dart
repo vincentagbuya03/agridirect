@@ -11,6 +11,7 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class FarmerVouchersScreen extends StatefulWidget {
   const FarmerVouchersScreen({super.key});
@@ -75,6 +76,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
   }
 
   Future<void> _handleDeleteVoucher(String voucherId) async {
+    final loc = FarmerLocaleService.instance;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -96,13 +98,16 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
             ),
             const SizedBox(width: 12),
             Text(
-              'Delete Voucher',
+              loc.s('Delete Voucher', 'Burahin ang Voucher'),
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 17),
             ),
           ],
         ),
         content: Text(
-          'Are you sure you want to delete this voucher? Customers will no longer be able to claim or use it.',
+          loc.s(
+            'Are you sure you want to delete this voucher? Customers will no longer be able to claim or use it.',
+            'Sigurado ka bang nais mong burahin ang voucher na ito? Hindi na ito magagamit ng mga mamimili.',
+          ),
           style: GoogleFonts.inter(color: AppColors.textSubtle, fontSize: 14, height: 1.5),
         ),
         actions: [
@@ -114,7 +119,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            child: Text(loc.s('Cancel', 'Kanselahin'), style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -124,7 +129,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            child: Text(loc.s('Delete', 'Burahin'), style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -140,7 +145,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
                 children: [
                   const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 10),
-                  const Text('Voucher deleted successfully'),
+                  Text(loc.s('Voucher deleted successfully', 'Matagumpay na nabura ang voucher')),
                 ],
               ),
               backgroundColor: AppColors.success,
@@ -155,7 +160,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to delete voucher: $e'),
+              content: Text('${loc.s("Failed to delete voucher", "Bigo sa pagbura ng voucher")}: $e'),
               backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -182,59 +187,65 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      appBar: _buildAppBar(),
-      floatingActionButton: _buildFAB(),
-      body: RefreshIndicator(
-        onRefresh: _fetchVouchers,
-        color: AppColors.primary,
-        backgroundColor: Colors.white,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildStatsHeader()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: Text(
-                  'Your Vouchers',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textHeadline,
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        return Scaffold(
+          backgroundColor: const Color(0xFFF1F5F9),
+          appBar: _buildAppBar(loc),
+          floatingActionButton: _buildFAB(loc),
+          body: RefreshIndicator(
+            onRefresh: _fetchVouchers,
+            color: AppColors.primary,
+            backgroundColor: Colors.white,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _buildStatsHeader(loc)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: Text(
+                      loc.s('Your Vouchers', 'Iyong mga Voucher'),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (_isLoading)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList.builder(
+                      itemCount: 3,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: SizedBox(height: 120, child: AppShimmerLoader.rectangle(borderRadius: 20)),
+                      ),
+                    ),
+                  )
+                else if (_vouchers.isEmpty)
+                  SliverFillRemaining(child: _buildEmptyState(loc))
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    sliver: SliverList.builder(
+                      itemCount: _vouchers.length,
+                      itemBuilder: (context, index) => _buildVoucherCard(_vouchers[index], loc),
+                    ),
+                  ),
+              ],
             ),
-            if (_isLoading)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList.builder(
-                  itemCount: 3,
-                  itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: SizedBox(height: 120, child: AppShimmerLoader.rectangle(borderRadius: 20)),
-                  ),
-                ),
-              )
-            else if (_vouchers.isEmpty)
-              SliverFillRemaining(child: _buildEmptyState())
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                sliver: SliverList.builder(
-                  itemCount: _vouchers.length,
-                  itemBuilder: (context, index) => _buildVoucherCard(_vouchers[index]),
-                ),
-              ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(FarmerLocaleService loc) {
     return AppBar(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -248,7 +259,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
         ),
       ),
       title: Text(
-        'Voucher Manager',
+        loc.s('Voucher Manager', 'Pamamahala ng Voucher'),
         style: GoogleFonts.plusJakartaSans(
           fontWeight: FontWeight.w800,
           fontSize: 17,
@@ -262,7 +273,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     );
   }
 
-  Widget _buildFAB() {
+  Widget _buildFAB(FarmerLocaleService loc) {
     return FloatingActionButton.extended(
       onPressed: _openCreateVoucherSheet,
       backgroundColor: AppColors.primary,
@@ -271,13 +282,13 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       icon: const Icon(Icons.add_rounded, size: 22),
       label: Text(
-        'New Voucher',
+        loc.s('New Voucher', 'Bagong Voucher'),
         style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );
   }
 
-  Widget _buildStatsHeader() {
+  Widget _buildStatsHeader(FarmerLocaleService loc) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       padding: const EdgeInsets.all(20),
@@ -311,7 +322,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Overview',
+                loc.s('Overview', 'Pangkalahatang-ideya'),
                 style: GoogleFonts.inter(
                   color: Colors.white.withValues(alpha: 0.9),
                   fontWeight: FontWeight.w600,
@@ -325,19 +336,19 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
             children: [
               _buildStatCell(
                 icon: Icons.local_offer_rounded,
-                label: 'Active',
+                label: loc.s('Active', 'Aktibo'),
                 value: '$_activeVouchersCount',
               ),
               _buildStatDivider(),
               _buildStatCell(
                 icon: Icons.people_alt_rounded,
-                label: 'Total Claims',
+                label: loc.s('Total Claims', 'Kabuuang Kinuha'),
                 value: '$_totalClaimsCount',
               ),
               _buildStatDivider(),
               _buildStatCell(
                 icon: Icons.timer_off_rounded,
-                label: 'Expired',
+                label: loc.s('Expired', 'Paso Na'),
                 value: '$_expiredCount',
               ),
             ],
@@ -383,7 +394,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(FarmerLocaleService loc) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -404,7 +415,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'No Vouchers Yet',
+              loc.s('No Vouchers Yet', 'Wala Pang mga Voucher'),
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
@@ -414,7 +425,10 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Create store coupons and discount vouchers to encourage customers to purchase more from your farm stall.',
+              loc.s(
+                'Create store coupons and discount vouchers to encourage customers to purchase more from your farm stall.',
+                'Gumawa ng mga kupon at diskwento upang hikayatin ang mga mamimili na bumili pa sa iyong tindahan.',
+              ),
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 color: AppColors.textSubtle,
@@ -433,7 +447,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
               ),
               icon: const Icon(Icons.add_rounded),
               label: Text(
-                'Create Your First Voucher',
+                loc.s('Create Your First Voucher', 'Gawin ang Unang Voucher'),
                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
               ),
             ),
@@ -443,7 +457,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     );
   }
 
-  Widget _buildVoucherCard(Map<String, dynamic> voucher) {
+  Widget _buildVoucherCard(Map<String, dynamic> voucher, FarmerLocaleService loc) {
     final now = DateTime.now();
     final code = voucher['code'] ?? '';
     final discValue = (voucher['discount_percentage'] as num?)?.toDouble() ??
@@ -463,19 +477,19 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     final isFlat = type == 'flat';
 
     final discountMain = isFreeShipping
-        ? 'FREE'
+        ? loc.s('FREE', 'LIBRE')
         : (isFlat
             ? '₱${discValue.toStringAsFixed(0)}'
             : '${discValue.toStringAsFixed(0)}%');
     final discountSub = isFreeShipping
-        ? 'DELIVERY'
-        : (isFlat ? 'DISCOUNT' : 'OFF HARVEST');
+        ? loc.s('DELIVERY', 'PAGHAHATID')
+        : (isFlat ? loc.s('DISCOUNT', 'DISKWENTO') : loc.s('OFF HARVEST', 'BAWAS SA ANI'));
 
     final statusLabel = isExpired
-        ? 'Expired'
+        ? loc.s('Expired', 'Paso Na')
         : isFullyClaimed
-            ? 'Fully Claimed'
-            : 'Active';
+            ? loc.s('Fully Claimed', 'Ubos Na')
+            : loc.s('Active', 'Aktibo');
 
     final statusColor = isActive
         ? AppColors.success
@@ -686,8 +700,8 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 minSpend > 0
-                                    ? 'Min ₱${minSpend.toStringAsFixed(0)}'
-                                    : 'No Min Spend',
+                                    ? '${loc.s("Min", "Min.")} ₱${minSpend.toStringAsFixed(0)}'
+                                    : loc.s('No Min Spend', 'Walang Min. Halaga'),
                                 style: GoogleFonts.inter(
                                   color: AppColors.textBody,
                                   fontSize: 11.5,
@@ -703,7 +717,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
                                   endDate != null
                                       ? DateFormat('MMM d, yyyy')
                                           .format(endDate)
-                                      : 'No Expiry',
+                                      : loc.s('No Expiry', 'Walang Expiry'),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
@@ -737,7 +751,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '$used / $limit claimed',
+                                '$used / $limit ${loc.s("claimed", "nakuha")}',
                                 style: GoogleFonts.inter(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
@@ -873,11 +887,12 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
   }
 
   Future<void> _submit() async {
+    final loc = FarmerLocaleService.instance;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedEndDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please select an expiration date'),
+          content: Text(loc.s('Please select an expiration date', 'Mangyaring pumili ng petsa ng pag-expire')),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -917,7 +932,7 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                 const SizedBox(width: 10),
-                const Text('Voucher created successfully!'),
+                Text(loc.s('Voucher created successfully!', 'Matagumpay na nagawa ang voucher!')),
               ],
             ),
             backgroundColor: AppColors.success,
@@ -933,7 +948,7 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create voucher: $e'),
+            content: Text('${loc.s("Failed to create voucher", "Bigo sa paggawa ng voucher")}: $e'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -948,310 +963,332 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            top: 0,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
           ),
-          child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sheet Handle + Header
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14, bottom: 20),
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                top: 0,
+                left: 24,
+                right: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 28,
               ),
-
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.confirmation_number_rounded, color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create Voucher',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: AppColors.textHeadline,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Sheet Handle + Header
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 14, bottom: 20),
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
-                      Text(
-                        'Set up a discount for your customers',
-                        style: GoogleFonts.inter(
-                          color: AppColors.textSubtle,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-
-              // ── Voucher Code ──
-              _buildLabel('Voucher Code'),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _codeController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: _inputDecoration(
-                  hint: 'e.g., FRESH50',
-                  prefixIcon: Icons.tag_rounded,
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Code is required';
-                  if (val.trim().length < 3) return 'Code must be at least 3 characters';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // ── Discount Type ──
-              _buildLabel('Discount Type'),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTypeChip(
-                      label: 'Flat (₱)',
-                      icon: Icons.currency_exchange_rounded,
-                      isSelected: _discountType == 'flat',
-                      onTap: () => setState(() => _discountType = 'flat'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildTypeChip(
-                      label: 'Percentage (%)',
-                      icon: Icons.percent_rounded,
-                      isSelected: _discountType == 'percentage',
-                      onTap: () => setState(() => _discountType = 'percentage'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
 
-              // ── Value & Min Spend Row ──
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        _buildLabel(_discountType == 'flat' ? 'Discount Amount' : 'Percentage Value'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _valController,
-                          keyboardType: TextInputType.number,
-                          decoration: _inputDecoration(
-                            hint: _discountType == 'flat' ? 'e.g., 50' : 'e.g., 10',
-                            prefixIcon: _discountType == 'flat'
-                                ? Icons.currency_exchange_rounded
-                                : Icons.percent_rounded,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Required';
-                            final parsed = double.tryParse(val.trim());
-                            if (parsed == null || parsed <= 0) return 'Invalid';
-                            if (_discountType == 'percentage' && parsed > 100) return 'Max 100%';
-                            return null;
-                          },
+                          child: const Icon(Icons.confirmation_number_rounded, color: AppColors.primary, size: 20),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Min Spend (₱)'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _minSpendController,
-                          keyboardType: TextInputType.number,
-                          decoration: _inputDecoration(
-                            hint: 'e.g., 100',
-                            prefixIcon: Icons.shopping_bag_outlined,
-                          ),
-                          validator: (val) {
-                            if (val != null && val.trim().isNotEmpty) {
-                              final parsed = double.tryParse(val.trim());
-                              if (parsed == null || parsed < 0) return 'Invalid';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ── Usage Limit & Expiry Row ──
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Usage Limit'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _limitController,
-                          keyboardType: TextInputType.number,
-                          decoration: _inputDecoration(
-                            hint: 'e.g., 100',
-                            prefixIcon: Icons.people_alt_outlined,
-                          ),
-                          validator: (val) {
-                            if (val != null && val.trim().isNotEmpty) {
-                              final parsed = int.tryParse(val.trim());
-                              if (parsed == null || parsed <= 0) return 'Invalid';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Expiration Date'),
-                        const SizedBox(height: 8),
-                        InkWell(
-                          onTap: _pickEndDate,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _selectedEndDate != null
-                                    ? AppColors.primary.withValues(alpha: 0.4)
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today_rounded,
-                                  size: 16,
-                                  color: _selectedEndDate == null ? Colors.grey.shade400 : AppColors.primary,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _selectedEndDate == null
-                                        ? 'Pick date'
-                                        : DateFormat('MMM d, yy').format(_selectedEndDate!),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: _selectedEndDate == null
-                                          ? Colors.grey.shade400
-                                          : AppColors.textHeadline,
-                                      fontWeight: _selectedEndDate == null
-                                          ? FontWeight.w400
-                                          : FontWeight.w700,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // ── Submit Button ──
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isSaving ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    elevation: 0,
-                  ),
-                  child: _isSaving
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            Text(
+                              loc.s('Create Voucher', 'Gumawa ng Voucher'),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                color: AppColors.textHeadline,
                               ),
                             ),
-                            const SizedBox(width: 12),
                             Text(
-                              'Creating...',
-                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+                              loc.s('Set up a discount for your customers', 'Magtakda ng diskwento para sa iyong mga mamimili'),
+                              style: GoogleFonts.inter(
+                                color: AppColors.textSubtle,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
-                        )
-                      : Text(
-                          'Create Voucher',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Voucher Code ──
+                    _buildLabel(loc.s('Voucher Code', 'Code ng Voucher')),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _codeController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: _inputDecoration(
+                        hint: 'e.g., FRESH50',
+                        prefixIcon: Icons.tag_rounded,
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return loc.s('Code is required', 'Kailangan ang code');
+                        }
+                        if (val.trim().length < 3) {
+                          return loc.s('Code must be at least 3 characters', 'Dapat ay hindi bababa sa 3 titik ang code');
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Discount Type ──
+                    _buildLabel(loc.s('Discount Type', 'Uri ng Diskwento')),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTypeChip(
+                            label: loc.s('Flat (₱)', 'Bawas Presyo (₱)'),
+                            icon: Icons.currency_exchange_rounded,
+                            isSelected: _discountType == 'flat',
+                            onTap: () => setState(() => _discountType = 'flat'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTypeChip(
+                            label: loc.s('Percentage (%)', 'Porsyento (%)'),
+                            icon: Icons.percent_rounded,
+                            isSelected: _discountType == 'percentage',
+                            onTap: () => setState(() => _discountType = 'percentage'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Value & Min Spend Row ──
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(_discountType == 'flat'
+                                  ? loc.s('Discount Amount', 'Halaga ng Diskwento')
+                                  : loc.s('Percentage Value', 'Porsyento ng Diskwento')),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _valController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(
+                                  hint: _discountType == 'flat' ? 'e.g., 50' : 'e.g., 10',
+                                  prefixIcon: _discountType == 'flat'
+                                      ? Icons.currency_exchange_rounded
+                                      : Icons.percent_rounded,
+                                ),
+                                validator: (val) {
+                                  if (val == null || val.trim().isEmpty) {
+                                    return loc.s('Required', 'Kailangan');
+                                  }
+                                  final parsed = double.tryParse(val.trim());
+                                  if (parsed == null || parsed <= 0) {
+                                    return loc.s('Invalid', 'Hindi wasto');
+                                  }
+                                  if (_discountType == 'percentage' && parsed > 100) {
+                                    return loc.s('Max 100%', 'Hanggang 100%');
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(loc.s('Min Spend (₱)', 'Min. Halaga (₱)')),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _minSpendController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(
+                                  hint: 'e.g., 100',
+                                  prefixIcon: Icons.shopping_bag_outlined,
+                                ),
+                                validator: (val) {
+                                  if (val != null && val.trim().isNotEmpty) {
+                                    final parsed = double.tryParse(val.trim());
+                                    if (parsed == null || parsed < 0) {
+                                      return loc.s('Invalid', 'Hindi wasto');
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Usage Limit & Expiry Row ──
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(loc.s('Usage Limit', 'Limitasyon sa Paggamit')),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _limitController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(
+                                  hint: 'e.g., 100',
+                                  prefixIcon: Icons.people_alt_outlined,
+                                ),
+                                validator: (val) {
+                                  if (val != null && val.trim().isNotEmpty) {
+                                    final parsed = int.tryParse(val.trim());
+                                    if (parsed == null || parsed <= 0) {
+                                      return loc.s('Invalid', 'Hindi wasto');
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel(loc.s('Expiration Date', 'Petsa ng Pagkawalang-bisa')),
+                              const SizedBox(height: 8),
+                              InkWell(
+                                onTap: _pickEndDate,
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _selectedEndDate != null
+                                          ? AppColors.primary.withValues(alpha: 0.4)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_rounded,
+                                        size: 16,
+                                        color: _selectedEndDate == null ? Colors.grey.shade400 : AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _selectedEndDate == null
+                                              ? loc.s('Pick date', 'Pumili ng petsa')
+                                              : DateFormat('MMM d, yy').format(_selectedEndDate!),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: _selectedEndDate == null
+                                                ? Colors.grey.shade400
+                                                : AppColors.textHeadline,
+                                            fontWeight: _selectedEndDate == null
+                                                ? FontWeight.w400
+                                                : FontWeight.w700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    // ── Submit Button ──
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isSaving ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          elevation: 0,
+                        ),
+                        child: _isSaving
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    loc.s('Creating...', 'Ginagawa...'),
+                                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                loc.s('Create Voucher', 'Gawin ang Voucher'),
+                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    ),
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildLabel(String text) {
     return Text(

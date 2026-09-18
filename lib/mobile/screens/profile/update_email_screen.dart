@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
 
 class UpdateEmailScreen extends StatefulWidget {
@@ -66,21 +67,9 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
     });
 
     try {
-      // 1. Verify current password credentials first for security
-      final currentUser = SupabaseConfig.client.auth.currentUser;
-      if (currentUser?.email != null) {
-        final reauth = await SupabaseConfig.client.auth.signInWithPassword(
-          email: currentUser!.email!,
-          password: password,
-        );
-        if (reauth.user == null) {
-          throw const AuthException('Incorrect password provided.');
-        }
-      }
-
-      // 2. Request Email Update via Supabase Auth
-      await SupabaseConfig.client.auth.updateUser(
-        UserAttributes(email: newEmail),
+      await AuthService().linkRealEmail(
+        newEmail: newEmail,
+        password: password,
       );
 
       if (!mounted) return;
@@ -88,6 +77,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
         _isLoading = false;
         _isSuccess = true;
         _pendingNewEmail = newEmail;
+        _currentEmail = newEmail;
       });
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -99,7 +89,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to update email: $e';
+        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
       });
     }
   }
@@ -150,104 +140,127 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
         children: [
           // Current Email Card
           if (_currentEmail.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+            Builder(
+              builder: (context) {
+                final isPhoneAccount = _currentEmail.toLowerCase().endsWith('@phone.agridirect.ph');
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF059669).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.email_outlined,
-                        color: Color(0xFF059669), size: 20),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Current Registered Email',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (isPhoneAccount ? const Color(0xFFF59E0B) : const Color(0xFF059669)).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isPhoneAccount ? Icons.phone_android_rounded : Icons.email_outlined,
+                          color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isPhoneAccount ? 'Sign-up Method' : 'Current Registered Email',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isPhoneAccount ? 'Registered with Phone Number' : _currentEmail,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPhoneAccount ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: (isPhoneAccount ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.3),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _currentEmail,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isPhoneAccount ? Icons.info_outline_rounded : Icons.check_circle_rounded,
+                              size: 12,
+                              color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isPhoneAccount ? 'No Email' : 'Active',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isPhoneAccount ? const Color(0xFFD97706) : const Color(0xFF059669),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            size: 12, color: Color(0xFF059669)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Active',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF059669),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 24),
           ],
 
-          Text(
-            'Change Email Address',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Enter your new email address and confirm your current password to proceed.',
-            style: GoogleFonts.inter(
-              fontSize: 13.5,
-              color: const Color(0xFF64748B),
-              height: 1.45,
-            ),
+          Builder(
+            builder: (context) {
+              final isPhoneAccount = _currentEmail.toLowerCase().endsWith('@phone.agridirect.ph');
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isPhoneAccount ? 'Link Personal Email' : 'Change Email Address',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isPhoneAccount
+                        ? 'Add your personal email to receive receipts, order tracking updates, and account recovery.'
+                        : 'Enter your new email address and confirm your current password to proceed.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      color: const Color(0xFF64748B),
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 20),
 
@@ -425,7 +438,9 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
                           strokeWidth: 2.5, color: Colors.white),
                     )
                   : Text(
-                      'Update Email Address',
+                      _currentEmail.toLowerCase().endsWith('@phone.agridirect.ph')
+                          ? 'Link Email Address'
+                          : 'Update Email Address',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -458,7 +473,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Verification Email Sent!',
+              'Email Linked Successfully!',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -467,7 +482,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'We sent a confirmation link to:\n$_pendingNewEmail',
+              'Your personal email address:\n$_pendingNewEmail\nhas been linked to your account.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 14.5,
@@ -478,7 +493,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Please open your email inbox and click the confirmation link to complete updating your account email.',
+              'You can now use this email address to log in, recover your password, and receive all your order receipts and updates.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 13.5,

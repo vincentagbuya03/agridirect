@@ -7,6 +7,7 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class FarmerFollowersScreen extends StatefulWidget {
   const FarmerFollowersScreen({super.key});
@@ -59,118 +60,124 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredFollowers;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        final filtered = _filteredFollowers;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18,
-            color: AppColors.textHeadline,
-          ),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'My Followers',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textHeadline,
-          ),
-        ),
-        actions: [
-          if (!_isLoading && _followers.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.groups_rounded,
-                        size: 14,
-                        color: Color(0xFF059669),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_followers.length}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF059669),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: AppColors.textHeadline,
+              ),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              loc.s('My Followers', 'Aking mga Tagasunod'),
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textHeadline,
               ),
             ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            color: const Color(0xFFE2E8F0),
-            height: 1,
-          ),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadFollowers,
-        color: const Color(0xFF059669),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            _buildSummaryCard(),
-            const SizedBox(height: 16),
-            if (_followers.isNotEmpty) ...[
-              _buildSearchBar(),
-              const SizedBox(height: 16),
-            ],
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 80),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF059669),
+            actions: [
+              if (!_isLoading && _followers.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.groups_rounded,
+                            size: 14,
+                            color: Color(0xFF059669),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_followers.length}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF059669),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              )
-            else if (_followers.isEmpty)
-              _buildEmptyState()
-            else if (filtered.isEmpty)
-              _buildNoSearchResults()
-            else
-              ...filtered.map(_buildFollowerCard),
-          ],
-        ),
-      ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                color: const Color(0xFFE2E8F0),
+                height: 1,
+              ),
+            ),
+          ),
+          body: RefreshIndicator(
+            onRefresh: _loadFollowers,
+            color: const Color(0xFF059669),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              children: [
+                _buildSummaryCard(loc),
+                const SizedBox(height: 16),
+                if (_followers.isNotEmpty) ...[
+                  _buildSearchBar(loc),
+                  const SizedBox(height: 16),
+                ],
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 80),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF059669),
+                      ),
+                    ),
+                  )
+                else if (_followers.isEmpty)
+                  _buildEmptyState(loc)
+                else if (filtered.isEmpty)
+                  _buildNoSearchResults(loc)
+                else
+                  ...filtered.map((f) => _buildFollowerCard(f, loc)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildSummaryCard(FarmerLocaleService loc) {
     final count = _followers.length;
     final followerLabel = count == 1
-        ? '1 customer follows your farm'
-        : '$count customers follow your farm';
+        ? loc.s('1 customer follows your farm', '1 mamimili ang sumusunod sa iyong sakahan')
+        : loc.s('$count customers follow your farm', '$count mamimili ang sumusunod sa iyong sakahan');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -251,7 +258,10 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Followers get automatic updates when you post or list new harvest!',
+                    loc.s(
+                      'Followers get automatic updates when you post or list new harvest!',
+                      'Awtomatikong nakatatanggap ng update ang mga tagasunod kapag nag-post o nagtala ka ng bagong ani!',
+                    ),
                     style: GoogleFonts.inter(
                       fontSize: 11.5,
                       color: Colors.white.withValues(alpha: 0.95),
@@ -267,7 +277,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(FarmerLocaleService loc) {
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -287,7 +297,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
         onChanged: (val) => setState(() => _searchQuery = val),
         style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textHeadline),
         decoration: InputDecoration(
-          hintText: 'Search followers by name or email...',
+          hintText: loc.s('Search followers by name or email...', 'Maghanap ng tagasunod ayon sa pangalan o email...'),
           hintStyle: GoogleFonts.inter(
             color: const Color(0xFF94A3B8),
             fontSize: 13,
@@ -319,7 +329,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(FarmerLocaleService loc) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -338,8 +348,8 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
+            decoration: const BoxDecoration(
+              color: Color(0xFFECFDF5),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -350,7 +360,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No followers yet',
+            loc.s('No followers yet', 'Wala pang mga tagasunod'),
             style: GoogleFonts.poppins(
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -359,7 +369,10 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'When buyers follow your farm, they will appear here and receive notifications whenever you post new products or community updates.',
+            loc.s(
+              'When buyers follow your farm, they will appear here and receive notifications whenever you post new products or community updates.',
+              'Kapag nag-follow ang mga mamimili sa iyong sakahan, lalabas sila rito at makatatanggap ng mga abiso tuwing magpo-post ka ng bagong produkto o update.',
+            ),
             style: GoogleFonts.inter(
               fontSize: 13,
               color: AppColors.textSubtle,
@@ -372,7 +385,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
     );
   }
 
-  Widget _buildNoSearchResults() {
+  Widget _buildNoSearchResults(FarmerLocaleService loc) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -389,7 +402,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'No followers matching "$_searchQuery"',
+            '${loc.s("No followers matching", "Walang tagasunod na tumutugma sa")} "$_searchQuery"',
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -401,16 +414,16 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
     );
   }
 
-  Widget _buildFollowerCard(Map<String, dynamic> follower) {
+  Widget _buildFollowerCard(Map<String, dynamic> follower, FarmerLocaleService loc) {
     final joinedAt = follower['followedAt'] as DateTime?;
     final joinedLabel = joinedAt == null
-        ? 'Recently followed'
-        : 'Followed on ${_formatDate(joinedAt)}';
+        ? loc.s('Recently followed', 'Kamakailang nag-follow')
+        : '${loc.s("Followed on", "Nag-follow noong")} ${_formatDate(joinedAt, loc)}';
 
     final customerId = follower['userId']?.toString() ?? '';
     final name = follower['name']?.toString().trim().isNotEmpty == true
         ? follower['name'].toString().trim()
-        : 'Customer';
+        : loc.s('Customer', 'Mamimili');
     final email = follower['email']?.toString().trim() ?? '';
     final avatarUrl = follower['avatarUrl']?.toString() ?? '';
 
@@ -524,7 +537,7 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Chat',
+                      loc.s('Chat', 'Mensahe'),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -596,8 +609,8 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
         .toUpperCase();
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
+  String _formatDate(DateTime date, FarmerLocaleService loc) {
+    const monthsEn = [
       'Jan',
       'Feb',
       'Mar',
@@ -611,6 +624,21 @@ class _FarmerFollowersScreenState extends State<FarmerFollowersScreen> {
       'Nov',
       'Dec',
     ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    const monthsFil = [
+      'Ene',
+      'Peb',
+      'Mar',
+      'Abr',
+      'May',
+      'Hun',
+      'Hul',
+      'Ago',
+      'Set',
+      'Okt',
+      'Nob',
+      'Dis',
+    ];
+    final monthStr = loc.isFilipino ? monthsFil[date.month - 1] : monthsEn[date.month - 1];
+    return '$monthStr ${date.day}, ${date.year}';
   }
 }

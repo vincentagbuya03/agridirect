@@ -218,7 +218,11 @@ class AutoUpdateService {
         RegExp(r'^[vV]'),
         '',
       );
-      final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int rawBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      // Flutter split-per-abi adds 1000 (arm), 2000 (arm64), 3000 (x86_64) to Android versionCode
+      final int currentBuild = (rawBuild >= 1000 && rawBuild < 10000)
+          ? (rawBuild % 1000)
+          : rawBuild;
 
       final updateType = _determineUpdateType(
         currentVersion: currentVersion,
@@ -283,7 +287,10 @@ class AutoUpdateService {
         RegExp(r'^[vV]'),
         '',
       );
-      final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int rawBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final int currentBuild = (rawBuild >= 1000 && rawBuild < 10000)
+          ? (rawBuild % 1000)
+          : rawBuild;
 
       if (info != null) {
         final updateType = _determineUpdateType(

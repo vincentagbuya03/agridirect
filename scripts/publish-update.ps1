@@ -105,7 +105,7 @@ try {
 
     $assetReady = $false
     try {
-        $headRes = Invoke-WebRequest -Uri $apkUrl -Method Head -MaximumRedirection 5 -ErrorAction Stop
+        $headRes = Invoke-WebRequest -Uri $apkUrl -Method Head -MaximumRedirection 5 -UseBasicParsing -ErrorAction Stop
         if ($headRes.StatusCode -eq 200) {
             $assetReady = $true
             Write-Host "[OK] GitHub Release asset is online and ready (HTTP 200)!" -ForegroundColor Green
@@ -135,6 +135,10 @@ try {
 
     Write-Host ""
     Write-Host "Updating Supabase remote version config..." -ForegroundColor Cyan
+
+    $supabaseUrl = "https://ywfppgarzyksacgbesme.supabase.co"
+    $supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnBwZ2Fyenlrc2FjZ2Jlc21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NzEzMjcsImV4cCI6MjA4NzM0NzMyN30.aX1HIacJsHV8gU-9tGONnDpucE9vePWOrJbgMR4fSzs"
+    $notesArray = @($Notes -split ',\s*')
 
     $headers = @{
         "apikey" = $supabaseKey

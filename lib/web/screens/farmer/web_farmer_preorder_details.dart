@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../widgets/crop_milestones_timeline.dart';
 import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class WebFarmerPreorderDetails extends StatefulWidget {
   final ProductItem product;
@@ -106,6 +107,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
   }
 
   Future<void> _showPostUpdateDialog() async {
+    final loc = FarmerLocaleService.instance;
     final titleController = TextEditingController();
     final descController = TextEditingController();
     XFile? pickedImage;
@@ -146,7 +148,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Post Growth Update',
+                            loc.s('Post Growth Update', 'Mag-post ng Update sa Paglaki'),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -175,7 +177,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                 const SizedBox(height: 24),
                 
                 Text(
-                  'Milestone Title',
+                  loc.s('Milestone Title', 'Pamagat ng Yugto'),
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -187,7 +189,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                   controller: titleController,
                   style: GoogleFonts.inter(fontSize: 14, color: _dark),
                   decoration: InputDecoration(
-                    hintText: 'e.g., Sprouting 🌱',
+                    hintText: loc.s('e.g., Sprouting 🌱', 'hal., Pagsibol 🌱'),
                     hintStyle: GoogleFonts.inter(fontSize: 14, color: _muted.withValues(alpha: 0.6)),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
@@ -210,7 +212,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                 const SizedBox(height: 18),
 
                 Text(
-                  'Update Description',
+                  loc.s('Update Description', 'Deskripsyon ng Update'),
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -223,7 +225,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                   maxLines: 4,
                   style: GoogleFonts.inter(fontSize: 14, color: _dark),
                   decoration: InputDecoration(
-                    hintText: 'Tell customers about the crop growth progress...',
+                    hintText: loc.s('Tell customers about the crop growth progress...', 'Ibahagi sa mga mamimili ang lagay ng ani...'),
                     hintStyle: GoogleFonts.inter(fontSize: 14, color: _muted.withValues(alpha: 0.6)),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
@@ -245,7 +247,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                 const SizedBox(height: 18),
 
                 Text(
-                  'Progress Photo',
+                  loc.s('Progress Photo', 'Litrato ng Pag-usad'),
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -342,7 +344,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
-                                  'Click to Upload Progress Photo',
+                                  loc.s('Click to Upload Progress Photo', 'Pindutin para Mag-upload ng Litrato'),
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -351,7 +353,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'JPEG, PNG up to 5MB',
+                                  loc.s('JPEG, PNG up to 5MB', 'JPEG, PNG hanggang 5MB'),
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     color: _muted,
@@ -378,7 +380,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                         ),
                       ),
                       child: Text(
-                        'Cancel',
+                        loc.s('Cancel', 'Kanselahin'),
                         style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                     ),
@@ -417,7 +419,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                                 Navigator.pop(context);
                                 _loadDetails();
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Growth milestone posted successfully!')),
+                                  SnackBar(content: Text(loc.s('Growth milestone posted successfully!', 'Matagumpay na na-post ang yugto ng paglaki!'))),
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
@@ -444,7 +446,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                           ],
                         ),
                         child: Text(
-                          isPosting ? 'Posting...' : 'Post Update',
+                          isPosting ? loc.s('Posting...', 'Ipinopost...') : loc.s('Post Update', 'I-post ang Update'),
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -464,6 +466,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
   }
 
   Future<void> _markHarvestComplete() async {
+    final loc = FarmerLocaleService.instance;
     final cropName = widget.product.name;
     final productId = widget.product.productId!;
 
@@ -497,7 +500,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
-                          'Confirm Harvest Complete',
+                          loc.s('Confirm Harvest Complete', 'Kumpirmahin ang Pag-ani'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -509,7 +512,10 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Are you sure you want to mark "$cropName" as harvested?\n\nThis will convert the pre-order product into a standard shop product, and immediately notify all reserving customers that their batch is ready.',
+                    loc.s(
+                      'Are you sure you want to mark "$cropName" as harvested?\n\nThis will convert the pre-order product into a standard shop product, and immediately notify all reserving customers that their batch is ready.',
+                      'Sigurado ka bang nais mong markahan ang "$cropName" bilang naani na?\n\nIto ay magiging regular na paninda sa tindahan, at agad na aabisuhan ang lahat ng nagreserbang mamimili na handa na ang kanilang ani.',
+                    ),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: _muted,
@@ -531,7 +537,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                           ),
                         ),
                         child: Text(
-                          'Cancel',
+                          loc.s('Cancel', 'Kanselahin'),
                           style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                         ),
                       ),
@@ -552,7 +558,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
                             ],
                           ),
                           child: Text(
-                            'Confirm Harvest',
+                            loc.s('Confirm Harvest', 'Kumpirmahin ang Pag-ani'),
                             style: GoogleFonts.inter(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -596,8 +602,11 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
       for (final customerId in uniqueCustomerIds) {
         await NotificationService().createNotification(
           userId: customerId,
-          title: '🍏 Crop Harvested!',
-          content: 'Your pre-ordered $cropName has been harvested and is ready for delivery/pickup!',
+          title: loc.s('🍏 Crop Harvested!', '🍏 Naani na ang Pananim!'),
+          content: loc.s(
+            'Your pre-ordered $cropName has been harvested and is ready for delivery/pickup!',
+            'Ang iyong pinaunang order na $cropName ay naani na at handa na para sa delivery o pickup!',
+          ),
           type: 'order_status',
           linkType: 'orders',
         );
@@ -605,7 +614,7 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$cropName" marked as harvested! Customers have been notified.')),
+        SnackBar(content: Text('"$cropName" ${loc.s("marked as harvested! Customers have been notified.", "minarkahan bilang naani na! Naabisuhan na ang mga mamimili.")}')),
       );
       context.pop();
     } catch (e) {
@@ -619,344 +628,367 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF8FAFC),
-        body: Center(child: AppShimmerLoader()),
-      );
-    }
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        if (_isLoading) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8FAFC),
+            body: Center(child: AppShimmerLoader()),
+          );
+        }
 
-    final targetVal = widget.product.targetQuantity ?? 100.0;
-    final percent = (_reservedQuantity / (targetVal > 0 ? targetVal : 1.0)).clamp(0.0, 1.0);
+        final targetVal = widget.product.targetQuantity ?? 100.0;
+        final percent = (_reservedQuantity / (targetVal > 0 ? targetVal : 1.0)).clamp(0.0, 1.0);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: _dark),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Pre-order Details',
-          style: GoogleFonts.plusJakartaSans(
-            color: _dark,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Card
-                  Container(
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (widget.product.imageUrl.isNotEmpty) ...[
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.network(
-                                  widget.product.imageUrl,
-                                  width: 90,
-                                  height: 90,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, o, s) => Container(
-                                    width: 90,
-                                    height: 90,
-                                    color: _border,
-                                    child: const Icon(Icons.broken_image, color: _muted),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 24),
-                            ],
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      widget.product.categoryName ?? 'Produce',
-                                      style: GoogleFonts.inter(
-                                        color: _primary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    widget.product.name,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                      color: _dark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Price: ${widget.product.price}/${widget.product.unit}  •  Harvest Period: ${widget.product.harvestDays} days',
-                                    style: GoogleFonts.inter(
-                                      color: _muted,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: _showPostUpdateDialog,
-                                  icon: const Icon(Icons.add_a_photo_rounded, size: 16),
-                                  label: const Text('Post Update'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: _primary,
-                                    side: const BorderSide(color: _primary),
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                FilledButton.icon(
-                                  onPressed: _markHarvestComplete,
-                                  icon: const Icon(Icons.check_circle_rounded, size: 16),
-                                  label: const Text('Mark Harvested'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: _primary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        const Divider(color: _border),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricTile(
-                                title: 'Total Reserved',
-                                value: '$_reservedQuantity / ${targetVal.toStringAsFixed(0)} ${widget.product.unit}',
-                                icon: Icons.shopping_bag_outlined,
-                                color: _primary,
-                              ),
-                            ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: _buildMetricTile(
-                                title: 'Projected Revenue',
-                                value: '₱${_projectedRevenue.toStringAsFixed(2)}',
-                                icon: Icons.monetization_on_outlined,
-                                color: const Color(0xFF3B82F6),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: percent,
-                                minHeight: 10,
-                                backgroundColor: const Color(0xFFE2E8F0),
-                                valueColor: const AlwaysStoppedAnimation<Color>(_primary),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              '${(percent * 100).toStringAsFixed(0)}% of crop batch reserved',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF047857),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+        String statusLabel(String code) {
+          switch (code.toLowerCase()) {
+            case 'pending':
+              return loc.s('PENDING', 'NAKABINBIN');
+            case 'confirmed':
+              return loc.s('CONFIRMED', 'KUMPIRMADO');
+            case 'ready':
+              return loc.s('READY', 'HANDA NA');
+            case 'completed':
+              return loc.s('COMPLETED', 'KUMPLETO');
+            case 'cancelled':
+              return loc.s('CANCELLED', 'KINANSELA');
+            default:
+              return code.toUpperCase();
+          }
+        }
 
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Active Reservations Table (Left)
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: _border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Active Reservations',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: _dark,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              if (_reservations.isEmpty) ...[
-                                Container(
-                                  padding: const EdgeInsets.all(32),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    'No reservations yet for this preorder listing.',
-                                    style: GoogleFonts.inter(color: _muted),
-                                  ),
-                                ),
-                              ] else ...[
-                                Table(
-                                  columnWidths: const {
-                                    0: FlexColumnWidth(2),
-                                    1: FlexColumnWidth(2),
-                                    2: FlexColumnWidth(1.5),
-                                    3: FlexColumnWidth(1.5),
-                                    4: FlexColumnWidth(1.5),
-                                  },
-                                  children: [
-                                    TableRow(
-                                      decoration: const BoxDecoration(
-                                        border: Border(bottom: BorderSide(color: _border, width: 1.5)),
-                                      ),
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          child: Text('Customer', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          child: Text('Order No.', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          child: Text('Quantity', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          child: Text('Payment', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          child: Text('Status', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
-                                        ),
-                                      ],
-                                    ),
-                                    ..._reservations.map((res) {
-                                      return TableRow(
-                                        decoration: const BoxDecoration(
-                                          border: Border(bottom: BorderSide(color: _border)),
-                                        ),
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: Text(res['customer_name'], style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 13.5)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: Text(res['order_number'], style: GoogleFonts.inter(color: _muted, fontSize: 13.5)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: Text('${res['quantity']} ${widget.product.unit}', style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 13.5)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: Text(res['payment_method'], style: GoogleFonts.inter(color: _dark, fontSize: 13.5)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEFF6FF),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                res['status'].toString().toUpperCase(),
-                                                style: GoogleFonts.inter(color: const Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 32),
-                      // Crop Milestones Timeline (Right)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: _border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CropMilestonesTimeline(milestones: _milestones),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: _dark),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              loc.s('Pre-order Details', 'Mga Detalye ng Paunang Order'),
+              style: GoogleFonts.plusJakartaSans(
+                color: _dark,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
               ),
             ),
           ),
-        ),
-      ),
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Card
+                      Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (widget.product.imageUrl.isNotEmpty) ...[
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.network(
+                                      widget.product.imageUrl,
+                                      width: 90,
+                                      height: 90,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (c, o, s) => Container(
+                                        width: 90,
+                                        height: 90,
+                                        color: _border,
+                                        child: const Icon(Icons.broken_image, color: _muted),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 24),
+                                ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          widget.product.categoryName ?? loc.s('Produce', 'Ani'),
+                                          style: GoogleFonts.inter(
+                                            color: _primary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        widget.product.name,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: _dark,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '${loc.s("Price", "Presyo")}: ${widget.product.price}/${widget.product.unit}  •  ${loc.s("Harvest Period", "Panahon ng Pag-ani")}: ${widget.product.harvestDays} ${loc.s("days", "araw")}',
+                                        style: GoogleFonts.inter(
+                                          color: _muted,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: _showPostUpdateDialog,
+                                      icon: const Icon(Icons.add_a_photo_rounded, size: 16),
+                                      label: Text(loc.s('Post Update', 'Mag-post ng Update')),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: _primary,
+                                        side: const BorderSide(color: _primary),
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    FilledButton.icon(
+                                      onPressed: _markHarvestComplete,
+                                      icon: const Icon(Icons.check_circle_rounded, size: 16),
+                                      label: Text(loc.s('Mark Harvested', 'Markahang Naani Na')),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: _primary,
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            const Divider(color: _border),
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMetricTile(
+                                    title: loc.s('Total Reserved', 'Kabuuang Nareserba'),
+                                    value: '$_reservedQuantity / ${targetVal.toStringAsFixed(0)} ${widget.product.unit}',
+                                    icon: Icons.shopping_bag_outlined,
+                                    color: _primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
+                                Expanded(
+                                  child: _buildMetricTile(
+                                    title: loc.s('Projected Revenue', 'Inaasahang Kita'),
+                                    value: '₱${_projectedRevenue.toStringAsFixed(2)}',
+                                    icon: Icons.monetization_on_outlined,
+                                    color: const Color(0xFF3B82F6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: percent,
+                                    minHeight: 10,
+                                    backgroundColor: const Color(0xFFE2E8F0),
+                                    valueColor: const AlwaysStoppedAnimation<Color>(_primary),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '${(percent * 100).toStringAsFixed(0)}% ${loc.s("of crop batch reserved", "ng ani ang nareserba")}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF047857),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Active Reservations Table (Left)
+                          Expanded(
+                            flex: 3,
+                            child: Container(
+                              padding: const EdgeInsets.all(28),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    loc.s('Active Reservations', 'Mga Aktibong Reserbasyon'),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: _dark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  if (_reservations.isEmpty) ...[
+                                    Container(
+                                      padding: const EdgeInsets.all(32),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        loc.s('No reservations yet for this preorder listing.', 'Wala pang mga reserbasyon para sa paunang order na ito.'),
+                                        style: GoogleFonts.inter(color: _muted),
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Table(
+                                      columnWidths: const {
+                                        0: FlexColumnWidth(2),
+                                        1: FlexColumnWidth(2),
+                                        2: FlexColumnWidth(1.5),
+                                        3: FlexColumnWidth(1.5),
+                                        4: FlexColumnWidth(1.5),
+                                      },
+                                      children: [
+                                        TableRow(
+                                          decoration: const BoxDecoration(
+                                            border: Border(bottom: BorderSide(color: _border, width: 1.5)),
+                                          ),
+                                          children: [
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              child: Text(loc.s('Customer', 'Mamimili'), style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              child: Text(loc.s('Order No.', 'Blg. ng Order'), style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              child: Text(loc.s('Quantity', 'Dami'), style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              child: Text(loc.s('Payment', 'Bayad'), style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              child: Text(loc.s('Status', 'Katayuan'), style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _muted, fontSize: 13)),
+                                            ),
+                                          ],
+                                        ),
+                                        ..._reservations.map((res) {
+                                          return TableRow(
+                                            decoration: const BoxDecoration(
+                                              border: Border(bottom: BorderSide(color: _border)),
+                                            ),
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                child: Text(res['customer_name'], style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                child: Text(res['order_number'], style: GoogleFonts.inter(color: _muted, fontSize: 13.5)),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                child: Text('${res['quantity']} ${widget.product.unit}', style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                child: Text(res['payment_method'], style: GoogleFonts.inter(color: _dark, fontSize: 13.5)),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    statusLabel(res['status'].toString()),
+                                                    style: GoogleFonts.inter(color: const Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 32),
+                          // Crop Milestones Timeline (Right)
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(28),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CropMilestonesTimeline(milestones: _milestones),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

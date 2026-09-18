@@ -15,6 +15,7 @@ import '../../widgets/farmer/web_farmer_header.dart';
 import '../../widgets/crop_milestones_timeline.dart';
 import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 
 class WebFarmerPreordersTab extends StatefulWidget {
   final Function(int) onNavigate;
@@ -192,8 +193,8 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
   }
 
   // ─── Next Imminent Harvest Calculation ─────────────────────────────────────
-  String get _nextHarvestInfo {
-    if (_preorders.isEmpty) return 'None active';
+  String _getNextHarvestInfo(FarmerLocaleService loc) {
+    if (_preorders.isEmpty) return loc.s('None active', 'Walang aktibo');
     int minDays = 9999;
     String crop = '';
     for (var p in _preorders) {
@@ -203,63 +204,69 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
       final daysLeft = createdAt.add(Duration(days: harvestDays)).difference(DateTime.now()).inDays + 1;
       if (daysLeft >= 0 && daysLeft < minDays) {
         minDays = daysLeft;
-        crop = p['name']?.toString() ?? 'Produce';
+        crop = p['name']?.toString() ?? loc.s('Produce', 'Ani');
       }
     }
-    if (minDays == 9999) return 'Harvested';
-    return '$crop ($minDays days)';
+    if (minDays == 9999) return loc.s('Harvested', 'Naani Na');
+    return '$crop ($minDays ${loc.s('days', 'araw')})';
   }
 
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 768;
+    return ListenableBuilder(
+      listenable: FarmerLocaleService.instance,
+      builder: (context, _) {
+        final loc = FarmerLocaleService.instance;
+        final sw = MediaQuery.of(context).size.width;
+        final isMobile = sw < 768;
 
-    return Scaffold(
-      backgroundColor: _surface,
-      body: Column(
-        children: [
-          WebFarmerHeader(
-            currentIndex: widget.currentIndex,
-            onNavigate: (index, [route]) => widget.onNavigate(index),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: AppShimmerLoader())
-                : SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      isMobile ? 16 : 36,
-                      12,
-                      isMobile ? 16 : 36,
-                      48,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1400),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildTopHeader(isMobile),
-                            const SizedBox(height: 20),
-                            _buildAnalyticsStrip(isMobile),
-                            const SizedBox(height: 24),
-                            _buildControlsHub(isMobile),
-                            const SizedBox(height: 18),
-                            _buildPreordersList(isMobile),
-                          ],
+        return Scaffold(
+          backgroundColor: _surface,
+          body: Column(
+            children: [
+              WebFarmerHeader(
+                currentIndex: widget.currentIndex,
+                onNavigate: (index, [route]) => widget.onNavigate(index),
+              ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: AppShimmerLoader())
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          isMobile ? 16 : 36,
+                          12,
+                          isMobile ? 16 : 36,
+                          48,
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1400),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildTopHeader(isMobile, loc),
+                                const SizedBox(height: 20),
+                                _buildAnalyticsStrip(isMobile, loc),
+                                const SizedBox(height: 24),
+                                _buildControlsHub(isMobile, loc),
+                                const SizedBox(height: 18),
+                                _buildPreordersList(isMobile, loc),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // ─── Header Section ────────────────────────────────────────────────────────
-  Widget _buildTopHeader(bool isMobile) {
+  Widget _buildTopHeader(bool isMobile, FarmerLocaleService loc) {
     return Row(
       children: [
         Expanded(
@@ -281,7 +288,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                         const Icon(Icons.spa_rounded, size: 14, color: _primary),
                         const SizedBox(width: 5),
                         Text(
-                          'HARVEST & PRE-ORDER PIPELINE',
+                          loc.s('HARVEST & PRE-ORDER PIPELINE', 'DALUYAN NG PAG-ANI AT PAUNANG ORDER'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
@@ -296,7 +303,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               ),
               const SizedBox(height: 8),
               Text(
-                'Pre-Order & Harvest Campaigns',
+                loc.s('Pre-Order & Harvest Campaigns', 'Mga Kampanya sa Paunang Order at Pag-ani'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 22 : 28,
                   fontWeight: FontWeight.w900,
@@ -306,7 +313,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               ),
               const SizedBox(height: 4),
               Text(
-                'Manage crop reservation quotas, post growth updates to buyers, and track seasonal harvest schedules.',
+                loc.s(
+                  'Manage crop reservation quotas, post growth updates to buyers, and track seasonal harvest schedules.',
+                  'Pamahalaan ang reserbasyon ng ani, mag-post ng update sa paglaki, at subaybayan ang petsa ng anihan.',
+                ),
                 style: GoogleFonts.inter(
                   fontSize: isMobile ? 12 : 13.5,
                   color: _muted,
@@ -320,7 +330,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
           onPressed: () => context.go(AppRoutes.addProduct),
           icon: const Icon(Icons.add_rounded, size: 18),
           label: Text(
-            isMobile ? 'New' : 'Launch Campaign',
+            isMobile ? loc.s('New', 'Bago') : loc.s('Launch Campaign', 'Maglunsad ng Kampanya'),
             style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           style: ElevatedButton.styleFrom(
@@ -339,39 +349,39 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
   }
 
   // ─── Executive Harvest Analytics Strip ─────────────────────────────────────
-  Widget _buildAnalyticsStrip(bool isMobile) {
+  Widget _buildAnalyticsStrip(bool isMobile, FarmerLocaleService loc) {
     final metrics = [
       _HarvestMetricData(
-        title: 'Active Campaigns',
+        title: loc.s('Active Campaigns', 'Aktibong Kampanya'),
         value: _preorders.length.toString(),
-        subtitle: 'Live pre-order listings',
+        subtitle: loc.s('Live pre-order listings', 'Mga live na paunang order'),
         icon: Icons.spa_rounded,
         color: const Color(0xFF059669),
         bgColor: const Color(0xFFECFDF5),
         borderColor: const Color(0xFFA7F3D0),
       ),
       _HarvestMetricData(
-        title: 'Reserved Volume',
-        value: '${_totalReservations.toStringAsFixed(0)} units',
-        subtitle: 'Advance buyer orders',
+        title: loc.s('Reserved Volume', 'Dami ng Nareserba'),
+        value: '${_totalReservations.toStringAsFixed(0)} ${loc.s('units', 'yunit')}',
+        subtitle: loc.s('Advance buyer orders', 'Paunang order ng mamimili'),
         icon: Icons.bookmark_added_rounded,
         color: const Color(0xFF0284C7),
         bgColor: const Color(0xFFF0F9FF),
         borderColor: const Color(0xFFBAE6FD),
       ),
       _HarvestMetricData(
-        title: 'Projected Revenue',
+        title: loc.s('Projected Revenue', 'Inaasahang Kita'),
         value: '₱${_totalProjectedRevenue.toStringAsFixed(2)}',
-        subtitle: 'Committed harvest payout',
+        subtitle: loc.s('Committed harvest payout', 'Kumpirmadong bayad sa ani'),
         icon: Icons.account_balance_wallet_rounded,
         color: const Color(0xFFD97706),
         bgColor: const Color(0xFFFFFBEB),
         borderColor: const Color(0xFFFDE68A),
       ),
       _HarvestMetricData(
-        title: 'Next Harvest',
-        value: _nextHarvestInfo,
-        subtitle: 'Upcoming batch deadline',
+        title: loc.s('Next Harvest', 'Susunod na Pag-ani'),
+        value: _getNextHarvestInfo(loc),
+        subtitle: loc.s('Upcoming batch deadline', 'Paparating na takdang-ani'),
         icon: Icons.calendar_month_rounded,
         color: const Color(0xFF7C3AED),
         bgColor: const Color(0xFFF5F3FF),
@@ -454,7 +464,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
           ),
           const SizedBox(height: 2),
           Text(
-            data.subtitle,
+            data.title,
             style: GoogleFonts.inter(
               fontSize: 11,
               color: _muted,
@@ -469,12 +479,12 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
   }
 
   // ─── Controls Hub (Status Chips + Search) ──────────────────────────────────
-  Widget _buildControlsHub(bool isMobile) {
+  Widget _buildControlsHub(bool isMobile, FarmerLocaleService loc) {
     final filters = [
-      {'id': 'ALL', 'label': 'All Campaigns'},
-      {'id': 'GROWING', 'label': '🌿 Growing'},
-      {'id': 'UNDER_RESERVED', 'label': '⚠️ Under-Reserved'},
-      {'id': 'IMMINENT', 'label': '🌾 Harvest Soon'},
+      {'id': 'ALL', 'label': loc.s('All Campaigns', 'Lahat ng Kampanya')},
+      {'id': 'GROWING', 'label': loc.s('🌿 Growing', '🌿 Lumalaki')},
+      {'id': 'UNDER_RESERVED', 'label': loc.s('⚠️ Under-Reserved', '⚠️ Kakaunti ang Reserba')},
+      {'id': 'IMMINENT', 'label': loc.s('🌾 Harvest Soon', '🌾 Aanihin Na')},
     ];
 
     return Container(
@@ -573,7 +583,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               onChanged: (v) => setState(() => _searchQuery = v),
               style: GoogleFonts.inter(fontSize: 13, color: _dark),
               decoration: InputDecoration(
-                hintText: 'Search crop or variety...',
+                hintText: loc.s('Search crop or variety...', 'Maghanap ng ani o barayti...'),
                 hintStyle: GoogleFonts.inter(color: _muted, fontSize: 12.5),
                 prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
                 border: InputBorder.none,
@@ -588,7 +598,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
   }
 
   // ─── Pre-Orders List ───────────────────────────────────────────────────────
-  Widget _buildPreordersList(bool isMobile) {
+  Widget _buildPreordersList(bool isMobile, FarmerLocaleService loc) {
     final filtered = _filteredPreorders;
 
     if (filtered.isEmpty) {
@@ -617,7 +627,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               ),
               const SizedBox(height: 16),
               Text(
-                'No Pre-Order Campaigns Found',
+                loc.s('No Pre-Order Campaigns Found', 'Walang Nahanap na Kampanya sa Paunang Order'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -627,8 +637,14 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               const SizedBox(height: 6),
               Text(
                 _searchQuery.isNotEmpty || _selectedFilter != 'ALL'
-                    ? 'No campaigns match your active search or filter criteria.'
-                    : 'Launch a pre-order campaign to start taking advance buyer reservations.',
+                    ? loc.s(
+                        'No campaigns match your active search or filter criteria.',
+                        'Walang tumutugma sa iyong paghahanap o filter.',
+                      )
+                    : loc.s(
+                        'Launch a pre-order campaign to start taking advance buyer reservations.',
+                        'Maglunsad ng paunang order para makatanggap ng reserbasyon.',
+                      ),
                 style: GoogleFonts.inter(fontSize: 13, color: _muted),
                 textAlign: TextAlign.center,
               ),
@@ -636,7 +652,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
               ElevatedButton.icon(
                 onPressed: () => context.go(AppRoutes.addProduct),
                 icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Create Pre-Order Listing'),
+                label: Text(loc.s('Create Pre-Order Listing', 'Gumawa ng Paunang Order')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   foregroundColor: Colors.white,
@@ -657,17 +673,17 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
       itemCount: filtered.length,
       separatorBuilder: (_, _) => const SizedBox(height: 18),
       itemBuilder: (context, index) {
-        return _buildCampaignCard(filtered[index], isMobile);
+        return _buildCampaignCard(filtered[index], isMobile, loc);
       },
     );
   }
 
   // ─── Individual Campaign Card ──────────────────────────────────────────────
-  Widget _buildCampaignCard(Map<String, dynamic> product, bool isMobile) {
+  Widget _buildCampaignCard(Map<String, dynamic> product, bool isMobile, FarmerLocaleService loc) {
     final reserved = product['reserved_quantity'] as double? ?? 0.0;
     final target = (product['stock_quantity'] as num?)?.toDouble() ?? 100.0;
     final percent = (reserved / (target > 0 ? target : 1.0)).clamp(0.0, 1.0);
-    final unitName = product['units']?['name']?.toString() ?? 'units';
+    final unitName = product['units']?['name']?.toString() ?? loc.s('units', 'yunit');
     final harvestDays = int.tryParse(product['harvest_days']?.toString() ?? '') ?? 0;
     final createdAt =
         product['created_at'] != null ? DateTime.parse(product['created_at'].toString()) : DateTime.now();
@@ -733,7 +749,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                               children: [
                                 Expanded(
                                   child: Text(
-                                    product['name']?.toString() ?? 'Crop Produce',
+                                    product['name']?.toString() ?? loc.s('Crop Produce', 'Ani ng Pananim'),
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: isMobile ? 16 : 18,
                                       fontWeight: FontWeight.w800,
@@ -796,7 +812,9 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              daysLeft > 0 ? '$daysLeft days left' : 'Harvest Ready',
+                              daysLeft > 0
+                                  ? '$daysLeft ${loc.s('days left', 'araw natitira')}'
+                                  : loc.s('Harvest Ready', 'Handa Nang Anihin'),
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
@@ -818,7 +836,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Reservation Goal: ${(percent * 100).toStringAsFixed(0)}%',
+                            '${loc.s('Reservation Goal', 'Layuning Reserbasyon')}: ${(percent * 100).toStringAsFixed(0)}%',
                             style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: _dark),
                           ),
                           Text(
@@ -858,7 +876,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Low reservation rate: ${(percent * 100).toStringAsFixed(0)}% with only $daysLeft days remaining before harvest!',
+                              loc.s(
+                                'Low reservation rate: ${(percent * 100).toStringAsFixed(0)}% with only $daysLeft days remaining before harvest!',
+                                'Mababang antas ng reserbasyon: ${(percent * 100).toStringAsFixed(0)}% na may $daysLeft araw na lang bago ang anihan!',
+                              ),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF9F1239),
@@ -882,7 +903,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                             product['name'],
                           ),
                           icon: const Icon(Icons.add_a_photo_rounded, size: 16),
-                          label: const Text('Post Update'),
+                          label: Text(loc.s('Post Update', 'Mag-post ng Update')),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: _primary,
                             side: const BorderSide(color: _primary),
@@ -900,7 +921,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                             product['name'],
                           ),
                           icon: const Icon(Icons.check_circle_rounded, size: 16),
-                          label: const Text('Mark Harvested'),
+                          label: Text(loc.s('Mark Harvested', 'Markahang Naani')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primary,
                             foregroundColor: Colors.white,
@@ -932,7 +953,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                           context.go(AppRoutes.farmerPreorderDetail, extra: productItem);
                         },
                         icon: const Icon(Icons.visibility_outlined, size: 20, color: _muted),
-                        tooltip: 'View Campaign Details',
+                        tooltip: loc.s('View Campaign Details', 'Tingnan ang Detalye ng Kampanya'),
                         splashRadius: 18,
                       ),
                       // Expand/collapse milestone feed
@@ -951,7 +972,9 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                           size: 22,
                           color: _muted,
                         ),
-                        tooltip: isExpanded ? 'Hide Milestones' : 'View Milestones',
+                        tooltip: isExpanded
+                            ? loc.s('Hide Milestones', 'Itago ang Milestones')
+                            : loc.s('View Milestones', 'Tingnan ang Milestones'),
                         splashRadius: 18,
                       ),
                     ],
@@ -973,7 +996,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Crop Growth Timeline & Updates',
+                      loc.s('Crop Growth Timeline & Updates', 'Takdang Oras ng Paglaki at mga Update'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
@@ -989,7 +1012,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No growth updates posted yet. Click "Post Update" above to share photos with buyers.',
+                          loc.s(
+                            'No growth updates posted yet. Click "Post Update" above to share photos with buyers.',
+                            'Wala pang na-post na update. Pindutin ang "Mag-post ng Update" sa itaas upang magbahagi ng larawan.',
+                          ),
                           style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
                         ),
                       ),
@@ -1005,6 +1031,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
 
   // ─── Post Growth Update Dialog ─────────────────────────────────────────────
   Future<void> _showPostUpdateDialog(String productId, String cropName) async {
+    final loc = FarmerLocaleService.instance;
     final titleController = TextEditingController();
     final descController = TextEditingController();
     XFile? pickedImage;
@@ -1041,7 +1068,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Post Growth Update',
+                            loc.s('Post Growth Update', 'Mag-post ng Update sa Paglaki'),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -1068,13 +1095,16 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   ],
                 ),
                 const SizedBox(height: 20),
-                Text('Milestone Title', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+                Text(
+                  loc.s('Milestone Title', 'Pamagat ng Yugto'),
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: titleController,
                   style: GoogleFonts.inter(fontSize: 14, color: _dark),
                   decoration: InputDecoration(
-                    hintText: 'e.g., Flowering Stage 🌱',
+                    hintText: loc.s('e.g., Flowering Stage 🌱', 'hal., Yugto ng Pamumulaklak 🌱'),
                     hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
@@ -1085,14 +1115,20 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Update Description', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+                Text(
+                  loc.s('Update Description', 'Paglalarawan ng Update'),
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: descController,
                   maxLines: 3,
                   style: GoogleFonts.inter(fontSize: 14, color: _dark),
                   decoration: InputDecoration(
-                    hintText: 'Describe crop health, weather conditions, and growth progress...',
+                    hintText: loc.s(
+                      'Describe crop health, weather conditions, and growth progress...',
+                      'Ilarawan ang kalusugan ng pananim, panahon, at progreso...',
+                    ),
                     hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
@@ -1103,7 +1139,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Progress Photo', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+                Text(
+                  loc.s('Progress Photo', 'Larawan ng Progreso'),
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark),
+                ),
                 const SizedBox(height: 6),
                 imageBytes != null
                     ? Container(
@@ -1172,7 +1211,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                                 const Icon(Icons.add_a_photo_rounded, color: _primary, size: 22),
                                 const SizedBox(width: 10),
                                 Text(
-                                  'Upload Progress Photo',
+                                  loc.s('Upload Progress Photo', 'Mag-upload ng Larawan ng Progreso'),
                                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _primary),
                                 ),
                               ],
@@ -1192,7 +1231,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: Text(loc.s('Cancel', 'Kanselahin'), style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
                     const SizedBox(width: 10),
                     ElevatedButton(
@@ -1228,8 +1267,8 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                                 Navigator.pop(context);
                                 _loadPreorders();
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Growth milestone posted successfully!'),
+                                  SnackBar(
+                                    content: Text(loc.s('Growth milestone posted successfully!', 'Matagumpay na na-post ang update sa paglaki!')),
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
@@ -1250,7 +1289,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       child: Text(
-                        isPosting ? 'Posting...' : 'Post Update',
+                        isPosting ? loc.s('Posting...', 'Nagpo-post...') : loc.s('Post Update', 'I-post ang Update'),
                         style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
                       ),
                     ),
@@ -1266,6 +1305,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
 
   // ─── Mark Harvest Complete ─────────────────────────────────────────────────
   Future<void> _markHarvestComplete(String productId, String cropName) async {
+    final loc = FarmerLocaleService.instance;
     bool confirm = await showDialog<bool>(
           context: context,
           builder: (context) => Dialog(
@@ -1291,7 +1331,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Confirm Harvest',
+                    loc.s('Confirm Harvest', 'Kumpirmahin ang Pag-ani'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -1300,7 +1340,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Are you sure "$cropName" is harvested?\n\nThis will convert the campaign to ready stock and notify all customers who pre-ordered.',
+                    loc.s(
+                      'Are you sure "$cropName" is harvested?\n\nThis will convert the campaign to ready stock and notify all customers who pre-ordered.',
+                      'Sigurado ka bang naani na ang "$cropName"?\n\nIlilipat nito ang produkto sa may stock at aabisuhan ang lahat ng nag-pre-order.',
+                    ),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
@@ -1320,7 +1363,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                          child: Text(loc.s('Cancel', 'Kanselahin'), style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1334,7 +1377,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: Text('Confirm Harvest', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                          child: Text(loc.s('Confirm Harvest', 'Kumpirmahin ang Pag-ani'), style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ],
@@ -1377,7 +1420,7 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('"$cropName" marked as harvested! Buyers have been notified.'),
+          content: Text(loc.s('"$cropName" marked as harvested! Buyers have been notified.', 'Ang "$cropName" ay minarkahang naani na! Naabisuhan na ang mga mamimili.')),
           behavior: SnackBarBehavior.floating,
         ),
       );

@@ -16,6 +16,8 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/mascot/mascot_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/offline/offline_queue_service.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 
 /// Add & Edit Product Screen for Farmers with Premium UI and Offline Support
 class AddProductScreen extends StatefulWidget {
@@ -147,26 +149,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _deleteProduct() async {
+    final locale = FarmerLocaleService.instance;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          'Delete Product',
+          locale.t('delete_product_confirm_title'),
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w700,
             color: _textHeadline,
           ),
         ),
         content: Text(
-          'Are you sure you want to delete "${widget.editProduct!['name']}"? This action cannot be undone.',
+          locale.s(
+            'Are you sure you want to delete "${widget.editProduct!['name']}"? This action cannot be undone.',
+            'Sigurado ka bang nais mong burahin ang "${widget.editProduct!['name']}"? Hindi na ito maibabalik.',
+          ),
           style: GoogleFonts.inter(color: _textSubtle, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              'Cancel',
+              locale.t('cancel_btn'),
               style: GoogleFonts.inter(
                 color: _textSubtle,
                 fontWeight: FontWeight.w600,
@@ -184,7 +190,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               elevation: 0,
             ),
             child: Text(
-              'Delete',
+              locale.t('delete_btn'),
               style: GoogleFonts.inter(fontWeight: FontWeight.w700),
             ),
           ),
@@ -198,9 +204,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
       try {
         if (!_isOnline) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Deleting products requires an active internet connection.',
+                locale.s(
+                  'Deleting products requires an active internet connection.',
+                  'Kinakailangan ng koneksyon sa internet para magbura ng paninda.',
+                ),
               ),
             ),
           );
@@ -209,9 +218,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
         await ProductService().deleteProduct(widget.editProduct!['id']);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Product deleted successfully!'),
-              backgroundColor: Color(0xFF059669),
+            SnackBar(
+              content: Text(
+                locale.s('Product deleted successfully!', 'Matagumpay na nabura ang paninda!'),
+              ),
+              backgroundColor: const Color(0xFF059669),
             ),
           );
           context.pop();
@@ -327,17 +338,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _submitForm() async {
+    final locale = FarmerLocaleService.instance;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null || _selectedUnit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select category and unit')),
+        SnackBar(
+          content: Text(
+            locale.s('Please select category and unit', 'Pakiusap pumili ng kategorya at yunit'),
+          ),
+        ),
       );
       return;
     }
 
     if (_selectedImageFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least 1 image')),
+        SnackBar(
+          content: Text(
+            locale.s('Please select at least 1 image', 'Pumili ng kahit 1 larawan'),
+          ),
+        ),
       );
       return;
     }
@@ -349,9 +369,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (_isEditMode) {
         if (!_isOnline) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Editing products requires an active internet connection.',
+                locale.s(
+                  'Editing products requires an active internet connection.',
+                  'Kinakailangan ng koneksyon sa internet para mag-edit ng paninda.',
+                ),
               ),
             ),
           );
@@ -451,9 +474,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Product updated successfully!'),
-              backgroundColor: Color(0xFF059669),
+            SnackBar(
+              content: Text(
+                locale.s('Product updated successfully!', 'Matagumpay na na-update ang paninda!'),
+              ),
+              backgroundColor: const Color(0xFF059669),
             ),
           );
           context.pop(true);
@@ -499,8 +524,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       if (mounted) {
         String message = _isOnline
-            ? 'Product added successfully!'
-            : 'Product saved offline! Will sync when online.';
+            ? locale.s('Product added successfully!', 'Matagumpay na naidagdag ang paninda!')
+            : locale.s('Product saved offline! Will sync when online.', 'Nai-save offline ang paninda! Mag-si-sync kapag online na.');
 
         MascotService.showCelebration(
           context,
@@ -511,7 +536,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(
+            content: Text('${locale.s('Error: ', 'May Error: ')}${e.toString()}'),
+          ),
         );
       }
     } finally {
@@ -613,139 +640,159 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18,
-            color: _textHeadline,
-          ),
-          onPressed: () => context.pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _isEditMode ? 'Edit Product' : 'Add New Product',
-              style: GoogleFonts.poppins(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+    final locale = FarmerLocaleService.instance;
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
                 color: _textHeadline,
               ),
+              onPressed: () => context.pop(),
             ),
-            Text(
-              _isEditMode
-                  ? 'Update listing details & pricing'
-                  : 'List fresh produce to the marketplace',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: _textSubtle,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Online / Offline Status Chip
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _isOnline
-                      ? const Color(0xFFECFDF5)
-                      : const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isOnline
-                        ? const Color(0xFF10B981).withValues(alpha: 0.3)
-                        : const Color(0xFFF97316).withValues(alpha: 0.3),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isEditMode
+                      ? locale.s('Edit Product', 'I-edit ang Paninda')
+                      : locale.s('Add New Product', 'Magdagdag ng Bagong Paninda'),
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _textHeadline,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 3.5,
-                      backgroundColor: _isOnline
-                          ? const Color(0xFF059669)
-                          : const Color(0xFFF97316),
+                Text(
+                  _isEditMode
+                      ? locale.s(
+                          'Update listing details & pricing',
+                          'I-update ang detalye at presyo',
+                        )
+                      : locale.s(
+                          'List fresh produce to the marketplace',
+                          'Magtinda ng sariwang ani sa palengke',
+                        ),
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: _textSubtle,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              const Padding(
+                padding: EdgeInsets.only(right: 6),
+                child: FarmerLanguageToggle(compact: true),
+              ),
+              // Online / Offline Status Chip
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _isOnline ? 'Online' : 'Offline',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                    decoration: BoxDecoration(
+                      color: _isOnline
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
                         color: _isOnline
-                            ? const Color(0xFF059669)
-                            : const Color(0xFFC2410C),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                            : const Color(0xFFF97316).withValues(alpha: 0.3),
                       ),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 3.5,
+                          backgroundColor: _isOnline
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFF97316),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _isOnline
+                              ? locale.s('Online', 'Naka-online')
+                              : locale.s('Offline', 'Naka-offline'),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _isOnline
+                                ? const Color(0xFF059669)
+                                : const Color(0xFFC2410C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
+              if (_isEditMode)
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFEF4444),
+                    size: 22,
+                  ),
+                  onPressed: _isLoading ? null : _deleteProduct,
+                  tooltip: locale.s('Delete Product', 'Burahin ang Paninda'),
+                ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(color: _borderColor, height: 1),
             ),
           ),
-          if (_isEditMode)
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: Color(0xFFEF4444),
-                size: 22,
-              ),
-              onPressed: _isLoading ? null : _deleteProduct,
-              tooltip: 'Delete Product',
-            ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: _borderColor, height: 1),
-        ),
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWidescreen = constraints.maxWidth >= 900;
-            return Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isWidescreen ? 32 : 16,
-                        vertical: 16,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: isWidescreen ? 1100 : 640,
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWidescreen = constraints.maxWidth >= 900;
+                return Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isWidescreen ? 32 : 16,
+                            vertical: 16,
                           ),
-                          child: isWidescreen
-                              ? _buildDesktopLayout()
-                              : _buildMobileLayout(),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: isWidescreen ? 1100 : 640,
+                              ),
+                              child: isWidescreen
+                                  ? _buildDesktopLayout()
+                                  : _buildMobileLayout(),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      _buildBottomActionBar(isWidescreen),
+                    ],
                   ),
-                  _buildBottomActionBar(isWidescreen),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -804,9 +851,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 1. Media Upload Section ───
   Widget _buildMediaSection() {
+    final locale = FarmerLocaleService.instance;
     return _buildSectionCard(
-      title: 'Product Photos',
-      subtitle: 'Upload up to 5 clear photos. First photo is the main cover.',
+      title: locale.s('Product Photos', 'Mga Larawan ng Paninda'),
+      subtitle: locale.s(
+        'Upload up to 5 clear photos. First photo is the main cover.',
+        'Mag-upload ng hanggang 5 malinaw na larawan. Ang unang larawan ang pangunahing pabalat.',
+      ),
       icon: Icons.photo_library_rounded,
       badge: '${_selectedImageFiles.length}/5',
       child: Column(
@@ -874,7 +925,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              isMain ? 'COVER' : '#${index + 1}',
+                              isMain
+                                  ? locale.s('COVER', 'PABALAT')
+                                  : '#${index + 1}',
                               style: GoogleFonts.inter(
                                 color: Colors.white,
                                 fontSize: 9,
@@ -921,6 +974,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Widget _buildEmptyPhotoUploader() {
+    final locale = FarmerLocaleService.instance;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
@@ -948,7 +1002,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Upload Fresh Produce Photos',
+            locale.s('Upload Fresh Produce Photos', 'Mag-upload ng Larawan ng Ani'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -957,7 +1011,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'High quality photos increase buyer trust and orders.',
+            locale.s(
+              'High quality photos increase buyer trust and orders.',
+              'Ang malilinaw na larawan ay nagpapataas ng tiwala ng mamimili at mga order.',
+            ),
             style: GoogleFonts.inter(fontSize: 12, color: _textSubtle),
             textAlign: TextAlign.center,
           ),
@@ -968,7 +1025,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _pickImageSource(ImageSource.camera),
                   icon: const Icon(Icons.camera_alt_rounded, size: 16),
-                  label: const Text('Camera'),
+                  label: Text(locale.s('Camera', 'Kamera')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _primary,
                     side: const BorderSide(color: Color(0xFF10B981)),
@@ -984,7 +1041,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => _pickImageSource(ImageSource.gallery),
                   icon: const Icon(Icons.photo_library_rounded, size: 16),
-                  label: const Text('Gallery'),
+                  label: Text(locale.s('Gallery', 'Galerya')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
                     foregroundColor: Colors.white,
@@ -1004,6 +1061,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Widget _buildAddMorePhotoButton() {
+    final locale = FarmerLocaleService.instance;
     return GestureDetector(
       onTap: () => _pickImageSource(ImageSource.gallery),
       child: Container(
@@ -1022,7 +1080,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             const Icon(Icons.add_photo_alternate_rounded, color: _primary, size: 24),
             const SizedBox(height: 4),
             Text(
-              'Add More',
+              locale.s('Add More', 'Magdagdag'),
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -1037,27 +1095,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 2. Basic Information Section ───
   Widget _buildBasicInfoSection() {
+    final locale = FarmerLocaleService.instance;
     return _buildSectionCard(
-      title: 'Basic Information',
-      subtitle: 'Name your product and choose its marketplace category',
+      title: locale.s('Basic Information', 'Pangunahing Impormasyon'),
+      subtitle: locale.s(
+        'Name your product and choose its marketplace category',
+        'Pangalanan ang paninda at piliin ang kategorya nito',
+      ),
       icon: Icons.info_outline_rounded,
       child: Column(
         children: [
           _buildStyledTextField(
             controller: _nameController,
-            label: 'Product / Crop Name',
-            hint: 'e.g., Fresh Organic Native Tomatoes',
+            label: locale.s('Product / Crop Name', 'Pangalan ng Paninda / Ani'),
+            hint: locale.s('e.g., Fresh Organic Native Tomatoes', 'hal., Sariwang Kamatis'),
             prefixIcon: Icons.grass_rounded,
             validator: (value) =>
-                value?.trim().isEmpty ?? true ? 'Product name is required' : null,
+                value?.trim().isEmpty ?? true ? locale.s('Product name is required', 'Kailangan ang pangalan ng paninda') : null,
           ),
           const SizedBox(height: 14),
           _buildCategoryDropdown(),
           const SizedBox(height: 14),
           _buildStyledTextField(
             controller: _descriptionController,
-            label: 'Description & Origin (Optional)',
-            hint: 'Describe farming practices (organic, pesticide-free), taste profile, harvest origin...',
+            label: locale.s('Description & Origin (Optional)', 'Deskripsyon at Pinagmulan (Opsyonal)'),
+            hint: locale.s(
+              'Describe farming practices (organic, pesticide-free), taste profile, harvest origin...',
+              'Ilarawan ang paraan ng pagtatanim (organiko), lasa, pinanggalingan ng ani...',
+            ),
             maxLines: 3,
             prefixIcon: Icons.description_outlined,
           ),
@@ -1068,9 +1133,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 3. Pricing & Inventory Section ───
   Widget _buildPricingSection() {
+    final locale = FarmerLocaleService.instance;
     return _buildSectionCard(
-      title: 'Pricing & Inventory',
-      subtitle: 'Set unit pricing and current stock availability',
+      title: locale.s('Pricing & Inventory', 'Presyo at Imbentaryo'),
+      subtitle: locale.s(
+        'Set unit pricing and current stock availability',
+        'Itakda ang presyo bawat yunit at dami ng kasalukuyang stock',
+      ),
       icon: Icons.sell_outlined,
       child: Column(
         children: [
@@ -1081,15 +1150,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 flex: 3,
                 child: _buildStyledTextField(
                   controller: _priceController,
-                  label: 'Price per Unit',
+                  label: locale.s('Price per Unit', 'Presyo bawat Yunit'),
                   hint: '0.00',
                   prefixText: '₱ ',
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
                   validator: (value) {
-                    if (value?.trim().isEmpty ?? true) return 'Required';
-                    if (double.tryParse(value!) == null) return 'Invalid';
+                    if (value?.trim().isEmpty ?? true) return locale.s('Required', 'Kailangan');
+                    if (double.tryParse(value!) == null) return locale.s('Invalid', 'Di-wasto');
                     return null;
                   },
                 ),
@@ -1109,13 +1178,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 flex: 3,
                 child: _buildStyledTextField(
                   controller: _quantityController,
-                  label: 'Available Stock',
+                  label: locale.s('Available Stock', 'Kasalukuyang Stock'),
                   hint: 'e.g., 50',
                   prefixIcon: Icons.inventory_2_outlined,
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value?.trim().isEmpty ?? true) return 'Required';
-                    if (double.tryParse(value!) == null) return 'Invalid';
+                    if (value?.trim().isEmpty ?? true) return locale.s('Required', 'Kailangan');
+                    if (double.tryParse(value!) == null) return locale.s('Invalid', 'Di-wasto');
                     return null;
                   },
                 ),
@@ -1128,7 +1197,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total Inventory Value',
+                      locale.s('Total Inventory Value', 'Kabuuang Halaga ng Stock'),
                       style: GoogleFonts.inter(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
@@ -1168,17 +1237,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 4. Promotions & Marketplace Features (Replaces Grey Checkboxes) ───
   Widget _buildPromotionsSection() {
+    final locale = FarmerLocaleService.instance;
     return _buildSectionCard(
-      title: 'Marketplace Features & Promotions',
-      subtitle: 'Attract more buyers and enable bulk or seasonal discounts',
+      title: locale.s('Marketplace Features & Promotions', 'Mga Feature at Promosyon'),
+      subtitle: locale.s(
+        'Attract more buyers and enable bulk or seasonal discounts',
+        'Mang-akit ng mamimili at mag-alok ng diskuwento sa maramihan',
+      ),
       icon: Icons.auto_awesome_rounded,
       child: Column(
         children: [
           _buildFeatureToggleTile(
             icon: Icons.local_shipping_outlined,
             iconColor: const Color(0xFF0284C7),
-            title: 'Free Shipping',
-            subtitle: 'Cover delivery costs to attract 3x more consumer orders',
+            title: locale.s('Free Shipping', 'Libreng Pagpapadala'),
+            subtitle: locale.s(
+              'Cover delivery costs to attract 3x more consumer orders',
+              'Sagutin ang delivery upang makaakit ng mas maraming order',
+            ),
             value: _isFreeShipping,
             onChanged: (val) => setState(() => _isFreeShipping = val),
           ),
@@ -1186,8 +1262,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           _buildFeatureToggleTile(
             icon: Icons.storefront_outlined,
             iconColor: const Color(0xFF7C3AED),
-            title: 'Wholesale Pricing',
-            subtitle: 'Offer volume discounts for restaurants, bulk buyers & vendors',
+            title: locale.s('Wholesale Pricing', 'Presyong Pakyawan (Wholesale)'),
+            subtitle: locale.s(
+              'Offer volume discounts for restaurants, bulk buyers & vendors',
+              'Mag-alok ng diskuwento para sa mga restaurant at mamamakyaw',
+            ),
             value: _isWholesale,
             onChanged: (val) => setState(() => _isWholesale = val),
           ),
@@ -1195,8 +1274,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           _buildFeatureToggleTile(
             icon: Icons.bolt_rounded,
             iconColor: const Color(0xFFEA580C),
-            title: 'Flash Sale Nomination',
-            subtitle: 'Spotlight this item in seasonal and weekend flash deals',
+            title: locale.s('Flash Sale Nomination', 'Pagsali sa Flash Sale'),
+            subtitle: locale.s(
+              'Spotlight this item in seasonal and weekend flash deals',
+              'Itampok ang aning ito sa mga espesyal na bagsak-presyo',
+            ),
             value: _isFlashSale,
             onChanged: (val) => setState(() => _isFlashSale = val),
           ),
@@ -1204,7 +1286,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
             const SizedBox(height: 10),
             _buildStyledTextField(
               controller: _discountPercentController,
-              label: 'Flash Sale Discount Percentage (%)',
+              label: locale.s(
+                'Flash Sale Discount Percentage (%)',
+                'Porsyento ng Diskuwento sa Flash Sale (%)',
+              ),
               hint: 'e.g., 35',
               prefixIcon: Icons.percent_rounded,
               keyboardType:
@@ -1214,7 +1299,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Countdown Duration',
+                locale.s('Countdown Duration', 'Tagal ng Flash Sale'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -1227,11 +1312,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
               spacing: 8,
               runSpacing: 6,
               children: [
-                _buildAddProdDurationChip('Midnight', 'midnight'),
-                _buildAddProdDurationChip('24 Hours', '24_hours'),
-                _buildAddProdDurationChip('3 Days', '3_days'),
-                _buildAddProdDurationChip('7 Days', '7_days'),
-                _buildAddProdDurationChip('Custom Date', 'custom'),
+                _buildAddProdDurationChip(locale.s('Midnight', 'Hatinggabi'), 'midnight'),
+                _buildAddProdDurationChip(locale.s('24 Hours', '24 na Oras'), '24_hours'),
+                _buildAddProdDurationChip(locale.s('3 Days', '3 Araw'), '3_days'),
+                _buildAddProdDurationChip(locale.s('7 Days', '7 Araw'), '7_days'),
+                _buildAddProdDurationChip(locale.s('Custom Date', 'Ibang Petsa'), 'custom'),
               ],
             ),
             if (_flashDurationOption == 'custom') ...[
@@ -1275,8 +1360,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       const SizedBox(width: 8),
                       Text(
                         _flashSaleEndDate != null
-                            ? 'Ends: ${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
-                            : 'Pick Custom End Date',
+                            ? '${locale.s('Ends: ', 'Matatapos: ')}${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
+                            : locale.s('Pick Custom End Date', 'Pumili ng Petsa ng Pagtatapos'),
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1296,15 +1381,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 5. Farming & Pre-order Details ───
   Widget _buildFarmingDetailsSection() {
+    final locale = FarmerLocaleService.instance;
     return _buildSectionCard(
-      title: 'Harvest & Pre-order Details',
-      subtitle: 'Schedule upcoming harvests and accept advance customer reservations',
+      title: locale.s('Harvest & Pre-order Details', 'Detalye ng Ani at Pre-order'),
+      subtitle: locale.s(
+        'Schedule upcoming harvests and accept advance customer reservations',
+        'I-iskedyul ang darating na ani at tumanggap ng paunang reserbasyon',
+      ),
       icon: Icons.eco_outlined,
       child: Column(
         children: [
           _buildStyledTextField(
             controller: _harvestDaysController,
-            label: 'Estimated Days to Harvest (Optional)',
+            label: locale.s(
+              'Estimated Days to Harvest (Optional)',
+              'Tinatayang Araw Bago Maani (Opsyonal)',
+            ),
             hint: 'e.g., 14',
             prefixIcon: Icons.calendar_month_rounded,
             keyboardType: TextInputType.number,
@@ -1313,8 +1405,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           _buildFeatureToggleTile(
             icon: Icons.grass_rounded,
             iconColor: const Color(0xFF059669),
-            title: 'Enable Pre-order for this Crop',
-            subtitle: 'Allow buyers to reserve and pay in advance before harvest date',
+            title: locale.s('Enable Pre-order for this Crop', 'Paganahin ang Pre-order para sa Aning Ito'),
+            subtitle: locale.s(
+              'Allow buyers to reserve and pay in advance before harvest date',
+              'Pahintulutan ang mga mamimili na magreserba at magbayad bago ang anihan',
+            ),
             value: _isPreorder,
             onChanged: (val) => setState(() => _isPreorder = val),
           ),
@@ -1339,7 +1434,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Pre-orders let you post growth updates (🌱 sprouting, flowering, harvest) to build excitement with reserving buyers!',
+                      locale.s(
+                        'Pre-orders let you post growth updates (🌱 sprouting, flowering, harvest) to build excitement with reserving buyers!',
+                        'Nagbibigay-daan ang pre-order na mag-post ng growth update (🌱 pagsibol, pamumulaklak, pag-ani) para sa mga nagreserbang mamimili!',
+                      ),
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
                         color: const Color(0xFF065F46),
@@ -1358,15 +1456,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 6. Live Marketplace Buyer Preview ───
   Widget _buildLivePreviewCard() {
+    final locale = FarmerLocaleService.instance;
     final name = _nameController.text.trim().isEmpty
-        ? 'Fresh Farm Produce'
+        ? locale.s('Fresh Farm Produce', 'Sariwang Ani sa Bukid')
         : _nameController.text.trim();
     final priceText = _priceController.text.trim().isEmpty
         ? '0.00'
         : _priceController.text.trim();
     final qty = _quantityController.text.trim();
 
-    String categoryName = 'Produce';
+    String categoryName = locale.s('Produce', 'Ani');
     if (_selectedCategory != null) {
       final cat = _categories.firstWhere(
         (c) => c['id']?.toString() == _selectedCategory,
@@ -1416,7 +1515,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Marketplace Live Preview',
+                  locale.s('Marketplace Live Preview', 'Live Preview sa Palengke'),
                   style: GoogleFonts.poppins(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -1434,7 +1533,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'BUYER VIEW',
+                    locale.s('BUYER VIEW', 'TINGIN NG MAMIMILI'),
                     style: GoogleFonts.inter(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w800,
@@ -1544,7 +1643,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 ),
                               ),
                               child: Text(
-                                'PRE-ORDER',
+                                locale.s('PRE-ORDER', 'PAUNANG ORDER'),
                                 style: GoogleFonts.inter(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w800,
@@ -1554,7 +1653,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             )
                           else if (qty.isNotEmpty)
                             Text(
-                              '$qty in stock',
+                              '$qty ${locale.s('in stock', 'na stock')}',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: _textSubtle,
@@ -1575,6 +1674,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ─── 7. Sticky Bottom Action Bar ───
   Widget _buildBottomActionBar(bool isWidescreen) {
+    final locale = FarmerLocaleService.instance;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isWidescreen ? 32 : 16,
@@ -1601,7 +1701,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                   child: Text(
-                    'Cancel',
+                    locale.t('cancel_btn'),
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
@@ -1630,8 +1730,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                   label: Text(
                     _isEditMode
-                        ? 'Save Changes'
-                        : (_isOnline ? 'Publish Product' : 'Save Offline'),
+                        ? locale.s('Save Changes', 'I-save ang Pagbabago')
+                        : (_isOnline
+                            ? locale.s('Publish Product', 'I-publish ang Paninda')
+                            : locale.s('Save Offline', 'I-save Offline')),
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w800,
@@ -1886,6 +1988,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Widget _buildCategoryDropdown() {
+    final locale = FarmerLocaleService.instance;
     final validValue =
         _categories.any((item) => (item['id'] as String?) == _selectedCategory)
             ? _selectedCategory
@@ -1895,7 +1998,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Product Category',
+          locale.s('Product Category', 'Kategorya ng Paninda'),
           style: GoogleFonts.inter(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
@@ -1925,7 +2028,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             : DropdownButtonFormField<String>(
                 initialValue: validValue,
                 items: _categories.map((item) {
-                  final displayText = (item['name'] as String?) ?? 'Produce';
+                  final displayText = (item['name'] as String?) ?? locale.s('Produce', 'Ani');
                   final id = (item['id'] as String?) ?? '';
                   return DropdownMenuItem(
                     value: id,
@@ -1968,13 +2071,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   color: _textHeadline,
                 ),
                 validator: (value) =>
-                    value == null || value.isEmpty ? 'Category is required' : null,
+                    value == null || value.isEmpty ? locale.s('Category is required', 'Kailangan ang kategorya') : null,
               ),
       ],
     );
   }
 
   Widget _buildUnitDropdown() {
+    final locale = FarmerLocaleService.instance;
     final validValue =
         _units.any((item) => (item['id'] as String?) == _selectedUnit)
             ? _selectedUnit
@@ -1984,7 +2088,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Unit',
+          locale.s('Unit', 'Yunit'),
           style: GoogleFonts.inter(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
@@ -2052,7 +2156,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   color: _textHeadline,
                 ),
                 validator: (value) =>
-                    value == null || value.isEmpty ? 'Unit is required' : null,
+                    value == null || value.isEmpty ? locale.s('Unit is required', 'Kailangan ang yunit') : null,
               ),
       ],
     );

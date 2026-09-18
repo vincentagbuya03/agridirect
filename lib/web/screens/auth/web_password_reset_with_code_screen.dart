@@ -45,9 +45,19 @@ class _WebPasswordResetWithCodeScreenState
   }
 
   Future<void> _handleSendCode() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      _setFeedback('Please enter a valid email address', isError: true);
+    final identifier = _emailController.text.trim();
+    final isEmail = identifier.contains('@');
+    final digits = identifier.replaceAll(RegExp(r'[^\d]'), '');
+    final isPhone = digits.length >= 10 &&
+        (digits.startsWith('9') ||
+            digits.startsWith('09') ||
+            digits.startsWith('639'));
+
+    if (identifier.isEmpty || (!isEmail && !isPhone)) {
+      _setFeedback(
+        'Please enter a valid email address or Philippine mobile number',
+        isError: true,
+      );
       return;
     }
 
@@ -57,7 +67,7 @@ class _WebPasswordResetWithCodeScreenState
     });
 
     try {
-      final mode = await PasswordResetService.sendResetCode(email);
+      final mode = await PasswordResetService.sendResetCode(identifier);
 
       if (mode == PasswordResetDeliveryMode.code) {
         setState(() {
@@ -65,7 +75,9 @@ class _WebPasswordResetWithCodeScreenState
           _codeSent = true;
         });
         _setFeedback(
-          'Reset code sent! Check your email, then set your new password below.',
+          isPhone
+              ? 'Reset code sent via SMS! Check your messages, then enter the code below.'
+              : 'Reset code sent! Check your email, then set your new password below.',
           isError: false,
         );
       } else {
@@ -89,10 +101,10 @@ class _WebPasswordResetWithCodeScreenState
   }
 
   Future<void> _handleVerifyCode() async {
-    final email = _emailController.text.trim();
+    final identifier = _emailController.text.trim();
     final code = _codeController.text.trim();
 
-    if (email.isEmpty || code.isEmpty) {
+    if (identifier.isEmpty || code.isEmpty) {
       _setFeedback('Please fill in all fields', isError: true);
       return;
     }
@@ -103,7 +115,7 @@ class _WebPasswordResetWithCodeScreenState
     });
 
     try {
-      await PasswordResetService.verifyResetCode(email: email, code: code);
+      await PasswordResetService.verifyResetCode(email: identifier, code: code);
       setState(() {
         _isLoading = false;
         _codeVerified = true;
@@ -116,12 +128,22 @@ class _WebPasswordResetWithCodeScreenState
   }
 
   Future<void> _handleResetPassword() async {
-    final email = _emailController.text.trim();
+    final identifier = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (email.isEmpty || !email.contains('@')) {
-      _setFeedback('Please enter a valid email address', isError: true);
+    final isEmail = identifier.contains('@');
+    final digits = identifier.replaceAll(RegExp(r'[^\d]'), '');
+    final isPhone = digits.length >= 10 &&
+        (digits.startsWith('9') ||
+            digits.startsWith('09') ||
+            digits.startsWith('639'));
+
+    if (identifier.isEmpty || (!isEmail && !isPhone)) {
+      _setFeedback(
+        'Please enter a valid email address or Philippine mobile number',
+        isError: true,
+      );
       return;
     }
 
@@ -147,7 +169,7 @@ class _WebPasswordResetWithCodeScreenState
 
     try {
       await PasswordResetService.resetPasswordWithCode(
-        email: email,
+        email: identifier,
         code: _codeController.text.trim(),
         newPassword: password,
       );
@@ -244,7 +266,7 @@ class _WebPasswordResetWithCodeScreenState
         ),
         const SizedBox(height: 12),
         const Text(
-          'Enter your email to receive a reset code. If a valid code already exists, it will be reused.',
+          'Enter your email or registered mobile number to receive a reset code.',
           textAlign: TextAlign.center,
         ),
         if (_feedbackMessage != null) ...[
@@ -254,8 +276,9 @@ class _WebPasswordResetWithCodeScreenState
         const SizedBox(height: 36),
         _buildTextField(
           _emailController,
-          'Email Address',
-          Icons.email_outlined,
+          'Email or Mobile Number',
+          Icons.account_circle_outlined,
+          hint: 'name@example.com or 09XXXXXXXXX',
         ),
         const SizedBox(height: 28),
         SizedBox(
@@ -303,7 +326,7 @@ class _WebPasswordResetWithCodeScreenState
         ),
         const SizedBox(height: 12),
         const Text(
-          'Please enter the 6-digit verification code sent to your email.',
+          'Please enter the 6-digit verification code sent to your email or mobile number.',
           textAlign: TextAlign.center,
         ),
         if (_feedbackMessage != null) ...[
