@@ -17,4 +17,3 @@
 
 
 .\scripts\publish-update.ps1 -Version "1.0.10" -Notes "Smaller download size, performance improvements and bug fixes"
-[text](https://agridirect.site/)

@@ -1053,16 +1053,39 @@ class AuthService extends ChangeNotifier {
       final digits = e164.replaceAll('+', '');
       final syntheticEmail = '$digits@phone.agridirect.ph';
 
+      // 🧹 Clean up any incomplete/unverified registration attempt for this phone number
+      try {
+        await SupabaseDatabase.deleteUnverifiedUser(syntheticEmail);
+      } catch (_) {}
+
       // Sign up with Supabase Auth
-      final response = await _client.auth.signUp(
-        email: syntheticEmail,
-        password: password,
-        data: {
-          'name': name,
-          'phone_number': e164,
-          'phone_registration': true,
-        },
-      );
+      AuthResponse response;
+      try {
+        response = await _client.auth.signUp(
+          email: syntheticEmail,
+          password: password,
+          data: {
+            'name': name,
+            'phone_number': e164,
+            'phone_registration': true,
+          },
+        );
+      } catch (signUpErr) {
+        if (signUpErr.toString().toLowerCase().contains('already registered')) {
+          await SupabaseDatabase.deleteUnverifiedUser(syntheticEmail);
+          response = await _client.auth.signUp(
+            email: syntheticEmail,
+            password: password,
+            data: {
+              'name': name,
+              'phone_number': e164,
+              'phone_registration': true,
+            },
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       if (response.user == null) {
         _errorMessage = 'Registration failed. Please try again.';
@@ -1796,17 +1819,42 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await SupabaseConfig.client
           .from('users')
-          .select('user_id, phone, email')
+          .select('user_id, phone, email, email_verified')
           .or('phone.eq.$variantE164,phone.eq.$variant63,phone.eq.$variant09,phone.eq.$variant10,phone.ilike.%$tenDigits,email.eq.$syntheticEmail');
 
       if (response.isNotEmpty) {
+        bool hasVerifiedAccount = false;
+        String? unverifiedEmailToDelete;
+
         for (var row in response) {
           final existingUserId = row['user_id']?.toString();
           if (excludeUserId != null && existingUserId == excludeUserId) {
             continue; // Same user
           }
-          return true; // Already taken by another user
+
+          final isVerified = row['email_verified'] as bool? ?? false;
+          if (isVerified) {
+            hasVerifiedAccount = true;
+            break;
+          } else {
+            final rowEmail = row['email']?.toString();
+            if (rowEmail != null && rowEmail.isNotEmpty) {
+              unverifiedEmailToDelete = rowEmail;
+            }
+          }
         }
+
+        if (hasVerifiedAccount) {
+          return true; // Already taken by an ACTIVE, verified account
+        }
+
+        // If the number only belongs to an unverified/abandoned registration, clean it up!
+        if (unverifiedEmailToDelete != null) {
+          try {
+            await SupabaseDatabase.deleteUnverifiedUser(unverifiedEmailToDelete);
+          } catch (_) {}
+        }
+        return false; // Available to register!
       }
     } catch (e) {
       debugPrint('Notice: Direct phone uniqueness check error: $e');

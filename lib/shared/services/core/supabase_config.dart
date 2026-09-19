@@ -303,6 +303,26 @@ class SupabaseDatabase {
     }
   }
 
+  static Future<bool> deleteUnverifiedPhoneUser(String phoneNumber) async {
+    try {
+      final digits = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+      String tenDigits = digits;
+      if (digits.length >= 12 && digits.startsWith('639')) {
+        tenDigits = digits.substring(2, 12);
+      } else if (digits.length >= 11 && digits.startsWith('09')) {
+        tenDigits = digits.substring(1, 11);
+      } else if (digits.length >= 10 && digits.startsWith('9')) {
+        tenDigits = digits.substring(0, 10);
+      }
+
+      final syntheticEmail = '63$tenDigits@phone.agridirect.ph';
+      return await deleteUnverifiedUser(syntheticEmail);
+    } catch (e) {
+      debugPrint('Error invoking deleteUnverifiedPhoneUser: $e');
+      return false;
+    }
+  }
+
   static Future<bool> isPhoneAlreadyRegistered(String phone) async {
     try {
       final result = await _client
