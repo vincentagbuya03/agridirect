@@ -24,7 +24,8 @@ class EmailService {
     if (_gmailPassEnv.isNotEmpty) return _gmailPassEnv;
     final envPass = dotenv.env['GMAIL_PASS']?.trim();
     if (envPass != null && envPass.isNotEmpty) return envPass;
-    return 'tzah xwho pmqa poyx';
+    debugPrint('[EmailService] ⚠️ GMAIL_PASS is not configured in environment.');
+    return '';
   }
 
   static String get _webEmailApiBase {
@@ -55,7 +56,10 @@ class EmailService {
     try {
       final response = await http.post(
         uri,
-        headers: const {'Content-Type': 'application/json'},
+        headers: const {
+          'Content-Type': 'application/json',
+          'X-AgriDirect-App': 'agridirect-client',
+        },
         body: jsonEncode({
           'email': email,
           'type': type,

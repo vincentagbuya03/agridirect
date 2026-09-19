@@ -139,7 +139,7 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
 
     try {
       if (_isPhone) {
-        final isValid = TextBeeOtpService().verifyOtp(
+        final isValid = await TextBeeOtpService().verifyOtp(
           phoneNumber: widget.phoneNumber!,
           enteredCode: otp,
         );

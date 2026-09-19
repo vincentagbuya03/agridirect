@@ -272,35 +272,6 @@ class PasswordResetService {
     }
   }
 
-  /// Reset the password using the latest active password-reset code for the email.
-  /// This keeps the code invisible in the UI while still enforcing that it is
-  /// unexpired and unused.
-  static Future<void> resetPasswordWithLatestCode({
-    required String email,
-    required String newPassword,
-  }) async {
-    final normalizedEmail = _normalizeEmail(email);
-    final userId = await _findUserIdByIdentifier(normalizedEmail);
-
-    if (userId == null) {
-      throw 'Account identification failed.';
-    }
-
-    final code = await OTPService().getActiveOTPCode(
-      userId: userId,
-      type: 'password_reset',
-    );
-
-    if (code == null) {
-      throw 'Your reset code is expired or already used. Please request a new one.';
-    }
-
-    await resetPasswordWithCode(
-      email: normalizedEmail,
-      code: code,
-      newPassword: newPassword,
-    );
-  }
 
   /// Verify reset code first (step 1), before accepting password input.
   static Future<void> verifyResetCode({

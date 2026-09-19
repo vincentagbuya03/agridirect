@@ -1,7 +1,6 @@
 const nodemailer = require('nodemailer');
 
 const fallbackGmailUser = 'noreplyagridirect@gmail.com';
-const fallbackGmailPass = 'tzah xwho pmqa poyx';
 
 const allowedOrigins = new Set([
   'http://localhost:3000',
@@ -11,24 +10,67 @@ const allowedOrigins = new Set([
   'https://www.agridirect.site',
 ]);
 
+const emailRateLimits = new Map();
+
+function isRateLimited(email) {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute window
+  const maxDispatches = 5;
+
+  const records = (emailRateLimits.get(email) || []).filter((t) => now - t < windowMs);
+  if (records.length >= maxDispatches) {
+    return true;
+  }
+  records.push(now);
+  emailRateLimits.set(email, records);
+
+  // Clean stale keys
+  if (emailRateLimits.size > 2000) {
+    for (const [key, timestamps] of emailRateLimits.entries()) {
+      if (timestamps.every((t) => now - t >= windowMs)) {
+        emailRateLimits.delete(key);
+      }
+    }
+  }
+  return false;
+}
+
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function isOriginAllowed(origin) {
-  if (!origin) return true;
-  if (allowedOrigins.has(origin)) return true;
-  if (origin.endsWith('agridirect.site')) return true;
-  if (/^https:\/\/([a-z0-9-]+)\.vercel\.app$/.test(origin)) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    if (allowedOrigins.has(origin)) return true;
+    if (host === 'agridirect.site' || host.endsWith('.agridirect.site')) return true;
+    if (host.endsWith('.vercel.app')) return true;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+  } catch (_) {
+    // If not a full URL, fallback check
+    if (allowedOrigins.has(origin)) return true;
+    if (origin.endsWith('agridirect.site')) return true;
+  }
+  return false;
 }
 
 function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader(
     'Access-Control-Allow-Origin',
-    origin && isOriginAllowed(origin) ? origin : '*',
+    origin && isOriginAllowed(origin) ? origin : 'https://www.agridirect.site',
   );
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, Accept, X-Requested-With, Origin',
+    'Content-Type, Authorization, Accept, X-Requested-With, Origin, X-AgriDirect-App',
   );
 }
 
@@ -41,7 +83,7 @@ function cleanEnv(value) {
 }
 
 function buildHtmlTemplate(code, action) {
-  const cleanCode = code.trim();
+  const cleanCode = escapeHtml(code.trim());
   const splitDigits = cleanCode.split('');
   const useDigitBoxes = splitDigits.length === 6;
   const isPasswordReset = action.toLowerCase().includes('reset');
@@ -133,6 +175,10 @@ function buildHtmlTemplate(code, action) {
 }
 
 function buildSupportResolutionTemplate(name, subject, text) {
+  const safeName = escapeHtml(name);
+  const safeSubject = escapeHtml(subject);
+  const safeText = escapeHtml(text);
+
   return `
 <!doctype html>
 <html>
@@ -148,7 +194,7 @@ function buildSupportResolutionTemplate(name, subject, text) {
               <td style="padding:26px 28px 12px 28px; text-align:center;">
                 <div style="font-size:34px; line-height:34px;">✅</div>
                 <h1 style="margin:10px 0 0 0; color:#0f6c34; font-size:28px; font-weight:800; line-height:1.2;">Support Ticket Resolved</h1>
-                <p style="margin:8px 0 0 0; color:#5f6f62; font-size:14px; line-height:1.5;">Hi ${name}, our support team has responded to your ticket.</p>
+                <p style="margin:8px 0 0 0; color:#5f6f62; font-size:14px; line-height:1.5;">Hi ${safeName}, our support team has responded to your ticket.</p>
               </td>
             </tr>
             <tr>
@@ -156,10 +202,10 @@ function buildSupportResolutionTemplate(name, subject, text) {
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef9f1; border:1px solid #cfe7d5; border-radius:12px; font-size:14px; color:#1f3c29; line-height:1.6;">
                   <tr>
                     <td style="padding:18px 20px;">
-                      <p style="margin:0 0 8px 0;"><strong>Ticket Subject:</strong> ${subject}</p>
+                      <p style="margin:0 0 8px 0;"><strong>Ticket Subject:</strong> ${safeSubject}</p>
                       <hr style="border:0; border-top:1px solid #cfe7d5; margin:14px 0;" />
                       <p style="margin:0;"><strong>Support Team Response:</strong></p>
-                      <p style="margin:6px 0 0 0; white-space:pre-wrap; background:#ffffff; padding:12px; border:1px solid #cfe7d5; border-radius:8px;">${text}</p>
+                      <p style="margin:6px 0 0 0; white-space:pre-wrap; background:#ffffff; padding:12px; border:1px solid #cfe7d5; border-radius:8px;">${safeText}</p>
                     </td>
                   </tr>
                 </table>
@@ -195,20 +241,42 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed.' });
   }
 
+  const origin = req.headers.origin || req.headers.referer;
+  const appHeader = req.headers['x-agridirect-app'];
+
+  // Block unauthorized origins
+  if (origin && !isOriginAllowed(origin)) {
+    return res.status(403).json({ error: 'Origin not allowed.' });
+  }
+
+  // Non-browser client check
+  if (!origin && appHeader !== 'agridirect-client') {
+    return res.status(403).json({ error: 'Unauthorized request client.' });
+  }
+
+  const email = normalizeEmail(req.body && req.body.email);
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'A valid email address is required.' });
+  }
+
+  // Enforce sliding window rate limit
+  if (isRateLimited(email)) {
+    return res.status(429).json({ error: 'Too many email requests for this address. Please wait a minute.' });
+  }
+
   const gmailUser = cleanEnv(process.env.GMAIL_USER) || fallbackGmailUser;
-  const gmailPass = cleanEnv(process.env.GMAIL_PASS) || fallbackGmailPass;
+  const gmailPass = cleanEnv(process.env.GMAIL_PASS);
+
+  if (!gmailPass) {
+    return res.status(500).json({ error: 'Email service password is not configured in server environment.' });
+  }
 
   try {
-    const email = normalizeEmail(req.body && req.body.email);
     const type = req.body && req.body.type; // 'otp', 'alert' or 'resolution'
     const otpCode = req.body && req.body.otpCode;
     const userName = req.body && req.body.userName;
     const subjectLine = req.body && req.body.subject;
     const messageText = req.body && req.body.messageText;
-
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'A valid email address is required.' });
-    }
 
     if (
       type !== 'otp' &&

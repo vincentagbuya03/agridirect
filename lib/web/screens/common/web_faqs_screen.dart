@@ -55,7 +55,7 @@ class _WebFaqsScreenState extends State<WebFaqsScreen> {
       'icon': Icons.payments_outlined,
       'question': 'What payment methods are supported on the platform?',
       'answer':
-          'AgriDirect supports Cash on Delivery (COD) for home deliveries and Cash on Pickup (COP) when picking up fresh produce directly at the farmer hub. Online payment verification via GCash and bank transfers is also supported with verified growers.',
+          'AgriDirect currently supports Cash on Delivery (COD) for home deliveries and Cash on Pickup (COP) when picking up fresh produce directly from partner farms or hubs. Payments are completed safely upon physical inspection of your fresh produce.',
     },
     {
       'category': 'Farmers & Selling',

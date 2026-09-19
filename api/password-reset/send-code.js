@@ -88,7 +88,7 @@ module.exports = async function handler(req, res) {
   const configuredKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY) || cleanEnv(process.env.SUPABASE_ANON_KEY);
   const supabaseKey = looksLikeJwt(configuredKey) ? configuredKey : fallbackSupabaseAnonKey;
   const gmailUser = cleanEnv(process.env.GMAIL_USER) || 'noreplyagridirect@gmail.com';
-  const gmailPass = cleanEnv(process.env.GMAIL_PASS) || 'tzah xwho pmqa poyx';
+  const gmailPass = cleanEnv(process.env.GMAIL_PASS);
 
   if (!supabaseUrl || !supabaseKey || !gmailUser || !gmailPass) {
     return res.status(500).json({ error: 'Password reset email is not configured.' });

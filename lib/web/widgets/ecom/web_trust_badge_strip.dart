@@ -32,9 +32,9 @@ class WebTrustBadgeStrip extends StatelessWidget {
         'color': WebDesignTokens.trustBlue,
       },
       {
-        'icon': Icons.security_rounded,
-        'title': 'Safe Escrow & COD',
-        'subtitle': 'Protected payments via GCash, Maya, or Cash on Delivery.',
+        'icon': Icons.verified_rounded,
+        'title': 'Secure COD & Pick Up',
+        'subtitle': 'Pay with Cash on Delivery or Cash on Pickup upon produce inspection.',
         'color': WebDesignTokens.dealAmber,
       },
     ];

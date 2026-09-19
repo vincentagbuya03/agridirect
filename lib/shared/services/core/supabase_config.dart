@@ -198,19 +198,19 @@ class SupabaseDatabase {
       await _client
           .from('users')
           .upsert(userData, onConflict: 'user_id')
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 15));
 
       await _client
           .from('customers')
           .upsert({'user_id': userId, 'is_active': true}, onConflict: 'user_id')
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 15));
 
       // Auto-assign customer role
       try {
         await addUserRole(
           userId: userId,
           roleName: 'customer',
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint('⚠️ Warning: Failed to assign customer role: $e');
       }
@@ -225,19 +225,20 @@ class SupabaseDatabase {
               'role_level': 3,
               'is_active': true,
             }, onConflict: 'user_id')
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 15));
 
         try {
           await addUserRole(
             userId: userId,
             roleName: 'admin',
-          ).timeout(const Duration(seconds: 4));
+          ).timeout(const Duration(seconds: 15));
         } catch (e) {
           debugPrint('⚠️ Warning: Failed to assign admin role: $e');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error creating/updating user: $e');
+      debugPrint('❌ Error creating/updating user profile: $e');
+      rethrow;
     }
   }
 

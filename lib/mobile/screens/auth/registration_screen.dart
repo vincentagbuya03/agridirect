@@ -76,10 +76,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
         if (mounted) {
           setState(() => _isLoading = false);
-          _showErrorModal(
-            'Account Exists',
-            'This email is already registered. Please log in instead.',
-          );
+          _showAccountExistsModal(email: email);
         }
         return;
       }
@@ -109,10 +106,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
         if (mounted) {
           setState(() => _isLoading = false);
-          _showErrorModal(
-            'Registration Failed',
-            AuthService().errorMessage ?? 'Failed to create account',
-          );
+          final errorMsg = AuthService().errorMessage ?? '';
+          if (errorMsg.toLowerCase().contains('already registered') ||
+              errorMsg.toLowerCase().contains('already exists')) {
+            _showAccountExistsModal(email: email);
+          } else {
+            _showErrorModal(
+              'Registration Failed',
+              errorMsg.isNotEmpty ? errorMsg : 'Failed to create account',
+            );
+          }
         }
         return;
       }
@@ -397,6 +400,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAccountExistsModal({required String email}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text('Account Exists', style: AppTextStyles.headline2),
+          ],
+        ),
+        content: Text(
+          'An account with "$email" is already registered.\n\n'
+          'If you already created an account, please log in. '
+          'If your previous registration was interrupted, you can reset your password to set up your account credentials.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push(
+                '${AppRoutes.resetPasswordWithCode}?email=${Uri.encodeComponent(email)}',
+              );
+            },
+            child: const Text('Reset Password'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              context.go(AppRoutes.login);
+            },
+            child: const Text('Log In'),
           ),
         ],
       ),

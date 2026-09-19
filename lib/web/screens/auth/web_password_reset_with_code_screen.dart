@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,12 +33,16 @@ class _WebPasswordResetWithCodeScreenState
   String? _feedbackMessage;
   bool _feedbackIsError = false;
 
+  Timer? _cooldownTimer;
+  int _cooldownSeconds = 0;
+
   static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
   static const Color _mutedDark = Color(0xFF6B7280);
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _emailController.dispose();
     _codeController.dispose();
     _passwordController.dispose();
@@ -45,7 +50,28 @@ class _WebPasswordResetWithCodeScreenState
     super.dispose();
   }
 
+  void _startCooldown([int seconds = 60]) {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownSeconds = seconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_cooldownSeconds <= 1) {
+          _cooldownSeconds = 0;
+          timer.cancel();
+        } else {
+          _cooldownSeconds--;
+        }
+      });
+    });
+  }
+
   Future<void> _handleSendCode() async {
+    if (_isLoading || _cooldownSeconds > 0) return;
+
     final identifier = _emailController.text.trim();
     final isEmail = identifier.contains('@');
     final digits = identifier.replaceAll(RegExp(r'[^\d]'), '');
@@ -75,6 +101,7 @@ class _WebPasswordResetWithCodeScreenState
           _isLoading = false;
           _codeSent = true;
         });
+        _startCooldown(60);
         _setFeedback(
           isPhone
               ? 'Reset code sent via SMS! Check your messages, then enter the code below.'
@@ -286,12 +313,16 @@ class _WebPasswordResetWithCodeScreenState
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
-            onPressed: _isLoading ? null : _handleSendCode,
+            onPressed: (_isLoading || _cooldownSeconds > 0)
+                ? null
+                : _handleSendCode,
             child: _isLoading
                 ? const AppShimmerLoader(color: Colors.white)
-                : const Text(
-                    'Send Reset Code',
-                    style: TextStyle(
+                : Text(
+                    _cooldownSeconds > 0
+                        ? 'Resend Code in ${_cooldownSeconds}s'
+                        : 'Send Reset Code',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -357,6 +388,49 @@ class _WebPasswordResetWithCodeScreenState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "Didn't receive the code? ",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            ),
+            TextButton(
+              onPressed: (_isLoading || _cooldownSeconds > 0)
+                  ? null
+                  : _handleSendCode,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                _cooldownSeconds > 0
+                    ? 'Resend in ${_cooldownSeconds}s'
+                    : 'Resend Code',
+                style: TextStyle(
+                  color: _cooldownSeconds > 0 ? Colors.grey : _primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _codeSent = false;
+              _feedbackMessage = null;
+            });
+          },
+          child: const Text(
+            'Change Email or Mobile Number',
+            style: TextStyle(color: _mutedDark, fontSize: 13),
           ),
         ),
       ],

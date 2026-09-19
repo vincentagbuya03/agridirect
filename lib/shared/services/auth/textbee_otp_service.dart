@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// TextBee Free SMS Gateway Service
 /// Sends REAL carrier SMS directly to phone SIM cards via your paired Android phone.
@@ -102,10 +103,25 @@ class TextBeeOtpService {
     final random = Random();
     final otpCode = customCode ?? (100000 + random.nextInt(900000)).toString();
 
+    final expiresAt = DateTime.now().add(const Duration(minutes: 10));
     _pendingOtps[formattedPhone] = _TextBeeOtpRecord(
       code: otpCode,
-      expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+      expiresAt: expiresAt,
     );
+
+    // Persist to local storage to survive app pause / background kill / tab reload
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'textbee_otp_$formattedPhone',
+        jsonEncode({
+          'code': otpCode,
+          'expires_at': expiresAt.toIso8601String(),
+        }),
+      );
+    } catch (e) {
+      debugPrint('TextBee persistence save notice: $e');
+    }
 
     if (_apiKey.isEmpty) {
       debugPrint('⚠️ TextBee: TEXTBEE_API_KEY is not set in .env');
@@ -148,26 +164,64 @@ class TextBeeOtpService {
     }
   }
 
-  /// Verify entered OTP code
-  bool verifyOtp({
+  /// Verify entered OTP code (checks in-memory first, falls back to persistent storage)
+  Future<bool> verifyOtp({
     required String phoneNumber,
     required String enteredCode,
-  }) {
+  }) async {
     final formattedPhone = formatE164(phoneNumber);
-    final record = _pendingOtps[formattedPhone];
+    final cleanEnteredCode = enteredCode.trim();
 
-    if (record == null) return false;
-    if (DateTime.now().isAfter(record.expiresAt)) {
-      _pendingOtps.remove(formattedPhone);
-      return false;
+    // 1. Check in-memory first
+    final record = _pendingOtps[formattedPhone];
+    if (record != null) {
+      if (DateTime.now().isAfter(record.expiresAt)) {
+        _pendingOtps.remove(formattedPhone);
+        await _clearPersistedOtp(formattedPhone);
+        return false;
+      }
+
+      if (record.code == cleanEnteredCode) {
+        _pendingOtps.remove(formattedPhone);
+        await _clearPersistedOtp(formattedPhone);
+        return true;
+      }
     }
 
-    if (record.code == enteredCode.trim()) {
-      _pendingOtps.remove(formattedPhone);
-      return true;
+    // 2. Fallback to SharedPreferences if app process was refreshed or suspended
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('textbee_otp_$formattedPhone');
+      if (raw != null && raw.isNotEmpty) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final code = data['code']?.toString() ?? '';
+        final expiresAtStr = data['expires_at']?.toString() ?? '';
+        final expiresAt =
+            DateTime.tryParse(expiresAtStr) ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        if (DateTime.now().isAfter(expiresAt)) {
+          await prefs.remove('textbee_otp_$formattedPhone');
+          return false;
+        }
+
+        if (code == cleanEnteredCode) {
+          await prefs.remove('textbee_otp_$formattedPhone');
+          _pendingOtps.remove(formattedPhone);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('TextBee persistence check notice: $e');
     }
 
     return false;
+  }
+
+  Future<void> _clearPersistedOtp(String formattedPhone) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('textbee_otp_$formattedPhone');
+    } catch (_) {}
   }
 }
 

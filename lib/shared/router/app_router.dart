@@ -345,13 +345,15 @@ GoRouter createAppRouter({String? initialRoute}) {
 
       // debugPrint('ðŸ”€ Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
-      // 1. ABSOLUTE PRIORITY: Admin Redirect
-      if (isLoggedIn && isAdmin) {
-        if (location != AppRoutes.admin &&
-            location != AppRoutes.loading &&
-            location != AppRoutes.webWelcome) {
-          debugPrint('â†ªï¸ Router: Force routing Admin to /admin');
-          return AppRoutes.admin;
+      // 1. ABSOLUTE PRIORITY: Admin Route Guarding
+      if (location.startsWith(AppRoutes.admin)) {
+        if (!isLoggedIn) {
+          debugPrint('🛡️ Router: Unauthenticated attempt to access /admin, redirecting to login');
+          return AppRoutes.login;
+        }
+        if (!isAdmin) {
+          debugPrint('🛡️ Router: Non-admin attempted to access /admin, redirecting to marketplace');
+          return AppRoutes.marketplace;
         }
         return null;
       }
@@ -1371,24 +1373,39 @@ GoRouter createAppRouter({String? initialRoute}) {
     ],
 
     errorBuilder: (context, state) => Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Page not found',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text('No route found for: ${state.uri}'),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => context.go(AppRoutes.home),
-              child: const Text('Go Home'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.travel_explore_rounded, size: 64, color: Color(0xFF16A34A)),
+              const SizedBox(height: 16),
+              const Text(
+                'Page Not Found',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No route found for: ${state.uri.path}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => context.go(kIsWeb ? AppRoutes.marketplace : AppRoutes.home),
+                icon: const Icon(Icons.home_rounded),
+                label: const Text('Back to Home'),
+              ),
+            ],
+          ),
         ),
       ),
     ),

@@ -459,18 +459,21 @@ class ForumService {
 
   /// Search posts
   Future<List<ForumPost>> searchPosts(String query) async {
+    final cleanQuery = query.replaceAll(RegExp(r'[,()"\\]'), '').trim();
+    if (cleanQuery.isEmpty) return [];
+
     try {
       final response = await _supabase
           .from('v_forum_posts')
           .select()
-          .or('title.ilike.%\$query%,body.ilike.%\$query%')
+          .or('title.ilike.%$cleanQuery%,body.ilike.%$cleanQuery%')
           .order('created_at', ascending: false);
 
       return (response as List<dynamic>)
           .map((json) => ForumPost.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw Exception('Failed to search posts: \$e');
+      throw Exception('Failed to search posts: $e');
     }
   }
 }

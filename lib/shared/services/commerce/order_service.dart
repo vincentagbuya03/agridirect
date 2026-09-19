@@ -449,38 +449,58 @@ class OrderService {
       if (!isDeductedStatus(currentStatus) && isDeductedStatus(targetStatus)) {
         final items = await getOrderItems(orderId);
         for (final item in items) {
-          final inv = await _supabase
-              .from('product_inventory')
-              .select('available_quantity, reserved_quantity')
-              .eq('product_id', item.productId)
-              .maybeSingle();
+          bool updatedViaRpc = false;
+          try {
+            final rpcRes = await _supabase.rpc('decrement_product_stock_atomic', params: {
+              'p_product_id': item.productId,
+              'p_quantity': item.quantity,
+            });
+            if (rpcRes == false) {
+              throw Exception('Insufficient stock to fulfill order for product ${item.productId}');
+            }
+            updatedViaRpc = true;
+          } catch (e) {
+            // If RPC is missing or fails with something other than insufficient stock, use fallback
+            if (e.toString().contains('Insufficient stock')) {
+              rethrow;
+            }
+            updatedViaRpc = false;
+          }
 
-          if (inv != null) {
-            final prod = await _supabase
-                .from('products')
-                .select('is_preorder')
+          if (!updatedViaRpc) {
+            final inv = await _supabase
+                .from('product_inventory')
+                .select('available_quantity, reserved_quantity')
                 .eq('product_id', item.productId)
                 .maybeSingle();
-            final isPreorder = prod?['is_preorder'] == true;
 
-            if (isPreorder) {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
-              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
-              await _supabase
-                  .from('product_inventory')
-                  .update({
-                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
-                    'reserved_quantity': reserved + item.quantity,
-                  })
-                  .eq('product_id', item.productId);
-            } else {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
-              await _supabase
-                  .from('product_inventory')
-                  .update({
-                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
-                  })
-                  .eq('product_id', item.productId);
+            if (inv != null) {
+              final prod = await _supabase
+                  .from('products')
+                  .select('is_preorder')
+                  .eq('product_id', item.productId)
+                  .maybeSingle();
+              final isPreorder = prod?['is_preorder'] == true;
+
+              if (isPreorder) {
+                final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+                final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+                await _supabase
+                    .from('product_inventory')
+                    .update({
+                      'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
+                      'reserved_quantity': reserved + item.quantity,
+                    })
+                    .eq('product_id', item.productId);
+              } else {
+                final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+                await _supabase
+                    .from('product_inventory')
+                    .update({
+                      'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
+                    })
+                    .eq('product_id', item.productId);
+              }
             }
           }
         }
@@ -489,36 +509,49 @@ class OrderService {
       else if (targetStatus == 'cancelled' && isDeductedStatus(currentStatus)) {
         final items = await getOrderItems(orderId);
         for (final item in items) {
-          final inv = await _supabase
-              .from('product_inventory')
-              .select('available_quantity, reserved_quantity')
-              .eq('product_id', item.productId)
-              .maybeSingle();
+          bool restoredViaRpc = false;
+          try {
+            await _supabase.rpc('restore_product_stock_atomic', params: {
+              'p_product_id': item.productId,
+              'p_quantity': item.quantity,
+            });
+            restoredViaRpc = true;
+          } catch (_) {
+            restoredViaRpc = false;
+          }
 
-          if (inv != null) {
-            final prod = await _supabase
-                .from('products')
-                .select('is_preorder')
+          if (!restoredViaRpc) {
+            final inv = await _supabase
+                .from('product_inventory')
+                .select('available_quantity, reserved_quantity')
                 .eq('product_id', item.productId)
                 .maybeSingle();
-            final isPreorder = prod?['is_preorder'] == true;
 
-            if (isPreorder) {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
-              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
-              await _supabase
-                  .from('product_inventory')
-                  .update({
-                    'available_quantity': available + item.quantity,
-                    'reserved_quantity': (reserved - item.quantity).clamp(0.0, double.infinity),
-                  })
-                  .eq('product_id', item.productId);
-            } else {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
-              await _supabase
-                  .from('product_inventory')
-                  .update({'available_quantity': available + item.quantity})
-                  .eq('product_id', item.productId);
+            if (inv != null) {
+              final prod = await _supabase
+                  .from('products')
+                  .select('is_preorder')
+                  .eq('product_id', item.productId)
+                  .maybeSingle();
+              final isPreorder = prod?['is_preorder'] == true;
+
+              if (isPreorder) {
+                final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+                final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+                await _supabase
+                    .from('product_inventory')
+                    .update({
+                      'available_quantity': available + item.quantity,
+                      'reserved_quantity': (reserved - item.quantity).clamp(0.0, double.infinity),
+                    })
+                    .eq('product_id', item.productId);
+              } else {
+                final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+                await _supabase
+                    .from('product_inventory')
+                    .update({'available_quantity': available + item.quantity})
+                    .eq('product_id', item.productId);
+              }
             }
           }
         }

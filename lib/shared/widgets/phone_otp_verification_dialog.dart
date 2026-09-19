@@ -140,7 +140,7 @@ class _PhoneOtpVerificationDialogState
     });
 
     try {
-      final isValid = TextBeeOtpService().verifyOtp(
+      final isValid = await TextBeeOtpService().verifyOtp(
         phoneNumber: widget.phoneNumber,
         enteredCode: code,
       );

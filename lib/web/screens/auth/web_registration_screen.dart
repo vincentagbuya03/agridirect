@@ -81,9 +81,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
 
         if (mounted) {
           setState(() => _isLoading = false);
-          _showSnackBar(
-            'This email is already registered. Please log in instead.',
-          );
+          _showAccountExistsDialog(email: email);
         }
         return;
       }
@@ -113,7 +111,13 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
 
         if (mounted) {
           setState(() => _isLoading = false);
-          _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
+          final errorMsg = AuthService().errorMessage ?? '';
+          if (errorMsg.toLowerCase().contains('already registered') ||
+              errorMsg.toLowerCase().contains('already exists')) {
+            _showAccountExistsDialog(email: email);
+          } else {
+            _showSnackBar(errorMsg.isNotEmpty ? errorMsg : 'Registration failed');
+          }
         }
         return;
       }
@@ -272,6 +276,54 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
         _showSnackBar('Error: $e');
       }
     }
+  }
+
+  void _showAccountExistsDialog({required String email}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.info_outline, color: _primary),
+            const SizedBox(width: 8),
+            const Text('Account Exists'),
+          ],
+        ),
+        content: Text(
+          'An account with "$email" is already registered.\n\n'
+          'If you already finished registration, please log in. '
+          'If your registration was interrupted, you can reset your password to regain access.',
+          style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF374151)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go(
+                '${AppRoutes.resetPasswordWithCode}?email=${Uri.encodeComponent(email)}',
+              );
+            },
+            child: const Text('Reset Password'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go(AppRoutes.login);
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool> _resumeIfAlreadyRegistered({
