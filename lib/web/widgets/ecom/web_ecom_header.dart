@@ -304,6 +304,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
   }
 
   Widget _buildUtilityStrip(BuildContext context) {
+    final auth = AuthService();
     return Container(
       color: WebDesignTokens.bg,
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 6),
@@ -403,6 +404,15 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                 context.go(AppRoutes.aboutUs);
               }),
               _buildUtilityDivider(),
+              if (auth.isAdmin) ...[
+                _buildUtilityLink(
+                  'Admin Portal',
+                  () => context.go(AppRoutes.admin),
+                  icon: Icons.admin_panel_settings_rounded,
+                  isHighlighted: true,
+                ),
+                _buildUtilityDivider(),
+              ],
               _buildUtilityLink('Farmer Portal', () {
                 final auth = AuthService();
                 if (auth.isLoggedIn) {
@@ -439,19 +449,41 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
     );
   }
 
-  Widget _buildUtilityLink(String title, VoidCallback onTap) {
+  Widget _buildUtilityLink(
+    String title,
+    VoidCallback onTap, {
+    IconData? icon,
+    bool isHighlighted = false,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        child: Text(
-          title,
-          style: GoogleFonts.nunitoSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: WebDesignTokens.slate600,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 13,
+                color: isHighlighted
+                    ? const Color(0xFF7C3AED)
+                    : WebDesignTokens.slate600,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              title,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 12,
+                fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.w500,
+                color: isHighlighted
+                    ? const Color(0xFF7C3AED)
+                    : WebDesignTokens.slate600,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -816,6 +848,9 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                   ),
                   onSelected: (val) {
                     switch (val) {
+                      case 'admin':
+                        context.go(AppRoutes.admin);
+                        break;
                       case 'profile':
                         widget.onNavigate(3, AppRoutes.profile);
                         break;
@@ -858,18 +893,44 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            auth.isViewingAsFarmer
-                                ? 'Farmer Mode'
-                                : 'Consumer Mode',
+                            auth.isAdmin
+                                ? 'Administrator'
+                                : (auth.isViewingAsFarmer
+                                    ? 'Farmer Mode'
+                                    : 'Consumer Mode'),
                             style: GoogleFonts.nunitoSans(
                               fontSize: 11,
-                              color: WebDesignTokens.slate500,
+                              fontWeight: auth.isAdmin ? FontWeight.w700 : FontWeight.normal,
+                              color: auth.isAdmin
+                                  ? const Color(0xFF7C3AED)
+                                  : WebDesignTokens.slate500,
                             ),
                           ),
                         ],
                       ),
                     ),
                     const PopupMenuDivider(),
+                    if (auth.isAdmin)
+                      PopupMenuItem(
+                        value: 'admin',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.admin_panel_settings_rounded,
+                              size: 18,
+                              color: Color(0xFF7C3AED),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Admin Dashboard',
+                              style: GoogleFonts.nunitoSans(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF7C3AED),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     PopupMenuItem(
                       value: 'profile',
                       child: Row(

@@ -54,6 +54,18 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   void initState() {
     super.initState();
     _startCountdownTimer();
+    for (final node in _focusNodes) {
+      node.addListener(_onFocusChange);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focusNodes.isNotEmpty) {
+        _focusNodes[0].requestFocus();
+      }
+    });
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() {});
   }
 
   void _startCountdownTimer() {
@@ -84,13 +96,55 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   String _getOTPCode() => _codeControllers.map((c) => c.text).join();
 
   void _handleOTPChange(int index, String value) {
-    if (value.length > 1) {
-      final digits = value.replaceAll(RegExp(r'[^\d]'), '');
-      for (int i = 0; i < 6 && i < digits.length; i++) {
+    if (value.isEmpty) {
+      setState(() {});
+      return;
+    }
+
+    final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (digits.isEmpty) {
+      _codeControllers[index].clear();
+      setState(() {});
+      return;
+    }
+
+    // 1. Full 6-digit paste
+    if (digits.length >= 6) {
+      for (int i = 0; i < 6; i++) {
         _codeControllers[i].text = digits[i];
       }
-      final next = (digits.length < 6) ? digits.length : 5;
-      FocusScope.of(context).requestFocus(_focusNodes[next]);
+      _focusNodes[5].unfocus();
+      setState(() {});
+      if (!_isVerifying) {
+        _verifyOTP();
+      }
+      return;
+    }
+
+    // 2. Replacing single digit
+    if (digits.length == 2) {
+      final newChar = digits[digits.length - 1];
+      _codeControllers[index].text = newChar;
+      setState(() {});
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+      if (_getOTPCode().length == 6 && !_isVerifying) {
+        _verifyOTP();
+      }
+      return;
+    }
+
+    // 3. Partial multi-digit entry
+    if (digits.length > 2) {
+      for (int i = 0; i < digits.length && (index + i) < 6; i++) {
+        _codeControllers[index + i].text = digits[i];
+      }
+      final next = (index + digits.length < 6) ? (index + digits.length) : 5;
+      _focusNodes[next].requestFocus();
       setState(() {});
       if (_getOTPCode().length == 6 && !_isVerifying) {
         _verifyOTP();
@@ -98,21 +152,18 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       return;
     }
 
-    setState(() {}); // Updates Clear Code button visibility
+    // 4. Standard single digit entry
+    _codeControllers[index].text = digits;
+    setState(() {});
 
-    if (value.length == 1) {
-      if (index < 5) {
-        FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
-      } else {
-        _focusNodes[index].unfocus();
-      }
+    if (index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    } else {
+      _focusNodes[index].unfocus();
+    }
 
-      // Auto-submit once all 6 fields are filled.
-      if (_getOTPCode().length == 6 && !_isVerifying) {
-        _verifyOTP();
-      }
-    } else if (value.isEmpty && index > 0) {
-      FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
+    if (_getOTPCode().length == 6 && !_isVerifying) {
+      _verifyOTP();
     }
   }
 
@@ -287,11 +338,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   @override
   void dispose() {
+    for (var n in _focusNodes) {
+      n.removeListener(_onFocusChange);
+      n.dispose();
+    }
     for (var c in _codeControllers) {
       c.dispose();
-    }
-    for (var n in _focusNodes) {
-      n.dispose();
     }
     _timerCountdown.cancel();
     super.dispose();
@@ -496,56 +548,88 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   Widget _buildOTPField(int index) {
-    return SizedBox(
+    final hasValue = _codeControllers[index].text.isNotEmpty;
+    final hasFocus = _focusNodes[index].hasFocus;
+
+    return Container(
       width: 48,
       height: 56,
+      decoration: BoxDecoration(
+        color: hasFocus
+            ? Colors.white
+            : (hasValue ? const Color(0xFFF0FDF4) : Colors.white),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasFocus
+              ? AppColors.primary
+              : (hasValue
+                  ? AppColors.primary.withValues(alpha: 0.6)
+                  : const Color(0xFFCBD5E1)),
+          width: hasFocus ? 2.0 : 1.5,
+        ),
+        boxShadow: hasFocus
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+      ),
       child: Focus(
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent &&
               (event.logicalKey == LogicalKeyboardKey.backspace ||
                event.physicalKey == PhysicalKeyboardKey.backspace)) {
-            if (_codeControllers[index].text.isEmpty && index > 0) {
+            if (_codeControllers[index].text.isNotEmpty) {
+              _codeControllers[index].clear();
+              setState(() {});
+              return KeyEventResult.handled;
+            } else if (index > 0) {
               _codeControllers[index - 1].clear();
-              FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
+              _focusNodes[index - 1].requestFocus();
               setState(() {});
               return KeyEventResult.handled;
             }
           }
           return KeyEventResult.ignored;
         },
-        child: TextField(
-          controller: _codeControllers[index],
-          focusNode: _focusNodes[index],
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-          ],
-          maxLength: 1,
-          onTap: () {
-            _codeControllers[index].selection = TextSelection(
-              baseOffset: 0,
-              extentOffset: _codeControllers[index].text.length,
-            );
-          },
-          onChanged: (v) => _handleOTPChange(index, v),
-          style: AppTextStyles.headline2.copyWith(color: AppColors.primary),
-          decoration: InputDecoration(
-            counterText: '',
-            contentPadding: EdgeInsets.zero,
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[200]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[200]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        child: Center(
+          child: TextField(
+            controller: _codeControllers[index],
+            focusNode: _focusNodes[index],
+            textAlign: TextAlign.center,
+            textAlignVertical: TextAlignVertical.center,
+            showCursor: true,
+            cursorColor: AppColors.primary,
+            cursorWidth: 2,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            onTap: () {
+              _codeControllers[index].selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _codeControllers[index].text.length,
+              );
+            },
+            onChanged: (v) => _handleOTPChange(index, v),
+            style: AppTextStyles.headline2.copyWith(color: AppColors.primary),
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
             ),
           ),
         ),

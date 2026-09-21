@@ -723,6 +723,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   // â”€â”€â”€ Shopee Style Left Sidebar â”€â”€â”€
   Widget _buildShopeeSidebar(AuthService auth, {required bool isMobile}) {
     final isFarmer = auth.isViewingAsFarmer;
+    final isAdmin = auth.isAdmin;
     final displayName = isFarmer && _farmerProfile != null
         ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
         : auth.userName;
@@ -780,17 +781,25 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         ? Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: isFarmer ? Colors.amber.shade50 : const Color(0xFFDCFCE7),
+                              color: isAdmin
+                                  ? const Color(0xFFF3E8FF)
+                                  : (isFarmer ? Colors.amber.shade50 : const Color(0xFFDCFCE7)),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isFarmer ? Colors.amber.shade200 : const Color(0xFFBBF7D0),
+                                color: isAdmin
+                                    ? const Color(0xFFD8B4FE)
+                                    : (isFarmer ? Colors.amber.shade200 : const Color(0xFFBBF7D0)),
                               ),
                             ),
                             child: Text(
-                              isFarmer ? 'Farmer Account' : 'Consumer Account',
+                              isAdmin
+                                  ? 'Super Administrator'
+                                  : (isFarmer ? 'Farmer Account' : 'Consumer Account'),
                               style: GoogleFonts.inter(
                                 fontSize: 10.5,
-                                color: isFarmer ? Colors.amber.shade900 : primary,
+                                color: isAdmin
+                                    ? const Color(0xFF7C3AED)
+                                    : (isFarmer ? Colors.amber.shade900 : primary),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -882,6 +891,35 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ),
 
               const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+              if (isAdmin) ...[
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 2,
+                  ),
+                  leading: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    size: 18,
+                    color: Color(0xFF7C3AED),
+                  ),
+                  title: Text(
+                    'Admin Dashboard',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF7C3AED),
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Color(0xFF7C3AED),
+                  ),
+                  onTap: () => context.go(AppRoutes.admin),
+                ),
+              ],
 
               // Mode switch item
               ListTile(
@@ -1046,11 +1084,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // â”€â”€ Header (responsive) â”€â”€
+                // ── Header (responsive) ──
                 if (isMobileLayout)
-                  ..._buildMobileHeader(isFarmer)
+                  ..._buildMobileHeader(isFarmer, auth.isAdmin)
                 else
-                  ..._buildDesktopHeader(isFarmer),
+                  ..._buildDesktopHeader(isFarmer, auth.isAdmin),
 
                 const Divider(height: 32, color: Color(0xFFF1F5F9)),
 
@@ -1132,8 +1170,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // â”€â”€ Mobile header: icon+title stacked above save button â”€â”€
-  List<Widget> _buildMobileHeader(bool isFarmer) {
+  // ── Mobile header: icon+title stacked above save button ──
+  List<Widget> _buildMobileHeader(bool isFarmer, bool isAdmin) {
     return [
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1141,12 +1179,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isFarmer ? Colors.amber.shade100 : const Color(0xFFDCFCE7),
+              color: isAdmin
+                  ? const Color(0xFFF3E8FF)
+                  : (isFarmer ? Colors.amber.shade100 : const Color(0xFFDCFCE7)),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              isFarmer ? Icons.storefront_rounded : Icons.person_rounded,
-              color: isFarmer ? Colors.amber.shade900 : primary,
+              isAdmin
+                  ? Icons.admin_panel_settings_rounded
+                  : (isFarmer ? Icons.storefront_rounded : Icons.person_rounded),
+              color: isAdmin
+                  ? const Color(0xFF7C3AED)
+                  : (isFarmer ? Colors.amber.shade900 : primary),
               size: 20,
             ),
           ),
@@ -1160,7 +1204,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   spacing: 8,
                   children: [
                     Text(
-                      isFarmer ? 'Farm Store Profile' : 'My Personal Profile',
+                      isAdmin
+                          ? 'Administrator Profile'
+                          : (isFarmer ? 'Farm Store Profile' : 'My Personal Profile'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -1173,17 +1219,23 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: isFarmer
-                            ? Colors.amber.shade100
-                            : const Color(0xFFDCFCE7),
+                        color: isAdmin
+                            ? const Color(0xFFF3E8FF)
+                            : (isFarmer
+                                ? Colors.amber.shade100
+                                : const Color(0xFFDCFCE7)),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
-                        isFarmer ? 'FARMER' : 'CONSUMER',
+                        isAdmin
+                            ? 'ADMINISTRATOR'
+                            : (isFarmer ? 'FARMER' : 'CONSUMER'),
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: isFarmer ? Colors.amber.shade900 : primary,
+                          color: isAdmin
+                              ? const Color(0xFF7C3AED)
+                              : (isFarmer ? Colors.amber.shade900 : primary),
                         ),
                       ),
                     ),
@@ -1191,9 +1243,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isFarmer
-                      ? 'Manage your farm store details'
-                      : 'Manage your buyer information',
+                  isAdmin
+                      ? 'Super Administrator credentials and system control'
+                      : (isFarmer
+                          ? 'Manage your farm store details'
+                          : 'Manage your buyer information'),
                   style: GoogleFonts.inter(fontSize: 11, color: _muted),
                 ),
               ],
@@ -1234,8 +1288,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     ];
   }
 
-  // â”€â”€ Desktop header: icon+title on left, save button on right â”€â”€
-  List<Widget> _buildDesktopHeader(bool isFarmer) {
+  // ── Desktop header: icon+title on left, save button on right ──
+  List<Widget> _buildDesktopHeader(bool isFarmer, bool isAdmin) {
     return [
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1246,14 +1300,20 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isFarmer
-                        ? Colors.amber.shade100
-                        : const Color(0xFFDCFCE7),
+                    color: isAdmin
+                        ? const Color(0xFFF3E8FF)
+                        : (isFarmer
+                            ? Colors.amber.shade100
+                            : const Color(0xFFDCFCE7)),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    isFarmer ? Icons.storefront_rounded : Icons.person_rounded,
-                    color: isFarmer ? Colors.amber.shade900 : primary,
+                    isAdmin
+                        ? Icons.admin_panel_settings_rounded
+                        : (isFarmer ? Icons.storefront_rounded : Icons.person_rounded),
+                    color: isAdmin
+                        ? const Color(0xFF7C3AED)
+                        : (isFarmer ? Colors.amber.shade900 : primary),
                     size: 24,
                   ),
                 ),
@@ -1267,9 +1327,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         spacing: 10,
                         children: [
                           Text(
-                            isFarmer
-                                ? 'Farm Store Profile'
-                                : 'My Personal Profile',
+                            isAdmin
+                                ? 'Administrator Profile'
+                                : (isFarmer
+                                    ? 'Farm Store Profile'
+                                    : 'My Personal Profile'),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -1282,19 +1344,25 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: isFarmer
-                                  ? Colors.amber.shade100
-                                  : const Color(0xFFDCFCE7),
+                              color: isAdmin
+                                  ? const Color(0xFFF3E8FF)
+                                  : (isFarmer
+                                      ? Colors.amber.shade100
+                                      : const Color(0xFFDCFCE7)),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
-                              isFarmer ? 'FARMER MODE' : 'CONSUMER MODE',
+                              isAdmin
+                                  ? 'ADMIN MODE'
+                                  : (isFarmer ? 'FARMER MODE' : 'CONSUMER MODE'),
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: isFarmer
-                                    ? Colors.amber.shade900
-                                    : primary,
+                                color: isAdmin
+                                    ? const Color(0xFF7C3AED)
+                                    : (isFarmer
+                                        ? Colors.amber.shade900
+                                        : primary),
                               ),
                             ),
                           ),
@@ -1302,9 +1370,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isFarmer
-                            ? 'Manage your public farm details, location, and store branding for buyers'
-                            : 'Manage your personal buyer information and contact details',
+                        isAdmin
+                            ? 'Super Administrator account with system-wide management and control privileges'
+                            : (isFarmer
+                                ? 'Manage your public farm details, location, and store branding for buyers'
+                                : 'Manage your personal buyer information and contact details'),
                         style: GoogleFonts.inter(fontSize: 13, color: _muted),
                       ),
                     ],
@@ -1314,6 +1384,22 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             ),
           ),
           const SizedBox(width: 16),
+          if (isAdmin) ...[
+            OutlinedButton.icon(
+              onPressed: () => context.go(AppRoutes.admin),
+              icon: const Icon(Icons.admin_panel_settings_rounded, size: 16),
+              label: const Text('Admin Dashboard'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF7C3AED),
+                side: const BorderSide(color: Color(0xFFD8B4FE)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           ElevatedButton.icon(
             onPressed: _isSavingProfile ? null : _saveInlineProfileChanges,
             icon: _isSavingProfile
@@ -1575,6 +1661,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
   // ─── Mobile form: avatar on top center, fields below ───
   List<Widget> _buildMobileFormLayout(bool isFarmer) {
+    final auth = AuthService();
     return [
       Center(
         child: Column(
@@ -1837,8 +1924,16 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         ),
         _buildInlineEditRow(
           label: 'Account Type',
-          controller: TextEditingController(text: 'Consumer / Buyer Account'),
-          icon: Icons.badge_outlined,
+          controller: TextEditingController(
+            text: auth.isAdmin
+                ? 'Super Administrator'
+                : (isFarmer
+                    ? 'Verified Farmer / Seller'
+                    : 'Consumer / Buyer Account'),
+          ),
+          icon: auth.isAdmin
+              ? Icons.admin_panel_settings_outlined
+              : Icons.badge_outlined,
           readOnly: true,
         ),
       ],
@@ -1847,6 +1942,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
   // ─── Desktop form: fields on left, avatar on right ───
   List<Widget> _buildDesktopFormLayout(bool isFarmer) {
+    final auth = AuthService();
     return [
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1976,11 +2072,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   _buildInlineEditRow(
                     label: 'Account Type',
                     controller: TextEditingController(
-                      text: isFarmer
-                          ? 'Verified Farmer / Seller'
-                          : 'Consumer / Buyer Account',
+                      text: auth.isAdmin
+                          ? 'Super Administrator'
+                          : (isFarmer
+                              ? 'Verified Farmer / Seller'
+                              : 'Consumer / Buyer Account'),
                     ),
-                    icon: Icons.badge_outlined,
+                    icon: auth.isAdmin
+                        ? Icons.admin_panel_settings_outlined
+                        : Icons.badge_outlined,
                     readOnly: true,
                   ),
                   const SizedBox(height: 24),
@@ -2267,10 +2367,16 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     _buildAccountInfoRow(
-                      icon: isFarmer ? Icons.storefront_rounded : Icons.shopping_bag_outlined,
-                      iconColor: isFarmer ? Colors.amber.shade800 : primary,
+                      icon: auth.isAdmin
+                          ? Icons.admin_panel_settings_rounded
+                          : (isFarmer ? Icons.storefront_rounded : Icons.shopping_bag_outlined),
+                      iconColor: auth.isAdmin
+                          ? const Color(0xFF7C3AED)
+                          : (isFarmer ? Colors.amber.shade800 : primary),
                       label: 'Role',
-                      value: isFarmer ? 'Seller' : 'Buyer',
+                      value: auth.isAdmin
+                          ? 'Super Admin'
+                          : (isFarmer ? 'Seller' : 'Buyer'),
                     ),
                   ],
                 ),

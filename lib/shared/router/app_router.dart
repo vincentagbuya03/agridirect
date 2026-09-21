@@ -399,12 +399,19 @@ GoRouter createAppRouter({String? initialRoute}) {
           return AppRoutes.loading;
         }
 
-        // If on home/base path, go to welcome screen (or farmer dashboard if farmer)
+        // If on home/base path, go to admin, farmer dashboard, or welcome screen
         if (location == AppRoutes.home) {
+          if (isAdmin) return AppRoutes.admin;
           // On mobile, the home path (/) is already the dashboard
           if (isMobile) return null;
 
           return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.webWelcome;
+        }
+
+        // If authenticated user visits webWelcome directly, route to appropriate dashboard
+        if (location == AppRoutes.webWelcome) {
+          if (isAdmin) return AppRoutes.admin;
+          if (isFarmer) return AppRoutes.farmerDashboard;
         }
       } else {
         // 5. Unauthenticated Users logic
@@ -1011,13 +1018,24 @@ GoRouter createAppRouter({String? initialRoute}) {
         path: AppRoutes.completeProfile,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
+            final auth = AuthService();
+            void handleComplete(BuildContext ctx) {
+              if (auth.isAdmin) {
+                ctx.go(AppRoutes.admin);
+              } else if (auth.isViewingAsFarmer) {
+                ctx.go(AppRoutes.farmerDashboard);
+              } else {
+                ctx.go(AppRoutes.home);
+              }
+            }
+
             if (kIsWeb || constraints.maxWidth > 800) {
               return WebCompleteProfileScreen(
-                onComplete: () => context.go(AppRoutes.home),
+                onComplete: () => handleComplete(context),
               );
             }
             return CompleteProfileScreen(
-              onComplete: () => context.go(AppRoutes.home),
+              onComplete: () => handleComplete(context),
             );
           },
         ),

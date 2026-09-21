@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
@@ -59,6 +60,18 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
   void initState() {
     super.initState();
     _startCountdownTimer();
+    for (final node in _focusNodes) {
+      node.addListener(_onFocusChange);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focusNodes.isNotEmpty) {
+        _focusNodes[0].requestFocus();
+      }
+    });
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() {});
   }
 
   void _startCountdownTimer() {
@@ -95,13 +108,55 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
   String _getOTPCode() => _codeControllers.map((c) => c.text).join();
 
   void _handleOTPChange(int index, String value) {
-    if (value.length > 1) {
-      final digits = value.replaceAll(RegExp(r'[^\d]'), '');
-      for (int i = 0; i < 6 && i < digits.length; i++) {
+    if (value.isEmpty) {
+      setState(() {});
+      return;
+    }
+
+    final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (digits.isEmpty) {
+      _codeControllers[index].clear();
+      setState(() {});
+      return;
+    }
+
+    // 1. Full 6-digit paste
+    if (digits.length >= 6) {
+      for (int i = 0; i < 6; i++) {
         _codeControllers[i].text = digits[i];
       }
-      final next = (digits.length < 6) ? digits.length : 5;
-      FocusScope.of(context).requestFocus(_focusNodes[next]);
+      _focusNodes[5].unfocus();
+      setState(() {});
+      if (!_isVerifying) {
+        _verifyOTP();
+      }
+      return;
+    }
+
+    // 2. Replacing single digit
+    if (digits.length == 2) {
+      final newChar = digits[digits.length - 1];
+      _codeControllers[index].text = newChar;
+      setState(() {});
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+      if (_getOTPCode().length == 6 && !_isVerifying) {
+        _verifyOTP();
+      }
+      return;
+    }
+
+    // 3. Partial multi-digit entry
+    if (digits.length > 2) {
+      for (int i = 0; i < digits.length && (index + i) < 6; i++) {
+        _codeControllers[index + i].text = digits[i];
+      }
+      final next = (index + digits.length < 6) ? (index + digits.length) : 5;
+      _focusNodes[next].requestFocus();
       setState(() {});
       if (_getOTPCode().length == 6 && !_isVerifying) {
         _verifyOTP();
@@ -109,20 +164,18 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
       return;
     }
 
+    // 4. Standard single digit entry
+    _codeControllers[index].text = digits;
     setState(() {});
 
-    if (value.length == 1) {
-      if (index < 5) {
-        FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
-      } else {
-        _focusNodes[index].unfocus();
-      }
+    if (index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    } else {
+      _focusNodes[index].unfocus();
+    }
 
-      if (_getOTPCode().length == 6 && !_isVerifying) {
-        _verifyOTP();
-      }
-    } else if (value.isEmpty && index > 0) {
-      FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
+    if (_getOTPCode().length == 6 && !_isVerifying) {
+      _verifyOTP();
     }
   }
 
@@ -143,13 +196,12 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
           phoneNumber: widget.phoneNumber!,
           enteredCode: otp,
         );
-
         if (!isValid) {
+          _clearFields(clearError: false);
           setState(() {
             _errorMessage = 'Invalid or expired SMS code. Please try again.';
             _isVerifying = false;
           });
-          _clearFields();
           return;
         }
 
@@ -172,11 +224,11 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
         );
 
         if (result['success'] != true) {
+          _clearFields(clearError: false);
           setState(() {
             _errorMessage = result['message'] ?? 'Invalid or expired code.';
             _isVerifying = false;
           });
-          _clearFields();
           return;
         }
       }
@@ -230,23 +282,24 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
 
     try {
       if (_isPhone) {
-        final sent = await TextBeeOtpService().sendOtp(
+        final ok = await TextBeeOtpService().sendOtp(
           phoneNumber: widget.phoneNumber!,
           onSuccess: (code) {
-            debugPrint('✅ TextBee SMS OTP resent: ${widget.phoneNumber}');
+            debugPrint('TextBee SMS code resent: $code');
           },
           onError: (err) {
-            debugPrint('⚠️ TextBee SMS OTP resend error: $err');
+            debugPrint('TextBee error: $err');
           },
         );
-
-        if (sent) {
+        if (ok) {
           _clearFields();
           _startCountdownTimer();
           _showSnackBar('New SMS code sent to ${widget.phoneNumber}');
         } else {
-          setState(() =>
-              _errorMessage = 'Failed to dispatch SMS code. Check your network.');
+          setState(
+            () => _errorMessage =
+                'SMS dispatch failed. Please check carrier signal.',
+          );
         }
       } else {
         final newCode = await OTPService().generateAndStoreOTP(
@@ -259,6 +312,7 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
             email: widget.email,
             otpCode: newCode,
           );
+
           if (sent) {
             _clearFields();
             _startCountdownTimer();
@@ -277,11 +331,16 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
     }
   }
 
-  void _clearFields() {
+  void _clearFields({bool clearError = true}) {
     for (var c in _codeControllers) {
       c.clear();
     }
     FocusScope.of(context).requestFocus(_focusNodes[0]);
+    if (clearError) {
+      setState(() => _errorMessage = null);
+    } else {
+      setState(() {});
+    }
   }
 
   void _showSnackBar(String message) {
@@ -296,11 +355,12 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
 
   @override
   void dispose() {
+    for (var n in _focusNodes) {
+      n.removeListener(_onFocusChange);
+      n.dispose();
+    }
     for (var c in _codeControllers) {
       c.dispose();
-    }
-    for (var n in _focusNodes) {
-      n.dispose();
     }
     _timerCountdown.cancel();
     super.dispose();
@@ -436,43 +496,7 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: List.generate(
                           6,
-                          (i) => SizedBox(
-                            width: 52,
-                            height: 60,
-                            child: TextField(
-                              controller: _codeControllers[i],
-                              focusNode: _focusNodes[i],
-                              textAlign: TextAlign.center,
-                              keyboardType: TextInputType.number,
-                              maxLength: 1,
-                              style: GoogleFonts.inter(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
-                              onChanged: (v) => _handleOTPChange(i, v),
-                              decoration: InputDecoration(
-                                counterText: '',
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: EdgeInsets.zero,
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: _primary,
-                                    width: 2.0,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                          (i) => _buildDigitCell(i),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -561,6 +585,98 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDigitCell(int index) {
+    final hasValue = _codeControllers[index].text.isNotEmpty;
+    final hasFocus = _focusNodes[index].hasFocus;
+
+    return Container(
+      width: 52,
+      height: 60,
+      decoration: BoxDecoration(
+        color: hasFocus
+            ? Colors.white
+            : (hasValue ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasFocus
+              ? _primary
+              : (hasValue
+                  ? _primary.withValues(alpha: 0.6)
+                  : const Color(0xFFCBD5E1)),
+          width: hasFocus ? 2.0 : 1.5,
+        ),
+        boxShadow: hasFocus
+            ? [
+                BoxShadow(
+                  color: _primary.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+      ),
+      child: Focus(
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.backspace ||
+               event.physicalKey == PhysicalKeyboardKey.backspace)) {
+            if (_codeControllers[index].text.isNotEmpty) {
+              _codeControllers[index].clear();
+              setState(() {});
+              return KeyEventResult.handled;
+            } else if (index > 0) {
+              _codeControllers[index - 1].clear();
+              _focusNodes[index - 1].requestFocus();
+              setState(() {});
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Center(
+          child: TextField(
+            controller: _codeControllers[index],
+            focusNode: _focusNodes[index],
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            textAlignVertical: TextAlignVertical.center,
+            showCursor: true,
+            cursorColor: _primary,
+            cursorWidth: 2,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onTap: () {
+              _codeControllers[index].selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _codeControllers[index].text.length,
+              );
+            },
+            style: GoogleFonts.inter(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+            ),
+            onChanged: (v) => _handleOTPChange(index, v),
+          ),
+        ),
       ),
     );
   }

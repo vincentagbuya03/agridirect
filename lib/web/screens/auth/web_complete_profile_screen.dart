@@ -232,7 +232,14 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
         } else if (widget.onFinalizeSuccess != null) {
           widget.onFinalizeSuccess!();
         } else {
-          context.go(AppRoutes.home);
+          final auth = AuthService();
+          if (auth.isAdmin) {
+            context.go(AppRoutes.admin);
+          } else if (auth.isViewingAsFarmer) {
+            context.go(AppRoutes.farmerDashboard);
+          } else {
+            context.go(AppRoutes.home);
+          }
         }
       } else {
         _showErrorModal(

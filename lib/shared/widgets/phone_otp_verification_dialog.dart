@@ -42,13 +42,24 @@ class _PhoneOtpVerificationDialogState
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
   static const Color _muted = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
-  static const Color _inputBg = Color(0xFFF9FAFB);
 
   @override
   void initState() {
     super.initState();
     _startCountdownTimer();
+    for (final node in _focusNodes) {
+      node.addListener(_onFocusChange);
+    }
+    // Automatically focus the first input cell on dialog presentation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focusNodes.isNotEmpty) {
+        _focusNodes[0].requestFocus();
+      }
+    });
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() {});
   }
 
   void _startCountdownTimer() {
@@ -73,11 +84,12 @@ class _PhoneOtpVerificationDialogState
   @override
   void dispose() {
     _timerCountdown.cancel();
+    for (final node in _focusNodes) {
+      node.removeListener(_onFocusChange);
+      node.dispose();
+    }
     for (final c in _codeControllers) {
       c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
     }
     super.dispose();
   }
@@ -85,13 +97,55 @@ class _PhoneOtpVerificationDialogState
   String _getOTPCode() => _codeControllers.map((c) => c.text).join();
 
   void _handleOTPChange(int index, String value) {
-    if (value.length > 1) {
-      final digits = value.replaceAll(RegExp(r'[^\d]'), '');
-      for (int i = 0; i < 6 && i < digits.length; i++) {
+    if (value.isEmpty) {
+      setState(() {});
+      return;
+    }
+
+    final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (digits.isEmpty) {
+      _codeControllers[index].clear();
+      setState(() {});
+      return;
+    }
+
+    // 1. Full 6-digit paste (e.g. copied from SMS)
+    if (digits.length >= 6) {
+      for (int i = 0; i < 6; i++) {
         _codeControllers[i].text = digits[i];
       }
-      final next = (digits.length < 6) ? digits.length : 5;
-      FocusScope.of(context).requestFocus(_focusNodes[next]);
+      _focusNodes[5].unfocus();
+      setState(() {});
+      if (!_isVerifying) {
+        _verifyCode();
+      }
+      return;
+    }
+
+    // 2. Replacing single digit (field already had a digit, user typed a new one)
+    if (digits.length == 2) {
+      final newChar = digits[digits.length - 1];
+      _codeControllers[index].text = newChar;
+      setState(() {});
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+      if (_getOTPCode().length == 6 && !_isVerifying) {
+        _verifyCode();
+      }
+      return;
+    }
+
+    // 3. Partial multi-digit entry
+    if (digits.length > 2) {
+      for (int i = 0; i < digits.length && (index + i) < 6; i++) {
+        _codeControllers[index + i].text = digits[i];
+      }
+      final next = (index + digits.length < 6) ? (index + digits.length) : 5;
+      _focusNodes[next].requestFocus();
       setState(() {});
       if (_getOTPCode().length == 6 && !_isVerifying) {
         _verifyCode();
@@ -99,31 +153,33 @@ class _PhoneOtpVerificationDialogState
       return;
     }
 
+    // 4. Standard single digit entry
+    _codeControllers[index].text = digits;
     setState(() {});
 
-    if (value.length == 1) {
-      if (index < 5) {
-        FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
-      } else {
-        _focusNodes[index].unfocus();
-      }
+    if (index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    } else {
+      _focusNodes[index].unfocus();
+    }
 
-      if (_getOTPCode().length == 6 && !_isVerifying) {
-        _verifyCode();
-      }
-    } else if (value.isEmpty && index > 0) {
-      FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
+    if (_getOTPCode().length == 6 && !_isVerifying) {
+      _verifyCode();
     }
   }
 
-  void _clearFields() {
+  void _clearFields({bool clearError = true}) {
     for (final c in _codeControllers) {
       c.clear();
     }
     if (_focusNodes.isNotEmpty) {
       FocusScope.of(context).requestFocus(_focusNodes[0]);
     }
-    setState(() => _errorMessage = null);
+    if (clearError) {
+      setState(() => _errorMessage = null);
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _verifyCode() async {
@@ -139,6 +195,8 @@ class _PhoneOtpVerificationDialogState
       _errorMessage = null;
     });
 
+    FocusScope.of(context).unfocus();
+
     try {
       final isValid = await TextBeeOtpService().verifyOtp(
         phoneNumber: widget.phoneNumber,
@@ -151,12 +209,12 @@ class _PhoneOtpVerificationDialogState
         _timerCountdown.cancel();
         Navigator.of(context).pop(true);
       } else {
+        _clearFields(clearError: false);
         setState(() {
           _isVerifying = false;
           _errorMessage =
               'Invalid or expired verification code. Please check your SMS and try again.';
         });
-        _clearFields();
       }
     } catch (e) {
       if (mounted) {
@@ -292,8 +350,45 @@ class _PhoneOtpVerificationDialogState
                 children: List.generate(6, (i) => _buildDigitCell(i, isCompact)),
               ),
 
+              const SizedBox(height: 14),
+
+              // Auto-verify status or helper hint
+              if (_isVerifying)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_primary),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Verifying code automatically...',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _primary,
+                      ),
+                    ),
+                  ],
+                )
+              else if (_errorMessage == null)
+                Text(
+                  'Code verifies automatically once all 6 digits are entered',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: _muted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
               if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -406,48 +501,92 @@ class _PhoneOtpVerificationDialogState
   Widget _buildDigitCell(int index, bool isCompact) {
     final hasValue = _codeControllers[index].text.isNotEmpty;
     final hasFocus = _focusNodes[index].hasFocus;
-    final size = isCompact ? 44.0 : 50.0;
+    final size = isCompact ? 46.0 : 52.0;
 
-    return SizedBox(
+    return Container(
       width: size,
-      height: size + 6,
-      child: TextField(
-        controller: _codeControllers[index],
-        focusNode: _focusNodes[index],
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        maxLength: 1,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: isCompact ? 20 : 22,
-          fontWeight: FontWeight.w800,
-          color: _dark,
+      height: size + 8,
+      decoration: BoxDecoration(
+        color: hasFocus
+            ? Colors.white
+            : (hasValue ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasFocus
+              ? _primary
+              : (hasValue
+                  ? _primary.withValues(alpha: 0.6)
+                  : const Color(0xFFCBD5E1)),
+          width: hasFocus ? 2.0 : 1.5,
         ),
-        decoration: InputDecoration(
-          counterText: '',
-          filled: true,
-          fillColor: hasFocus ? Colors.white : _inputBg,
-          contentPadding: EdgeInsets.zero,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: hasFocus ? _primary : _border,
-              width: hasFocus ? 2 : 1,
+        boxShadow: hasFocus
+            ? [
+                BoxShadow(
+                  color: _primary.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+      ),
+      child: Focus(
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.backspace ||
+               event.physicalKey == PhysicalKeyboardKey.backspace)) {
+            if (_codeControllers[index].text.isNotEmpty) {
+              _codeControllers[index].clear();
+              setState(() {});
+              return KeyEventResult.handled;
+            } else if (index > 0) {
+              _codeControllers[index - 1].clear();
+              _focusNodes[index - 1].requestFocus();
+              setState(() {});
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Center(
+          child: TextField(
+            controller: _codeControllers[index],
+            focusNode: _focusNodes[index],
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            textAlignVertical: TextAlignVertical.center,
+            showCursor: true,
+            cursorColor: _primary,
+            cursorWidth: 2,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onTap: () {
+              _codeControllers[index].selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _codeControllers[index].text.length,
+              );
+            },
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isCompact ? 20 : 22,
+              fontWeight: FontWeight.w800,
+              color: _dark,
             ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: hasValue ? _primary.withValues(alpha: 0.5) : _border,
-              width: hasValue ? 1.5 : 1,
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
             ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: _primary, width: 2),
+            onChanged: (val) => _handleOTPChange(index, val),
           ),
         ),
-        onChanged: (val) => _handleOTPChange(index, val),
       ),
     );
   }

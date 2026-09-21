@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../utils/apk_downloader.dart';
 
 /// Top banner / popup for web visitors prompting them to open or download the mobile app.
@@ -17,9 +16,6 @@ class AppOpenBanner extends StatefulWidget {
       context: context,
       builder: (dialogContext) {
         final path = targetRoute ?? Uri.base.path;
-        final query = Uri.base.query.isNotEmpty ? '?${Uri.base.query}' : '';
-        final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-        final appSchemeUrl = 'agridirect://$cleanPath$query';
 
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -68,18 +64,7 @@ class AppOpenBanner extends StatefulWidget {
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       Navigator.of(dialogContext).pop();
-                      try {
-                        final uri = Uri.parse(appSchemeUrl);
-                        final launched = await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        );
-                        if (!launched) {
-                          await ApkDownloader.download();
-                        }
-                      } catch (_) {
-                        await ApkDownloader.download();
-                      }
+                      await ApkDownloader.openAppOrDownload(targetRoute: path);
                     },
                     icon: const Icon(Icons.open_in_new_rounded, size: 18),
                     label: Text(
@@ -182,48 +167,38 @@ class _AppOpenBannerState extends State<AppOpenBanner> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'AgriDirect Mobile App',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                  child: GestureDetector(
+                    onTap: () => AppOpenBanner.showOpenAppDialog(context),
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'AgriDirect Mobile App',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Open in app or get the APK for direct mobile features.',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF94A3B8),
-                          fontSize: 11,
+                        Text(
+                          'Open in app or get the APK for direct mobile features.',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF94A3B8),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () async {
-                    final path = Uri.base.path;
-                    final query = Uri.base.query.isNotEmpty ? '?${Uri.base.query}' : '';
-                    final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-                    final appSchemeUrl = 'agridirect://$cleanPath$query';
-                    try {
-                      final launched = await launchUrl(
-                        Uri.parse(appSchemeUrl),
-                        mode: LaunchMode.externalApplication,
-                      );
-                      if (!launched) {
-                        await ApkDownloader.download();
-                      }
-                    } catch (_) {
-                      await ApkDownloader.download();
-                    }
+                    await ApkDownloader.openAppOrDownload();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),

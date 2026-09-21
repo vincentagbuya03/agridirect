@@ -104,6 +104,10 @@ class _WebNavigationState extends State<WebNavigation> {
         child: WebLoginScreen(
           onLoginSuccess: () {
             Navigator.of(dialogContext).pop();
+            if (_auth.isAdmin) {
+              context.go(AppRoutes.admin);
+              return;
+            }
             if (mounted) setState(() {});
           },
         ),

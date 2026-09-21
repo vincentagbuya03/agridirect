@@ -1317,6 +1317,17 @@ class AuthService extends ChangeNotifier {
         _userId,
       ).timeout(const Duration(seconds: 10), onTimeout: () => <String>[]);
 
+      try {
+        await SupabaseDatabase.ensureAdminProfileExists(
+          userId: _userId,
+          email: _userEmail,
+        );
+      } catch (e) {
+        debugPrint('Warning: Could not ensure admin profile in _finalizeSession: $e');
+      }
+
+      _isAdmin = await _resolveAdminStatus(_userId, roles, email: _userEmail);
+
       final reg = await SupabaseDatabase.getFarmerRegistration(
         _userId,
       ).timeout(const Duration(seconds: 10), onTimeout: () => null);

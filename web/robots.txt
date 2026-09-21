@@ -4,6 +4,9 @@ Allow: /web-welcome
 Allow: /marketplace
 Allow: /shop
 Allow: /community
+Allow: /favicon.ico
+Allow: /favicon.png
+Allow: /icons/
 
 # Host
 Host: https://www.agridirect.site
