@@ -281,6 +281,8 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 const SizedBox(height: 3),
                 Text(
                   loc.s('AgriDirect Farmers', 'Mga Magsasaka ng AgriDirect'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,

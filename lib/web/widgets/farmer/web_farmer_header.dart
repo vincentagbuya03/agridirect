@@ -82,8 +82,9 @@ class _WebFarmerHeaderState extends State<WebFarmerHeader> {
         final loc = FarmerLocaleService.instance;
         final tabs = _getTabs(loc);
         final sw = MediaQuery.of(context).size.width;
-        final isMobile = sw < 920;
-        final isCompact = sw < 1180;
+        final isMobile = sw < 1000;
+        final isCompact = sw < 1280;
+        final isTight = sw < 1140;
         final auth = AuthService();
 
         return Container(
@@ -109,7 +110,7 @@ class _WebFarmerHeaderState extends State<WebFarmerHeader> {
               constraints: const BoxConstraints(maxWidth: 1440),
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 28,
+                  horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
                   vertical: 12,
                 ),
                 child: Row(
@@ -123,45 +124,47 @@ class _WebFarmerHeaderState extends State<WebFarmerHeader> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             BrandLogo(
-                              size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                              size: (isMobile || isTight) ? BrandLogoSize.small : BrandLogoSize.medium,
                             ),
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: WebDesignTokens.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: WebDesignTokens.primary.withValues(alpha: 0.25),
+                            if (!isTight) ...[
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: WebDesignTokens.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: WebDesignTokens.primary.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: WebDesignTokens.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      loc.s('SELLER HUB', 'SENTRO NG NAGTITINDA'),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: WebDesignTokens.primaryDark,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: WebDesignTokens.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    loc.s('SELLER HUB', 'SENTRO NG NAGTITINDA'),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: WebDesignTokens.primaryDark,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -169,82 +172,87 @@ class _WebFarmerHeaderState extends State<WebFarmerHeader> {
 
                     // ─── 2. Desktop Navigation Tabs ───
                     if (!isMobile) ...[
-                      SizedBox(width: isCompact ? 16 : 36),
+                      SizedBox(width: isCompact ? 12 : 24),
                       Expanded(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: tabs.map((tab) {
-                            final tabIndex = tab['index'] as int;
-                            final isSelected = widget.currentIndex == tabIndex;
-                            final isHovered = _hoveredIndex == tabIndex;
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: tabs.map((tab) {
+                              final tabIndex = tab['index'] as int;
+                              final isSelected = widget.currentIndex == tabIndex;
+                              final isHovered = _hoveredIndex == tabIndex;
 
-                            return Padding(
-                              padding: EdgeInsets.only(right: isCompact ? 4 : 8),
-                              child: MouseRegion(
-                                cursor: SystemMouseCursors.click,
-                                onEnter: (_) => setState(() => _hoveredIndex = tabIndex),
-                                onExit: (_) => setState(() => _hoveredIndex = -1),
-                                child: GestureDetector(
-                                  onTap: () => widget.onNavigate(tabIndex),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: isCompact ? 10 : 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? WebDesignTokens.primary.withValues(alpha: 0.08)
-                                          : (isHovered
-                                              ? WebDesignTokens.bg
-                                              : Colors.transparent),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? WebDesignTokens.primary.withValues(alpha: 0.25)
-                                            : Colors.transparent,
+                              return Padding(
+                                padding: EdgeInsets.only(right: isCompact ? 4 : 8),
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  onEnter: (_) => setState(() => _hoveredIndex = tabIndex),
+                                  onExit: (_) => setState(() => _hoveredIndex = -1),
+                                  child: GestureDetector(
+                                    onTap: () => widget.onNavigate(tabIndex),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 180),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: isCompact ? 8 : 12,
+                                        vertical: 8,
                                       ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          isSelected
-                                              ? (tab['activeIcon'] as IconData)
-                                              : (tab['icon'] as IconData),
-                                          size: 17,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? WebDesignTokens.primary.withValues(alpha: 0.08)
+                                            : (isHovered
+                                                ? WebDesignTokens.bg
+                                                : Colors.transparent),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
                                           color: isSelected
-                                              ? WebDesignTokens.primary
-                                              : (isHovered
-                                                  ? WebDesignTokens.dark
-                                                  : WebDesignTokens.slate600),
+                                              ? WebDesignTokens.primary.withValues(alpha: 0.25)
+                                              : Colors.transparent,
                                         ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          tab['label'] as String,
-                                          style: GoogleFonts.rubik(
-                                            fontSize: isCompact ? 13 : 13.5,
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700
-                                                : (isHovered
-                                                    ? FontWeight.w600
-                                                    : FontWeight.w500),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isSelected
+                                                ? (tab['activeIcon'] as IconData)
+                                                : (tab['icon'] as IconData),
+                                            size: isCompact ? 16 : 17,
                                             color: isSelected
-                                                ? WebDesignTokens.primaryDark
+                                                ? WebDesignTokens.primary
                                                 : (isHovered
                                                     ? WebDesignTokens.dark
-                                                    : WebDesignTokens.slate700),
+                                                    : WebDesignTokens.slate600),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            tab['label'] as String,
+                                            style: GoogleFonts.rubik(
+                                              fontSize: isCompact ? 12.5 : 13.5,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : (isHovered
+                                                      ? FontWeight.w600
+                                                      : FontWeight.w500),
+                                              color: isSelected
+                                                  ? WebDesignTokens.primaryDark
+                                                  : (isHovered
+                                                      ? WebDesignTokens.dark
+                                                      : WebDesignTokens.slate700),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
                     ] else
                       const Spacer(),
 
@@ -254,53 +262,56 @@ class _WebFarmerHeaderState extends State<WebFarmerHeader> {
                       children: [
                         // Language Toggle
                         const Padding(
-                          padding: EdgeInsets.only(right: 10),
+                          padding: EdgeInsets.only(right: 8),
                           child: FarmerLanguageToggle(compact: true),
                         ),
 
                         // Switch to Buyer Mode CTA Button
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: _switchToBuyerMode,
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isMobile ? 10 : 14,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: WebDesignTokens.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: WebDesignTokens.border,
+                        Tooltip(
+                          message: loc.s('Switch to Buyer Mode', 'Bumalik sa Mamimili'),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: _switchToBuyerMode,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: (isMobile || isCompact) ? 10 : 14,
+                                  vertical: 8,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.storefront_outlined,
-                                    size: 16,
-                                    color: WebDesignTokens.slate700,
+                                decoration: BoxDecoration(
+                                  color: WebDesignTokens.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: WebDesignTokens.border,
                                   ),
-                                  if (!isMobile) ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      loc.s('Switch to Buyer', 'Bumalik sa Mamimili'),
-                                      style: GoogleFonts.nunitoSans(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: WebDesignTokens.dark,
-                                      ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.storefront_outlined,
+                                      size: 16,
+                                      color: WebDesignTokens.slate700,
                                     ),
+                                    if (!isMobile && !isCompact) ...[
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        loc.s('Switch to Buyer', 'Bumalik sa Mamimili'),
+                                        style: GoogleFonts.nunitoSans(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: WebDesignTokens.dark,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
 
                         // Notification / Order Alert Bell
                         IconButton(

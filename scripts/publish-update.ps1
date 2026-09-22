@@ -53,6 +53,9 @@ try {
     if (-not $SkipBuild) {
         Write-Host "Building release APKs with split-per-abi & obfuscation..." -ForegroundColor Yellow
         flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols
+        if ($LASTEXITCODE -ne 0) {
+            throw "Flutter build failed with exit code $LASTEXITCODE. Aborting release."
+        }
     } else {
         Write-Host "Skipping flutter build as requested (-SkipBuild)..." -ForegroundColor Yellow
     }

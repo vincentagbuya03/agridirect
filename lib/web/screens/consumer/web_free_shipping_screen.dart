@@ -53,18 +53,21 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
   }
 
   Future<List<VoucherItem>> _getFreeShippingVouchers() async {
-    final dbVouchers =
-        await SupabaseDataService().getAvailablePlatformVouchers();
+    final dbVouchers = await SupabaseDataService()
+        .getAvailablePlatformVouchers();
     final fsVouchers = dbVouchers
-        .where((v) =>
-            v.title.toLowerCase().contains('free') ||
-            v.title.toLowerCase().contains('shipping') ||
-            v.code.toLowerCase().contains('free') ||
-            v.code.toLowerCase().contains('ship'))
+        .where(
+          (v) =>
+              v.title.toLowerCase().contains('free') ||
+              v.title.toLowerCase().contains('shipping') ||
+              v.code.toLowerCase().contains('free') ||
+              v.code.toLowerCase().contains('ship'),
+        )
         .toList();
 
-    final userVouchers =
-        await SupabaseDataService().getUserVouchers('available');
+    final userVouchers = await SupabaseDataService().getUserVouchers(
+      'available',
+    );
     for (var uv in userVouchers) {
       final matches = fsVouchers.where((fv) => fv.title == uv.title);
       for (var match in matches) {
@@ -96,38 +99,47 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
       });
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                'Voucher added to your wallet!',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
-            ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Voucher added to your wallet!',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF047857),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            action: SnackBarAction(
+              label: 'VIEW VOUCHERS',
+              textColor: const Color(0xFF6EE7B7),
+              onPressed: () => context.go('/vouchers'),
+            ),
           ),
-          backgroundColor: const Color(0xFF047857),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(24),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          action: SnackBarAction(
-            label: 'VIEW VOUCHERS',
-            textColor: const Color(0xFF6EE7B7),
-            onPressed: () => context.go('/vouchers'),
-          ),
-        ));
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Already claimed or an error occurred.'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(24),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Already claimed or an error occurred.'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
       }
     }
   }
@@ -137,32 +149,39 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
     if (!mounted) return;
 
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result),
-        backgroundColor: Colors.red[600],
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result), backgroundColor: Colors.red[600]),
+      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded,
-                color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text('Added ${product.name} to Cart!',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          ],
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Added ${product.name} to Cart!',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          action: SnackBarAction(
+            label: 'VIEW CART',
+            textColor: Colors.white,
+            onPressed: () => context.go('/cart'),
+          ),
         ),
-        backgroundColor: const Color(0xFF059669),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(24),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'VIEW CART',
-          textColor: Colors.white,
-          onPressed: () => context.go('/cart'),
-        ),
-      ));
+      );
     }
   }
 
@@ -228,11 +247,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF064E3B),
-            Color(0xFF047857),
-            Color(0xFF0D9488),
-          ],
+          colors: [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF0D9488)],
         ),
         boxShadow: [
           BoxShadow(
@@ -284,18 +299,24 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2)),
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.arrow_back_rounded,
-                                color: Colors.white, size: 18),
+                            const Icon(
+                              Icons.arrow_back_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Back to Marketplace',
@@ -319,13 +340,17 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 6),
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFBBF24),
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.1),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -334,8 +359,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.local_shipping_rounded,
-                                        size: 14, color: Color(0xFF78350F)),
+                                    const Icon(
+                                      Icons.local_shipping_rounded,
+                                      size: 14,
+                                      color: Color(0xFF78350F),
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'ZERO MINIMUM SPEND · SITEWIDE',
@@ -372,7 +400,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                               ),
                               const SizedBox(height: 12),
                               ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 620),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 620,
+                                ),
                                 child: Text(
                                   'Claim your free delivery vouchers below and shop straight from local farms without paying extra delivery fees on qualified orders.',
                                   style: GoogleFonts.inter(
@@ -408,8 +438,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF047857)
-                                        .withValues(alpha: 0.5),
+                                    color: const Color(
+                                      0xFF047857,
+                                    ).withValues(alpha: 0.5),
                                     blurRadius: 30,
                                     spreadRadius: 5,
                                   ),
@@ -453,7 +484,8 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
         'color': const Color(0xFF2563EB),
         'bg': const Color(0xFFDBEAFE),
         'title': '2. Shop Fresh Produce',
-        'desc': 'Add any eligible farm products directly to your shopping cart.',
+        'desc':
+            'Add any eligible farm products directly to your shopping cart.',
       },
       {
         'icon': Icons.handshake_rounded,
@@ -590,10 +622,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-              child: Padding(
-            padding: EdgeInsets.all(24.0),
-            child: CircularProgressIndicator(),
-          ));
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
         final vouchers = snapshot.data ?? [];
@@ -615,8 +648,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                         color: const Color(0xFF10B981).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.confirmation_num_rounded,
-                          color: Color(0xFF059669), size: 20),
+                      child: const Icon(
+                        Icons.confirmation_num_rounded,
+                        color: Color(0xFF059669),
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -696,11 +732,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                               colors: isClaimed
                                   ? [
                                       const Color(0xFF94A3B8),
-                                      const Color(0xFF64748B)
+                                      const Color(0xFF64748B),
                                     ]
                                   : [
                                       const Color(0xFF059669),
-                                      const Color(0xFF10B981)
+                                      const Color(0xFF10B981),
                                     ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -714,8 +750,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.local_shipping_rounded,
-                                    color: Colors.white, size: 24),
+                                const Icon(
+                                  Icons.local_shipping_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'FREE\nSHIP',
@@ -734,7 +773,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -773,14 +814,17 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                         : () => _claimVoucher(v),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF059669),
-                                      disabledBackgroundColor:
-                                          const Color(0xFFE2E8F0),
+                                      disabledBackgroundColor: const Color(
+                                        0xFFE2E8F0,
+                                      ),
                                       foregroundColor: Colors.white,
-                                      disabledForegroundColor:
-                                          const Color(0xFF94A3B8),
+                                      disabledForegroundColor: const Color(
+                                        0xFF94A3B8,
+                                      ),
                                       elevation: 0,
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 14),
+                                        horizontal: 14,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -790,8 +834,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                             width: 14,
                                             height: 14,
                                             child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white),
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
                                           )
                                         : Text(
                                             isClaimed ? 'CLAIMED' : 'CLAIM',
@@ -872,8 +917,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                   }
 
                   return Row(
-                    children:
-                        categories.map((c) => _buildFilterChip(c)).toList(),
+                    children: categories
+                        .map((c) => _buildFilterChip(c))
+                        .toList(),
                   );
                 },
               ),
@@ -897,8 +943,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _sortBy,
-                icon: const Icon(Icons.swap_vert_rounded,
-                    size: 18, color: Color(0xFF059669)),
+                icon: const Icon(
+                  Icons.swap_vert_rounded,
+                  size: 18,
+                  color: Color(0xFF059669),
+                ),
                 style: GoogleFonts.inter(
                   color: const Color(0xFF1E293B),
                   fontWeight: FontWeight.w600,
@@ -911,11 +960,17 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                 },
                 items: const [
                   DropdownMenuItem(
-                      value: 'featured', child: Text('Featured Deals')),
+                    value: 'featured',
+                    child: Text('Featured Deals'),
+                  ),
                   DropdownMenuItem(
-                      value: 'price_low', child: Text('Price: Low to High')),
+                    value: 'price_low',
+                    child: Text('Price: Low to High'),
+                  ),
                   DropdownMenuItem(
-                      value: 'price_high', child: Text('Price: High to Low')),
+                    value: 'price_high',
+                    child: Text('Price: High to Low'),
+                  ),
                 ],
               ),
             ),
@@ -977,13 +1032,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
     int crossAxisCount = sw < 480 ? 2 : (sw < 768 ? 2 : (sw < 1100 ? 3 : 4));
     double childAspectRatio = sw < 480
         ? 0.62
-        : (sw < 640
-            ? 0.64
-            : (sw < 960
-                ? 0.68
-                : (sw < 1280
-                    ? 0.70
-                    : 0.72)));
+        : (sw < 640 ? 0.64 : (sw < 960 ? 0.68 : (sw < 1280 ? 0.70 : 0.72)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -999,17 +1048,22 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
               childAspectRatio: childAspectRatio,
             ),
             itemCount: 8,
-            itemBuilder: (context, index) => const AppShimmerLoader(height: 280),
+            itemBuilder: (context, index) =>
+                const AppShimmerLoader(height: 280),
           );
         }
 
         var products = snapshot.data ?? [];
         if (_searchQuery.isNotEmpty) {
           products = products
-              .where((p) =>
-                  p.name.toLowerCase().contains(_searchQuery) ||
-                  (p.description?.toLowerCase().contains(_searchQuery) ?? false) ||
-                  (p.categoryName?.toLowerCase().contains(_searchQuery) ?? false))
+              .where(
+                (p) =>
+                    p.name.toLowerCase().contains(_searchQuery) ||
+                    (p.description?.toLowerCase().contains(_searchQuery) ??
+                        false) ||
+                    (p.categoryName?.toLowerCase().contains(_searchQuery) ??
+                        false),
+              )
               .toList();
         }
         if (_selectedCategory != 'All Categories') {
@@ -1020,21 +1074,21 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
 
         if (_sortBy == 'price_low') {
           products.sort((a, b) {
-            final pA = double.tryParse(
-                    a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            final pA =
+                double.tryParse(a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
                 0;
-            final pB = double.tryParse(
-                    b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            final pB =
+                double.tryParse(b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
                 0;
             return pA.compareTo(pB);
           });
         } else if (_sortBy == 'price_high') {
           products.sort((a, b) {
-            final pA = double.tryParse(
-                    a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            final pA =
+                double.tryParse(a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
                 0;
-            final pB = double.tryParse(
-                    b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            final pB =
+                double.tryParse(b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
                 0;
             return pB.compareTo(pA);
           });
@@ -1057,8 +1111,11 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                       color: const Color(0xFF059669).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.local_shipping_outlined,
-                        size: 48, color: Color(0xFF059669)),
+                    child: const Icon(
+                      Icons.local_shipping_outlined,
+                      size: 48,
+                      color: Color(0xFF059669),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -1073,7 +1130,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                   Text(
                     'Try selecting a different category or check back later.',
                     style: GoogleFonts.inter(
-                        color: const Color(0xFF64748B), fontSize: 13),
+                      color: const Color(0xFF64748B),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -1125,13 +1184,15 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
     final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
         ? product.farm
         : ((product.farmerName != null && product.farmerName!.isNotEmpty)
-            ? product.farmerName!
-            : 'Local Farm');
+              ? product.farmerName!
+              : 'Local Farm');
 
     final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
     final double price = double.tryParse(rawPrice) ?? 0.0;
     final String formattedPrice = '₱${price.toStringAsFixed(0)}';
-    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
+    final String unitLabel = product.unit.isNotEmpty
+        ? ' / ${product.unit}'
+        : '';
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1175,13 +1236,15 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                   children: [
                     Container(
                       decoration: const BoxDecoration(
-                        borderRadius:
-                            BorderRadius.vertical(top: Radius.circular(15)),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(15),
+                        ),
                         color: Color(0xFFF8FAFC),
                       ),
                       child: ClipRRect(
                         borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(15)),
+                          top: Radius.circular(15),
+                        ),
                         child: CachedNetworkImage(
                           imageUrl: product.imageUrls.isNotEmpty
                               ? product.imageUrls.first
@@ -1191,80 +1254,86 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           errorWidget: (context, url, error) => const Center(
-                            child: Icon(Icons.eco_rounded,
-                                size: 40, color: Color(0xFF94A3B8)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF059669),
-                            Color(0xFF10B981),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF059669)
-                                .withValues(alpha: 0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.local_shipping_rounded,
-                            size: 10,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            'FREE SHIPPING',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.2,
+                            child: Icon(
+                              Icons.eco_rounded,
+                              size: 40,
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                  if (farmDisplayName.isNotEmpty)
                     Positioned(
                       top: 8,
-                      right: 8,
+                      left: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF059669), Color(0xFF10B981)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: const Color(
+                                0xFF059669,
+                              ).withValues(alpha: 0.3),
                               blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.verified_rounded,
-                            size: 12, color: Color(0xFF059669)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.local_shipping_rounded,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'FREE SHIPPING',
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                ],
+                    if (farmDisplayName.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.verified_rounded,
+                            size: 12,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
@@ -1296,17 +1365,18 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                                   color: Color(0xFFE2E8F0),
                                 ),
                                 child: ClipOval(
-                                  child: (product.farmerAvatarUrl != null &&
+                                  child:
+                                      (product.farmerAvatarUrl != null &&
                                           product.farmerAvatarUrl!.isNotEmpty)
                                       ? CachedNetworkImage(
                                           imageUrl: product.farmerAvatarUrl!,
                                           fit: BoxFit.cover,
                                           errorWidget: (context, url, error) =>
                                               const Icon(
-                                            Icons.storefront_rounded,
-                                            size: 10,
-                                            color: Color(0xFF059669),
-                                          ),
+                                                Icons.storefront_rounded,
+                                                size: 10,
+                                                color: Color(0xFF059669),
+                                              ),
                                         )
                                       : const Icon(
                                           Icons.storefront_rounded,
@@ -1358,8 +1428,11 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                               const Spacer(),
                               Row(
                                 children: [
-                                  const Icon(Icons.star_rounded,
-                                      size: 13, color: Color(0xFFF59E0B)),
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    size: 13,
+                                    color: Color(0xFFF59E0B),
+                                  ),
                                   const SizedBox(width: 2),
                                   Text(
                                     product.rating ?? '5.0',
@@ -1378,14 +1451,18 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: widget.onAddToCart,
-                              icon: const Icon(Icons.add_shopping_cart_rounded,
-                                  size: 13),
+                              icon: const Icon(
+                                Icons.add_shopping_cart_rounded,
+                                size: 13,
+                              ),
                               label: const Text('Add to Cart'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF059669),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
