@@ -384,6 +384,15 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
 
           Row(
             children: [
+              if (auth.isAdmin) ...[
+                _buildUtilityLink(
+                  'Admin Dashboard',
+                  () => context.go(AppRoutes.admin),
+                  icon: Icons.admin_panel_settings_rounded,
+                  isHighlighted: true,
+                ),
+                _buildUtilityDivider(),
+              ],
               _buildUtilityLink('Community', () {
                 context.go(AppRoutes.community);
               }),
@@ -404,15 +413,6 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                 context.go(AppRoutes.aboutUs);
               }),
               _buildUtilityDivider(),
-              if (auth.isAdmin) ...[
-                _buildUtilityLink(
-                  'Admin Portal',
-                  () => context.go(AppRoutes.admin),
-                  icon: Icons.admin_panel_settings_rounded,
-                  isHighlighted: true,
-                ),
-                _buildUtilityDivider(),
-              ],
               _buildUtilityLink('Farmer Portal', () {
                 final auth = AuthService();
                 if (auth.isLoggedIn) {
@@ -780,7 +780,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
               SizedBox(width: isMobile ? 6 : 14),
 
               // Quick Farmer Mode Switcher Pill
-              if (auth.isSeller || auth.isViewingAsFarmer) ...[
+              if (auth.isLoggedIn && (auth.isSeller || auth.isViewingAsFarmer)) ...[
                 FarmerModeSwitcherCapsule(
                   compact: true,
                   isFarmerMode: auth.isViewingAsFarmer,
@@ -1075,14 +1075,6 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
       {'label': '🚜 Farm Shops', 'route': AppRoutes.localShops},
     ];
 
-    final serviceLinks = [
-      {'label': '🌾 Find Farmer', 'route': AppRoutes.farmersMap},
-      {'label': '💬 Community', 'route': AppRoutes.community},
-      {'label': '🌦️ Weather Radar', 'route': AppRoutes.weatherRadar},
-      {'label': 'ℹ️ About Us', 'route': AppRoutes.aboutUs},
-      {'label': '✨ Welcome Tour', 'route': AppRoutes.webWelcome},
-    ];
-
     return Container(
       decoration: BoxDecoration(
         color: WebDesignTokens.surface,
@@ -1091,154 +1083,104 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left: Main Nav + Produce & Harvest Departments
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  // 1. Primary Site Navigation: Home & Marketplace
-                  ...mainNavButtons.map((btn) {
-                    final isActive = btn['isActive'] as bool;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => context.go(btn['route'] as String),
-                          borderRadius: BorderRadius.circular(8),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 11,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? WebDesignTokens.primary.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isActive
-                                    ? WebDesignTokens.primary.withValues(alpha: 0.4)
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  btn['icon'] as IconData,
-                                  size: 15,
-                                  color: isActive
-                                      ? WebDesignTokens.primaryDark
-                                      : WebDesignTokens.slate600,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  btn['label'] as String,
-                                  style: GoogleFonts.nunitoSans(
-                                    fontSize: 13,
-                                    fontWeight: isActive
-                                        ? FontWeight.w800
-                                        : FontWeight.w700,
-                                    color: isActive
-                                        ? WebDesignTokens.primaryDark
-                                        : WebDesignTokens.dark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-
-                  // Subtle divider between Site Navigation and Categories
-                  Container(
-                    height: 18,
-                    width: 1.2,
-                    margin: const EdgeInsets.only(left: 4, right: 8),
-                    color: WebDesignTokens.border,
-                  ),
-
-                  // 2. Department & Category Links
-                  ...produceLinks.map((cat) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: WebDesignTokens.dark,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () => context.go(cat['route']!),
-                        child: Text(
-                          cat['label']!,
-                          style: GoogleFonts.nunitoSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-
-          // Right: Community & Agricultural Services
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: serviceLinks.map((svc) {
-                final isSpecial =
-                    svc['label']!.contains('Community') ||
-                    svc['label']!.contains('Find Farmer');
-                return Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: isSpecial
-                          ? WebDesignTokens.primaryDark
-                          : WebDesignTokens.slate600,
-                      backgroundColor: isSpecial
-                          ? WebDesignTokens.primaryLight.withValues(alpha: 0.5)
-                          : Colors.transparent,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // 1. Primary Site Navigation: Home & Marketplace
+            ...mainNavButtons.map((btn) {
+              final isActive = btn['isActive'] as bool;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.go(btn['route'] as String),
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
+                        horizontal: 11,
+                        vertical: 7,
                       ),
-                      shape: RoundedRectangleBorder(
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? WebDesignTokens.primary.withValues(alpha: 0.12)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isActive
+                              ? WebDesignTokens.primary.withValues(alpha: 0.4)
+                              : Colors.transparent,
+                        ),
                       ),
-                    ),
-                    onPressed: () => context.go(svc['route']!),
-                    child: Text(
-                      svc['label']!,
-                      style: GoogleFonts.nunitoSans(
-                        fontSize: 12.5,
-                        fontWeight: isSpecial
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            btn['icon'] as IconData,
+                            size: 15,
+                            color: isActive
+                                ? WebDesignTokens.primaryDark
+                                : WebDesignTokens.slate600,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            btn['label'] as String,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 13,
+                              fontWeight: isActive
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
+                              color: isActive
+                                  ? WebDesignTokens.primaryDark
+                                  : WebDesignTokens.dark,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              );
+            }),
+
+            // Subtle divider between Site Navigation and Categories
+            Container(
+              height: 18,
+              width: 1.2,
+              margin: const EdgeInsets.only(left: 4, right: 8),
+              color: WebDesignTokens.border,
             ),
-          ),
-        ],
+
+            // 2. Department & Category Links
+            ...produceLinks.map((cat) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: WebDesignTokens.dark,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () => context.go(cat['route']!),
+                  child: Text(
+                    cat['label']!,
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

@@ -80,3 +80,7 @@ node_modules/
 
 # Service account keys / credentials
 *firebase-adminsdk*.json
+
+# Binaries and APK installers
+*.apk
+web/*.apk

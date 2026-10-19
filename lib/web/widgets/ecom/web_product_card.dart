@@ -148,6 +148,8 @@ class _WebProductCardState extends State<WebProductCard> {
                               ? CachedNetworkImage(
                                   imageUrl: widget.product.imageUrl,
                                   fit: BoxFit.cover,
+                                  memCacheWidth: 450,
+                                  maxWidthDiskCache: 600,
                                   errorWidget: (_, error, stackTrace) =>
                                       _buildPlaceholder(),
                                 )

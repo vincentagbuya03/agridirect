@@ -164,6 +164,7 @@ class _WebFarmerSpotlightCardState extends State<WebFarmerSpotlightCard> {
             ? CachedNetworkImage(
                 imageUrl: widget.avatarUrl!,
                 fit: BoxFit.cover,
+                memCacheWidth: 150,
                 placeholder: (context, url) => const Center(
                   child: SizedBox(
                     width: 20,
@@ -236,6 +237,7 @@ class _WebFarmerSpotlightCardState extends State<WebFarmerSpotlightCard> {
                         ? CachedNetworkImage(
                             imageUrl: widget.coverUrl!,
                             fit: BoxFit.cover,
+                            memCacheWidth: 600,
                             errorWidget: (context, url, error) => _buildDefaultBanner(),
                           )
                         : _buildDefaultBanner(),

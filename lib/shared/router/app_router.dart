@@ -396,6 +396,7 @@ GoRouter createAppRouter({String? initialRoute}) {
           if (!auth.isEmailVerified) {
             return null; // Stay on login or register to allow fresh start or resume
           }
+          if (isAdmin) return AppRoutes.admin;
           return AppRoutes.loading;
         }
 
@@ -914,11 +915,15 @@ GoRouter createAppRouter({String? initialRoute}) {
             final auth = AuthService();
 
             if (!isMobile) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
                 if (!context.mounted) return;
                 if (!auth.isLoggedIn) {
                   context.go(AppRoutes.marketplace);
                   return;
+                }
+                if (!auth.isInitialized || auth.isLoading) {
+                  await Future.delayed(const Duration(milliseconds: 300));
+                  if (!context.mounted) return;
                 }
                 if (auth.isAdmin) {
                   context.go(AppRoutes.admin);

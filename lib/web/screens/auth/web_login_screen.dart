@@ -110,13 +110,21 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           barrierDismissible: false,
           builder: (context) => const WebMfaChallengeDialog(),
         );
-        if (verified == true) {
-          widget.onLoginSuccess();
+        if (verified == true && mounted) {
+          if (auth.isAdmin) {
+            context.go(AppRoutes.admin);
+          } else {
+            widget.onLoginSuccess();
+          }
         }
       } else if (auth.needsProfileCompletion) {
         context.go(AppRoutes.completeProfile);
       } else {
-        widget.onLoginSuccess();
+        if (auth.isAdmin) {
+          context.go(AppRoutes.admin);
+        } else {
+          widget.onLoginSuccess();
+        }
       }
     } else if (!success) {
       _showLoginErrorDialog(auth.errorMessage ?? 'Login failed');
@@ -153,7 +161,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
 
       // Existing user - proceed with login
       if (success) {
-        widget.onLoginSuccess();
+        if (authService.isAdmin) {
+          context.go(AppRoutes.admin);
+        } else {
+          widget.onLoginSuccess();
+        }
       }
     }
   }

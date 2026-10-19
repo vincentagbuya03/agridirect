@@ -140,7 +140,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
         } else if (auth.needsProfileCompletion) {
           context.go(AppRoutes.completeProfile);
         } else {
-          widget.onLoginSuccess();
+          if (auth.isAdmin) {
+            context.go(AppRoutes.admin);
+          } else {
+            widget.onLoginSuccess();
+          }
         }
       } else {
         _showErrorModal(
@@ -171,7 +175,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
         if (AuthService().needsProfileCompletion) {
           context.go(AppRoutes.completeProfile);
         } else {
-          widget.onLoginSuccess();
+          if (AuthService().isAdmin) {
+            context.go(AppRoutes.admin);
+          } else {
+            widget.onLoginSuccess();
+          }
         }
       } else {
         _showErrorModal(

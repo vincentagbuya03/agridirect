@@ -622,9 +622,6 @@ class AuthService extends ChangeNotifier {
     if (user.emailConfirmedAt != null) {
       _requiresMfa = false;
       _isLoggedIn = true;
-      _isSeller = false;
-      _isViewingAsFarmer = false;
-      _isAdmin = false;
       _registrationStatus = null;
 
       // Use cached state first so offline startup still recognizes seller/admin.

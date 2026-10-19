@@ -356,193 +356,196 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             ),
           ),
 
-          // Aurora glow — ambient color blobs
+          // ─── Isolated Animated Hero Background ───
           Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: AuroraGlowPainter(
-                    animationValue: _waveController.value,
+            child: RepaintBoundary(
+              child: Stack(
+                children: [
+                  // Aurora glow — ambient color blobs
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: AuroraGlowPainter(
+                            animationValue: _waveController.value,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          // Hex pattern overlay
-          Positioned.fill(
-            child: CustomPaint(
-              painter: HexPatternPainter(opacity: 0.025, color: Colors.white),
-            ),
-          ),
-
-          // Ribbon curves
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: RibbonPainter(
-                    animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
-                    strokeWidth: 1.0,
+                  // Hex pattern overlay
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: HexPatternPainter(opacity: 0.025, color: Colors.white),
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          // Animated blobs
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: BlobPainter(
-                    animationValue: _waveController.value,
-                    color: AgriColors.emerald400.withValues(alpha: 0.08),
-                    center: const Offset(0.8, 0.3),
-                    radius: 280,
+                  // Ribbon curves
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: RibbonPainter(
+                            animationValue: _waveController.value,
+                            color: Colors.white.withValues(alpha: 0.04),
+                            strokeWidth: 1.0,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: BlobPainter(
-                    animationValue: 1 - _waveController.value,
-                    color: AgriColors.teal400.withValues(alpha: 0.06),
-                    center: const Offset(0.2, 0.7),
-                    radius: 220,
+                  // Animated blobs
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: BlobPainter(
+                            animationValue: _waveController.value,
+                            color: AgriColors.emerald400.withValues(alpha: 0.08),
+                            center: const Offset(0.8, 0.3),
+                            radius: 280,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          // Gold accent blob
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: BlobPainter(
-                    animationValue: _waveController.value * 0.7,
-                    color: AgriColors.gold400.withValues(alpha: 0.03),
-                    center: const Offset(0.9, 0.15),
-                    radius: 120,
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: BlobPainter(
+                            animationValue: 1 - _waveController.value,
+                            color: AgriColors.teal400.withValues(alpha: 0.06),
+                            center: const Offset(0.2, 0.7),
+                            radius: 220,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          // Floating particles — mixed green + gold
-          const Positioned.fill(
-            child: FloatingParticles(
-              count: 35,
-              maxSize: 3.5,
-              color: Color(0xFF34D399),
-              height: 640,
-            ),
-          ),
-          const Positioned.fill(
-            child: FloatingParticles(
-              count: 6,
-              maxSize: 2,
-              color: Color(0xFFFBBF24),
-              height: 640,
-            ),
-          ),
+                  // Gold accent blob
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: BlobPainter(
+                            animationValue: _waveController.value * 0.7,
+                            color: AgriColors.gold400.withValues(alpha: 0.03),
+                            center: const Offset(0.9, 0.15),
+                            radius: 120,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
-          // Animated waves at bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 120,
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: WavePainter(
-                    animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.06),
-                    amplitude: 25,
+                  // Floating particles — optimized count
+                  const Positioned.fill(
+                    child: FloatingParticles(
+                      count: 20,
+                      maxSize: 3.0,
+                      color: Color(0xFF34D399),
+                      height: 640,
+                    ),
                   ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 80,
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: WavePainter(
-                    animationValue: 1 - _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
-                    amplitude: 15,
+
+                  // Animated waves at bottom
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 120,
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: WavePainter(
+                            animationValue: _waveController.value,
+                            color: Colors.white.withValues(alpha: 0.06),
+                            amplitude: 25,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80,
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: WavePainter(
+                            animationValue: 1 - _waveController.value,
+                            color: Colors.white.withValues(alpha: 0.04),
+                            amplitude: 15,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
           // Content
           Center(
-            child: FadeTransition(
-              opacity: CurvedAnimation(
-                parent: _heroFadeCtrl,
-                curve: Curves.easeOut,
-              ),
-              child: SlideTransition(
-                position:
-                    Tween<Offset>(
-                      begin: const Offset(0, 0.08),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: _heroFadeCtrl,
-                        curve: Curves.easeOutCubic,
+            child: RepaintBoundary(
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: _heroFadeCtrl,
+                  curve: Curves.easeOut,
+                ),
+                child: SlideTransition(
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(0, 0.08),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _heroFadeCtrl,
+                          curve: Curves.easeOutCubic,
+                        ),
                       ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1300),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: sw < 480
+                            ? 16
+                            : sw < 768
+                            ? 24
+                            : sw * 0.06,
+                        vertical: sw < 480 ? 40 : 80,
+                      ),
+                      child: sw >= 900
+                          ? Row(
+                              children: [
+                                Expanded(child: _heroContent(sw)),
+                                const SizedBox(width: 60),
+                                _heroVisual(sw),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                _heroContent(sw),
+                                const SizedBox(height: 48),
+                                _heroVisual(sw),
+                              ],
+                            ),
                     ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1300),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: sw < 480
-                          ? 16
-                          : sw < 768
-                          ? 24
-                          : sw * 0.06,
-                      vertical: sw < 480 ? 40 : 80,
-                    ),
-                    child: sw >= 900
-                        ? Row(
-                            children: [
-                              Expanded(child: _heroContent(sw)),
-                              const SizedBox(width: 60),
-                              _heroVisual(sw),
-                            ],
-                          )
-                        : Column(
-                            children: [
-                              _heroContent(sw),
-                              const SizedBox(height: 48),
-                              _heroVisual(sw),
-                            ],
-                          ),
                   ),
                 ),
               ),
@@ -3754,11 +3757,12 @@ class _PulseDownloadButtonState extends State<_PulseDownloadButton>
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
+    return RepaintBoundary(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(
           scale: _isHovered ? 1.05 : _scaleAnimation.value,
@@ -3832,6 +3836,7 @@ class _PulseDownloadButtonState extends State<_PulseDownloadButton>
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ),

@@ -82,6 +82,10 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
       if (!mounted) return;
 
       debugPrint('OAuth callback: Redirecting to dashboard route...');
+      if (_auth.isAdmin) {
+        context.go(AppRoutes.admin);
+        return;
+      }
       final isFarmer = _auth.isViewingAsFarmer;
       context.go(isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace);
     } catch (e) {
