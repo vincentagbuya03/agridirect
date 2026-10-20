@@ -52,95 +52,11 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
     return '🌤️ Live Farm Weather Advice';
   }
 
-  // Categorized Discovery Prompts
-  List<Map<String, dynamic>> get _discoveryCategories {
-    final isFarmer = _auth.isViewingAsFarmer;
-    if (isFarmer) {
-      return [
-        {
-          'category': 'FARMING',
-          'icon': Icons.eco_rounded,
-          'color': const Color(0xFF059669),
-          'prompts': [
-            _weatherPromptLabel,
-            '🌾 Paano mag-list at mag-presyo ng bagong ani?',
-            '🌱 Kailan ang tamang planting window para sa kamatis?',
-            '🐛 Paano puksain ang uod at pests gamit ang organic spray?',
-          ],
-        },
-        {
-          'category': 'SALES & ORDERS',
-          'icon': Icons.receipt_long_rounded,
-          'color': const Color(0xFF2563EB),
-          'prompts': [
-            '📊 Paano tingnan ang aking daily at monthly sales?',
-            '📦 Paano gumagana ang pre-orders at harvest milestones?',
-            '🎟️ Paano gumawa ng shop discount vouchers?',
-          ],
-        },
-      ];
-    } else {
-      return [
-        {
-          'category': 'SHOPPING',
-          'icon': Icons.shopping_basket_rounded,
-          'color': const Color(0xFF059669),
-          'prompts': [
-            '🛒 Paano mag-order ng sariwang gulay direkta sa magsasaka?',
-            '🎟️ Paano mag-claim ng exclusive discount vouchers?',
-            '🌾 Paano mag-preorder ng paparating na ani?',
-            '🥬 Paano tamang pag-imbak ng leafy greens para tumagal?',
-          ],
-        },
-        {
-          'category': 'PAYMENT & TRACKING',
-          'icon': Icons.payments_rounded,
-          'color': const Color(0xFF7C3AED),
-          'prompts': [
-            '💳 Ano ang mga supported payment methods (COD/COP)?',
-            '📍 Paano i-track ang status ng aking order?',
-            '🎧 Paano kumontak sa direct customer support?',
-          ],
-        },
-      ];
-    }
-  }
 
   @override
   void initState() {
     super.initState();
-    final nowStr = DateFormat('h:mm a').format(DateTime.now());
-    final isFarmer = _auth.isViewingAsFarmer;
-
-    _messages = [
-      {
-        'isUser': false,
-        'text': isFarmer
-            ? 'Moo! 🌾 Mabuhay! Ako si **Kiko**, ang inyong opisyal na AgriDirect Carabao AI Advisor 🐮.\n\n'
-                'Handa akong tumulong sa:\n'
-                '• **Pest & Crop Diagnosis**: Mag-upload ng photo ng dahon o pananim gamit ang camera icon 📷.\n'
-                '• **Real-Time Weather Advice**: Tamang pataba, irrigation schedule, at dynamic weather alerts para sa San Carlos City.\n'
-                '• **Marketplace & Sales**: Pag-presyo ng ani, pre-orders, at shop promotions.'
-            : 'Moo! 🛒 Hello! Ako si **Kiko**, ang inyong official AgriDirect AI Assistant 🐮.\n\n'
-                'Maaari mo akong tanungin tungkol sa:\n'
-                '• Pag-order ng sariwang ani direkta sa local farmers 🥬.\n'
-                '• Pag-preorder ng paparating na harvest 🌾.\n'
-                '• Tips sa pag-imbak at pagluluto ng sariwang gulay at prutas!',
-        'time': nowStr,
-        'followUps': isFarmer
-            ? <String>[
-                '🌾 Paano mag-presyo ng ani?',
-                '📷 I-diagnose ang pananim ko',
-                '🌤️ Live Farm Weather Advice',
-              ]
-            : <String>[
-                '🛒 Paano mag-order?',
-                '🎟️ Vouchers & Discounts',
-                '📍 Paano mag-track ng order?',
-              ],
-      },
-    ];
-
+    _messages = [];
     _fetchLiveWeather();
   }
 
@@ -505,13 +421,16 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                             controller: _scrollController,
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                            itemCount: _messages.length + (_isTyping ? 1 : 0),
+                            itemCount: _messages.length + 1 + (_isTyping ? 1 : 0),
                             itemBuilder: (context, index) {
-                              if (index == _messages.length && _isTyping) {
+                              if (index == 0) {
+                                return _buildMigooHeroHeader();
+                              }
+                              if (index == _messages.length + 1 && _isTyping) {
                                 return _buildTypingIndicator();
                               }
 
-                              final msg = _messages[index];
+                              final msg = _messages[index - 1];
                               final bool isUser = msg['isUser'] as bool;
                               final followUps = msg['followUps'] as List<String>?;
                               final imageBytes = msg['imageBytes'] as Uint8List?;
@@ -527,7 +446,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                           ),
                         ),
                         if (_selectedImageBytes != null) _buildImagePreviewBar(),
-                        if (!_isTyping && _selectedImageBytes == null) _buildTopicCarousel(),
+                        if (!_isTyping && _selectedImageBytes == null) _buildCategoryShortcutBar(),
                         _buildInputComposer(),
                       ],
                     ),
@@ -541,7 +460,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: widget.embedMode ? null : _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -553,14 +472,17 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
               child: ListView.builder(
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                itemCount: _messages.length + (_isTyping ? 1 : 0),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                itemCount: _messages.length + 1 + (_isTyping ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (index == _messages.length && _isTyping) {
+                  if (index == 0) {
+                    return _buildMigooHeroHeader();
+                  }
+                  if (index == _messages.length + 1 && _isTyping) {
                     return _buildTypingIndicator();
                   }
 
-                  final msg = _messages[index];
+                  final msg = _messages[index - 1];
                   final bool isUser = msg['isUser'] as bool;
                   final followUps = msg['followUps'] as List<String>?;
                   final imageBytes = msg['imageBytes'] as Uint8List?;
@@ -579,10 +501,10 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
             // Image Preview Badge (if photo is selected)
             if (_selectedImageBytes != null) _buildImagePreviewBar(),
 
-            // Discovery Topic Horizontal Carousel (if not typing)
-            if (!_isTyping && _selectedImageBytes == null) _buildTopicCarousel(),
+            // Category shortcut bar (Shopping, Voucher, Inbox, Deals)
+            if (!_isTyping && _selectedImageBytes == null) _buildCategoryShortcutBar(),
 
-            // Message Input Bar
+            // Message Input Bar (Capsule)
             _buildInputComposer(),
           ],
         ),
@@ -591,103 +513,44 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 1. APP BAR & EMBED HEADER
+  // 1. APP BAR & EMBED HEADER (MIGOO MINIMALIST STYLE)
   // ===========================================================================
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(color: const Color(0xFFE2E8F0), height: 1),
-      ),
+      scrolledUnderElevation: 0,
       leading: IconButton(
         icon: const Icon(
-          Icons.arrow_back_ios_new_rounded,
-          color: Color(0xFF0F172A),
-          size: 18,
+          Icons.person_outline_rounded,
+          color: Color(0xFF1F2937),
+          size: 24,
         ),
-        onPressed: () => Navigator.pop(context),
+        tooltip: 'Profile',
+        onPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        },
       ),
-      title: Row(
+      centerTitle: true,
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Dynamic Kiko Avatar
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFECFDF5),
-              border: Border.all(
-                color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                _currentKikoMood,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.smart_toy_rounded,
-                  color: Color(0xFF059669),
-                  size: 20,
-                ),
-              ),
+          Text(
+            'Kiko',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              color: const Color(0xFF111827),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Kiko AI Carabao',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: const Color(0xFF0F172A),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)],
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'AI PRO',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  _isTyping
-                      ? 'Analyzing with AI…'
-                      : (_currentWeather != null
-                          ? 'San Carlos • ${_currentWeather!.temperature.toStringAsFixed(0)}°C ${_currentWeather!.description}'
-                          : 'Online • Agricultural & Market Advisor'),
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: _isTyping ? const Color(0xFFD97706) : const Color(0xFF059669),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          Text(
+            'Generated by AI',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF9CA3AF),
             ),
           ),
         ],
@@ -695,28 +558,12 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
       actions: [
         IconButton(
           icon: const Icon(
-            Icons.refresh_rounded,
-            color: Color(0xFF64748B),
-            size: 20,
+            Icons.description_outlined,
+            color: Color(0xFF1F2937),
+            size: 22,
           ),
-          tooltip: 'Reset Chat',
-          onPressed: () {
-            setState(() {
-              _messages.clear();
-              final nowStr = DateFormat('h:mm a').format(DateTime.now());
-              _messages.add({
-                'isUser': false,
-                'text':
-                    'Moo! 🌾 Chat reset. Paano kita matutulungan sa inyong sakahan o pamimili ngayon?',
-                'time': nowStr,
-                'followUps': <String>[
-                  _weatherPromptLabel,
-                  '🌾 Crop care guide',
-                  '📷 I-diagnose ang pananim',
-                ],
-              });
-            });
-          },
+          tooltip: 'Options & Topics',
+          onPressed: _showChatOptionsSheet,
         ),
       ],
     );
@@ -724,28 +571,45 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
 
   Widget _buildEmbedHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
+            padding: const EdgeInsets.all(2),
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFFECFDF5),
+              gradient: SweepGradient(
+                colors: [
+                  Color(0xFFE11D48),
+                  Color(0xFF9333EA),
+                  Color(0xFF0284C7),
+                  Color(0xFF06B6D4),
+                  Color(0xFFF59E0B),
+                  Color(0xFFE11D48),
+                ],
+              ),
             ),
-            child: ClipOval(
-              child: Image.asset(
-                _currentKikoMood,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.smart_toy_rounded,
-                  color: Color(0xFF059669),
-                  size: 20,
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: ClipOval(
+                child: Image.asset(
+                  _currentKikoMood,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.smart_toy_rounded,
+                    color: Color(0xFF059669),
+                    size: 18,
+                  ),
                 ),
               ),
             ),
@@ -755,48 +619,28 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Kiko AI Carabao',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: const Color(0xFF0F172A),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'AI',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Kiko',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: const Color(0xFF111827),
+                  ),
                 ),
                 Text(
-                  'Online 24/7 • Agri-Advisory',
+                  'Generated by AI',
                   style: GoogleFonts.inter(
                     fontSize: 11,
-                    color: const Color(0xFF059669),
-                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF9CA3AF),
                   ),
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.description_outlined, size: 20, color: Color(0xFF1F2937)),
+            tooltip: 'Options',
+            onPressed: _showChatOptionsSheet,
           ),
           if (widget.onExpand != null)
             IconButton(
@@ -819,37 +663,50 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
 
   Widget _buildWebChatHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
+            width: 42,
+            height: 42,
+            padding: const EdgeInsets.all(2.5),
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFECFDF5),
-              border: Border.all(
-                color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                width: 2,
+              gradient: SweepGradient(
+                colors: [
+                  Color(0xFFE11D48),
+                  Color(0xFF9333EA),
+                  Color(0xFF0284C7),
+                  Color(0xFF06B6D4),
+                  Color(0xFFF59E0B),
+                  Color(0xFFE11D48),
+                ],
               ),
             ),
-            child: ClipOval(
-              child: Image.asset(
-                _currentKikoMood,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.smart_toy_rounded,
-                  color: Color(0xFF059669),
-                  size: 24,
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: ClipOval(
+                child: Image.asset(
+                  _currentKikoMood,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.smart_toy_rounded,
+                    color: Color(0xFF059669),
+                    size: 22,
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -857,96 +714,46 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                 Row(
                   children: [
                     Text(
-                      'Kiko AI Carabao',
+                      'Kiko',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
-                        color: const Color(0xFF0F172A),
+                        color: const Color(0xFF111827),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)],
-                        ),
-                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Text(
-                        'AI PRO ADVISOR',
+                        'AI',
                         style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF4B5563),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _isTyping ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        _isTyping
-                            ? 'Analyzing with Agri-Intelligence…'
-                            : (_currentWeather != null
-                                ? 'San Carlos • ${_currentWeather!.temperature.toStringAsFixed(0)}°C ${_currentWeather!.description} • Online'
-                                : 'Online • Agricultural & Marketplace Intelligence'),
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: _isTyping ? const Color(0xFFD97706) : const Color(0xFF059669),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Generated by AI • AgriDirect Assistant',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: const Color(0xFF9CA3AF),
+                  ),
                 ),
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(() {
-                _messages.clear();
-                final nowStr = DateFormat('h:mm a').format(DateTime.now());
-                _messages.add({
-                  'isUser': false,
-                  'text':
-                      'Moo! 🌾 Chat reset. Paano kita matutulungan sa inyong sakahan o pamimili ngayon?',
-                  'time': nowStr,
-                  'followUps': <String>[
-                    _weatherPromptLabel,
-                    '🌾 Crop care guide',
-                    '📷 I-diagnose ang pananim',
-                  ],
-                });
-              });
-            },
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: Text(
-              'Reset Chat',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF64748B),
-              side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
+          IconButton(
+            icon: const Icon(Icons.description_outlined, color: Color(0xFF1F2937), size: 22),
+            tooltip: 'Options',
+            onPressed: _showChatOptionsSheet,
           ),
         ],
       ),
@@ -1512,48 +1319,203 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 5. TOPIC DISCOVERY CAROUSEL
+  // 5. MIGOO HERO HEADER, SUGGESTION PILLS & SHORTCUTS
   // ===========================================================================
-  Widget _buildTopicCarousel() {
-    final categories = _discoveryCategories;
+  List<String> get _migooSuggestionPrompts {
+    final isFarmer = _auth.isViewingAsFarmer;
+    if (isFarmer) {
+      return [
+        _weatherPromptLabel,
+        '🌾 Gabay sa pagpepresyo ng ani',
+        '🌱 Tamang planting window ng kamatis',
+        '🐛 Pest and disease diagnosis guide',
+        '📦 Paano gumagana ang pre-orders',
+      ];
+    }
+    return [
+      'Find best deals',
+      'Snacks worth trying & fresh harvest',
+      'Trending in organic produce',
+      'Sun protection & farmer tools',
+      'Useful kitchen storage tips',
+    ];
+  }
+
+  Widget _buildMigooHeroHeader() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 10),
+          // Iridescent Mascot Avatar Halo (Migoo Style)
+          Center(
+            child: Container(
+              width: 86,
+              height: 86,
+              padding: const EdgeInsets.all(3.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const SweepGradient(
+                  colors: [
+                    Color(0xFFE11D48), // Rose / Magenta
+                    Color(0xFF9333EA), // Purple
+                    Color(0xFF0284C7), // Blue
+                    Color(0xFF06B6D4), // Cyan
+                    Color(0xFFF59E0B), // Warm Amber
+                    Color(0xFFE11D48), // Wrap
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.22),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+                padding: const EdgeInsets.all(4),
+                child: ClipOval(
+                  child: Image.asset(
+                    _currentKikoMood,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.smart_toy_rounded,
+                      color: Color(0xFF059669),
+                      size: 38,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Welcome Message Bubble
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              "Hi, I'm Kiko, your AgriDirect AI assistant. Tell me what you need, and I'll find reliable options, compare what matters, and help you choose what fits you best.",
+              style: GoogleFonts.inter(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF1F2937),
+                height: 1.45,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Staggered Suggestion Chips
+          _buildSuggestionPills(),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionPills() {
+    final prompts = _migooSuggestionPrompts;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: prompts.map((prompt) {
+          return Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: () => _sendMessage(prompt),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Text(
+                  prompt,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCategoryShortcutBar() {
+    final isFarmer = _auth.isViewingAsFarmer;
+    final shortcuts = isFarmer
+        ? [
+            {'icon': Icons.eco_rounded, 'label': 'Farming', 'prompt': '🌾 Paano mag-list ng sariwang ani?'},
+            {'icon': Icons.wb_sunny_rounded, 'label': 'Weather', 'prompt': _weatherPromptLabel},
+            {'icon': Icons.receipt_long_rounded, 'label': 'Sales', 'prompt': '📊 Paano tingnan ang aking sales?'},
+            {'icon': Icons.discount_rounded, 'label': 'Voucher', 'prompt': '🎟️ Paano gumawa ng shop vouchers?'},
+          ]
+        : [
+            {'icon': Icons.shopping_bag_outlined, 'label': 'Shopping', 'prompt': '🛒 Paano mag-order ng sariwang ani?'},
+            {'icon': Icons.confirmation_number_outlined, 'label': 'Voucher', 'prompt': '🎟️ Paano mag-claim ng exclusive discount vouchers?'},
+            {'icon': Icons.inbox_outlined, 'label': 'Inbox', 'prompt': '📍 Paano i-track ang status ng aking order?'},
+            {'icon': Icons.local_offer_outlined, 'label': 'Deals', 'prompt': 'Find best deals'},
+          ];
 
     return Container(
       height: 38,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView.builder(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
-        itemCount: categories.expand((c) => c['prompts'] as List<String>).length,
+        itemCount: shortcuts.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, idx) {
-          final allPrompts =
-              categories.expand((c) => c['prompts'] as List<String>).toList();
-          final prompt = allPrompts[idx];
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: () => _sendMessage(prompt),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Text(
-                    prompt,
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF334155),
+          final item = shortcuts[idx];
+          return Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: () => _sendMessage(item['prompt'] as String),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(item['icon'] as IconData, size: 16, color: const Color(0xFF374151)),
+                    const SizedBox(width: 6),
+                    Text(
+                      item['label'] as String,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF1F2937),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -1564,125 +1526,278 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 6. INPUT COMPOSER
+  // 6. CAPSULE INPUT COMPOSER (MIGOO STYLE)
   // ===========================================================================
   Widget _buildInputComposer() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Camera / Gallery Image Attachment Button
-          PopupMenuButton<ImageSource>(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-              ),
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                color: Color(0xFF059669),
-                size: 19,
-              ),
-            ),
-            tooltip: 'Diagnose Crop / Leaf Photo',
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            onSelected: _pickImage,
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: ImageSource.camera,
-                child: Row(
-                  children: [
-                    const Icon(Icons.photo_camera_rounded, color: Color(0xFF059669), size: 20),
-                    const SizedBox(width: 10),
-                    Text('Take Photo (Camera)', style: GoogleFonts.inter(fontSize: 13)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: ImageSource.gallery,
-                child: Row(
-                  children: [
-                    const Icon(Icons.photo_library_rounded, color: Color(0xFF2563EB), size: 20),
-                    const SizedBox(width: 10),
-                    Text('Choose from Gallery', style: GoogleFonts.inter(fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 6),
+    final hasText = _messageController.text.trim().isNotEmpty || _selectedImageBytes != null;
 
-          // Text Field
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+      color: Colors.white,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Row(
+          children: [
+            // + Attachment Action (Camera / Gallery for Crop Diagnosis)
+            IconButton(
+              icon: const Icon(Icons.add_rounded, color: Color(0xFF1F2937), size: 24),
+              tooltip: 'Attach photo for diagnosis',
+              onPressed: _showAttachmentSheet,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+            const SizedBox(width: 4),
+
+            // Text Input Field
+            Expanded(
               child: TextField(
                 controller: _messageController,
                 textInputAction: TextInputAction.send,
+                onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _sendMessage(),
                 style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  color: const Color(0xFF0F172A),
+                  fontSize: 14,
+                  color: const Color(0xFF111827),
                 ),
                 decoration: InputDecoration(
-                  hintText: _selectedImageBytes != null
-                      ? 'Add question about this photo (optional)…'
-                      : 'Ask Kiko anything (Farming, Weather, Orders)…',
+                  hintText: 'Anything on your mind?',
                   hintStyle: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: const Color(0xFF94A3B8),
+                    fontSize: 14,
+                    color: const Color(0xFF9CA3AF),
                   ),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
 
-          // Send Button
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF059669), Color(0xFF047857)],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _sendMessage(),
-                borderRadius: BorderRadius.circular(22),
-                child: const Icon(
-                  Icons.send_rounded,
-                  color: Colors.white,
-                  size: 19,
+            // Trailing Mic or Send Action
+            if (hasText)
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF059669),
+                  shape: BoxShape.circle,
                 ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 19),
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _sendMessage(),
+                ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.mic_none_rounded, color: Color(0xFF1F2937), size: 22),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Voice input is coming soon! You can type in the box.',
+                        style: GoogleFonts.inter(fontSize: 13),
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 7. BOTTOM SHEETS (ATTACHMENT & CHAT OPTIONS)
+  // ===========================================================================
+  void _showAttachmentSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Crop & Leaf Diagnosis',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Upload a clear photo of your plant or crop to identify diseases',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.photo_camera_rounded, color: Color(0xFF059669)),
+                  ),
+                  title: Text(
+                    'Take Photo (Camera)',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    'Snap a live photo of the leaf or harvest',
+                    style: GoogleFonts.inter(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.photo_library_rounded, color: Color(0xFF2563EB)),
+                  ),
+                  title: Text(
+                    'Choose from Gallery',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    'Pick an existing photo from your device',
+                    style: GoogleFonts.inter(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
             ),
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  void _showChatOptionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Chat Options',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.refresh_rounded, color: Color(0xFFEF4444)),
+                  ),
+                  title: Text(
+                    'Reset Conversation',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    'Clear active messages and return to fresh start',
+                    style: GoogleFonts.inter(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _messages.clear();
+                      _selectedImageBytes = null;
+                      _selectedImageName = null;
+                    });
+                  },
+                ),
+                if (_currentWeather != null)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.wb_sunny_rounded, color: Color(0xFFD97706)),
+                    ),
+                    title: Text(
+                      'Live Weather: ${_currentWeather!.temperature.toStringAsFixed(0)}°C',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      'San Carlos City • ${_currentWeather!.description}',
+                      style: GoogleFonts.inter(fontSize: 12),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _sendMessage(_weatherPromptLabel);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
